@@ -1,7 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { SoilTestRecord } from '../database/datastorage';
-import { User } from '../store/authStore';
+import { User } from '../services/auth';
 
 export async function exportSoilReport(tests: SoilTestRecord[], user: User) {
   const html = generateReportHTML(tests, user);

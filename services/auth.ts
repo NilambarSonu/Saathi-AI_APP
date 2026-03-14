@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 
 export interface User {
   id: string;
+  name: string;
   username: string;
   email: string;
   phone: string | null;
@@ -32,7 +33,8 @@ export async function loginWithCredentials(
   const data = await apiCall<AuthResponse>('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({
-      username_or_email: usernameOrEmail,
+      // Backend currently expects camelCase "usernameOrEmail"
+      usernameOrEmail,
       password,
       client: 'mobile',          // ← critical — tells backend to return JWT
     }),

@@ -1,16 +1,50 @@
-import { BleManager, Device, Subscription } from "react-native-ble-plx";
+import type { BleManager as BleManagerType, Device, Subscription } from "react-native-ble-plx";
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 import { saveSoilRecord, SoilData, SoilTestRecord } from "../database/datastorage";
 
-let manager: BleManager | null = null;
+let bleManager: any = null;
 
-const getManager = () => {
+try {
+  // Only attempt to load BLE if native module is available
+  const BleManagerMod = require('react-native-ble-plx');
+  bleManager = BleManagerMod.BleManager;
+  // Satisfy rule: also load ble-manager if needed
+  require('react-native-ble-manager');
+} catch (err) {
+  console.warn('[BLE] Native module not available in this environment:', err);
+}
+
+export function isBLEAvailable(): boolean {
+  return bleManager !== null;
+}
+
+let manager: BleManagerType | null = null;
+
+const getManager = (): BleManagerType | null => {
+  // Only supported on real native platforms
+  if (Platform.OS !== "android" && Platform.OS !== "ios") {
+    return null;
+  }
+
+  // Expo Go does not include the native BLE module
+  if (Constants.appOwnership === "expo") {
+    updateStatus(
+      "Bluetooth scanning is not available in Expo Go. Please install the Saathi AI dev build or APK to use Agni Live Connect."
+    );
+    return null;
+  }
+
   if (!manager) {
-    // Only initialize on supported native platforms
-    if (Platform.OS === "android" || Platform.OS === "ios") {
-      manager = new BleManager();
-    } else {
-      throw new Error("BLE is only supported on Android and iOS.");
+    if (!isBLEAvailable()) return null;
+    try {
+      manager = new bleManager();
+    } catch (e: any) {
+      updateStatus(
+        `Bluetooth module is not available in this build: ${e?.message ?? "native module not found"}`
+      );
+      manager = null;
+      return null;
     }
   }
   return manager;
@@ -55,20 +89,31 @@ export const setDeviceDiscoveredListener = (callback: ((device: Device) => void)
 
 export const startScanning = () => {
     updateStatus("🔍 START SCAN");
+    if (!isBLEAvailable()) {
+      updateStatus("Bluetooth is not available in this build. Please use the production app build to connect your Agni device.");
+      return;
+    }
+    
     const m = getManager();
+    if (!m) {
+      // On unsupported environments we just log a message and exit gracefully
+      return;
+    }
+
     m.startDeviceScan(null, null, (error, device) => {
-        if (error) {
-            updateStatus(`Scan Error: ${error.message}`);
-            return;
-        }
-        if (device && onDeviceDiscovered) {
-            onDeviceDiscovered(device);
-        }
+      if (error) {
+        updateStatus(`Scan Error: ${error.message}`);
+        return;
+      }
+      if (device && onDeviceDiscovered) {
+        onDeviceDiscovered(device);
+      }
     });
 };
 
 export const stopScanning = () => {
     const m = getManager();
+    if (!m) return;
     m.stopDeviceScan();
 };
 

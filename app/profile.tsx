@@ -76,21 +76,22 @@ export default function ProfileScreen() {
 
       <View style={styles.content}>
         {/* Subscription Upgrade Card */}
-        <Pressable style={styles.proCard}>
-          <View style={styles.proCardContent}>
-            <Text style={styles.proTitle}>Saathi AI Pro ⚡</Text>
-            <Text style={styles.proSubtitle}>Get unlimited soil tests, API access, and priority AI analysis.</Text>
-            <View style={styles.upgradeBtn}>
-              <Text style={styles.upgradeBtnText}>Upgrade Plan</Text>
-            </View>
+        <Pressable style={styles.proBannerCard} onPress={() => router.push('/(app)/subscribe' as any)}>
+          {/* Subtle background watermark */}
+          <View style={styles.proBannerIconWrap}>
+            <Text style={{ fontSize: 80, lineHeight: 80 }}>👑</Text>
           </View>
-          <View style={styles.proAnimation}>
-            <LottieView
-              source={require('../animations/Order-now.json')}
-              autoPlay
-              loop
-              style={{ width: 100, height: 100 }}
-            />
+
+          {/* Left content */}
+          <View style={{ flex: 1, zIndex: 2 }}>
+            <Text style={styles.proBannerLabel}>UPGRADE TO</Text>
+            <Text style={styles.proBannerTitle}>Saathi AI Pro</Text>
+            <Text style={styles.proBannerSub}>Unlimited tests · All languages · PDF export</Text>
+          </View>
+
+          {/* CTA button */}
+          <View style={styles.proBannerBtn}>
+            <Text style={styles.proBannerBtnText}>Upgrade</Text>
           </View>
         </Pressable>
 
@@ -158,21 +159,13 @@ const styles = StyleSheet.create({
 
   content: { paddingTop: 120, paddingHorizontal: Spacing.xl },
 
-  proCard: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF8E1',
-    borderRadius: Spacing.radius.xl,
-    padding: Spacing.lg,
-    marginBottom: Spacing.xl,
-    borderWidth: 1, borderColor: '#FFE082',
-    overflow: 'hidden',
-  },
-  proCardContent: { flex: 1, zIndex: 10 },
-  proTitle: { fontFamily: 'Sora_800ExtraBold', fontSize: 16, color: '#F57F17', marginBottom: 4 },
-  proSubtitle: { fontFamily: 'Sora_400Regular', fontSize: 12, color: Colors.textSecondary, lineHeight: 18, marginBottom: Spacing.md },
-  upgradeBtn: { backgroundColor: '#F57F17', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  upgradeBtnText: { fontFamily: 'Sora_600SemiBold', fontSize: 12, color: '#FFF' },
-  proAnimation: { position: 'absolute', right: -10, top: -10, opacity: 0.9 },
+  proBannerCard: { backgroundColor: '#1A7B3C', borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', marginBottom: 16, gap: 12 },
+  proBannerIconWrap: { position: 'absolute', right: -12, top: -12, opacity: 0.12 },
+  proBannerLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 10, color: 'rgba(255,255,255,0.7)', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 2 },
+  proBannerTitle: { fontFamily: 'Sora_800ExtraBold', fontSize: 18, color: '#fff' },
+  proBannerSub: { fontFamily: 'Sora_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 3 },
+  proBannerBtn: { backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 },
+  proBannerBtnText: { fontFamily: 'Sora_700Bold', fontSize: 12, color: '#fff' },
 
   section: { marginBottom: Spacing.xl },
   sectionTitle: { fontFamily: 'Sora_700Bold', fontSize: 15, color: Colors.textPrimary, marginBottom: Spacing.md, marginLeft: 4 },

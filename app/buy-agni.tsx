@@ -29,7 +29,7 @@ export default function BuyAgniScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
-  const PRICE_PER_UNIT = 8999;
+  const PRICE_PER_UNIT = 4699;
   const SHIPPING = 150;
   
   const handlePurchase = async () => {
@@ -73,19 +73,48 @@ export default function BuyAgniScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.productImageContainer}>
-        {/* Placeholder for real hardware image */}
-        <View style={styles.imagePlaceholder}>
-          <Ionicons name="hardware-chip-outline" size={80} color={Colors.primary} />
-          <Text style={styles.imageText}>AGNI V1.0</Text>
+      <View style={styles.deviceCard}>
+        {/* Top: product label */}
+        <View style={styles.deviceBadgeRow}>
+          <View style={styles.deviceBadge}>
+            <Text style={styles.deviceBadgeText}>AGNI SOIL SENSOR</Text>
+          </View>
+          <View style={[styles.deviceBadge, { backgroundColor: '#E8F5E9' }]}>
+            <Text style={[styles.deviceBadgeText, { color: '#1A7B3C' }]}>V2.0</Text>
+          </View>
+        </View>
+        
+        {/* Center: device illustration using text/emoji composition */}
+        <View style={styles.deviceIllustration}>
+          <Text style={{ fontSize: 72, textAlign: 'center' }}>🌱</Text>
+          <Text style={styles.deviceIllustrationSub}>Agni Smart Soil Sensor</Text>
+          <Text style={styles.deviceIllustrationSpec}>14 Parameters · Bluetooth 5.0 · Offline-First</Text>
+        </View>
+
+        {/* Bottom: key specs chips */}
+        <View style={styles.specsRow}>
+          <View style={styles.specChip}><Text style={styles.specChipText}>⚡ &lt; 60 seconds</Text></View>
+          <View style={styles.specChip}><Text style={styles.specChipText}>📡 BT 5.0</Text></View>
+          <View style={styles.specChip}><Text style={styles.specChipText}>🔋 30 days</Text></View>
         </View>
       </View>
 
       <Text style={styles.title}>Agni Soil Sensor</Text>
-      <View style={styles.priceRow}>
-        <Text style={styles.price}>₹8,999</Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>In Stock</Text>
+      <View style={styles.priceBlock}>
+        {/* Limited time badge */}
+        <View style={styles.limitedBadge}>
+          <Text style={styles.limitedBadgeText}>⚡ Limited Time Offer!</Text>
+        </View>
+
+        <View style={styles.priceRow}>
+          {/* Current price */}
+          <Text style={styles.currentPrice}>₹4,699</Text>
+          {/* Original price with strikethrough */}
+          <Text style={styles.originalPrice}>₹5,999</Text>
+          {/* Discount badge */}
+          <View style={styles.discountBadge}>
+            <Text style={styles.discountText}>22% off</Text>
+          </View>
         </View>
       </View>
       
@@ -152,7 +181,7 @@ export default function BuyAgniScreen() {
           disabled={isProcessing}
         >
           <Text style={styles.checkoutBtnText}>
-            {isProcessing ? 'Processing Secure Payment...' : 'Buy Now'}
+            {isProcessing ? 'Processing Secure Payment...' : '🛒 Buy Now — ₹4,699'}
           </Text>
         </Pressable>
         <Text style={styles.guaranteeText}>
@@ -171,24 +200,29 @@ const styles = StyleSheet.create({
   header: { marginBottom: Spacing.md },
   backBtn: { padding: 4, marginLeft: -4 },
   
-  productImageContainer: {
-    width: '100%',
-    height: 240,
-    backgroundColor: '#E8F7ED',
-    borderRadius: Spacing.radius.xl,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-  },
-  imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  imageText: { fontFamily: 'Sora_700Bold', fontSize: 20, color: Colors.primary, marginTop: Spacing.md, letterSpacing: 2 },
-
-  title: { fontFamily: 'Sora_800ExtraBold', fontSize: 26, color: Colors.textPrimary, marginBottom: 4 },
+  title: { fontFamily: 'Sora_800ExtraBold', fontSize: 26, color: Colors.textPrimary, marginBottom: 4, marginTop: 16 },
   
-  priceRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md },
-  price: { fontFamily: 'Sora_700Bold', fontSize: 22, color: Colors.primary, marginRight: Spacing.md },
+  priceBlock: { backgroundColor: '#F0FBF4', borderWidth: 1.5, borderColor: '#C8E6D0', borderRadius: 16, padding: 16, marginVertical: 16 },
+  limitedBadge: { marginBottom: 8 },
+  limitedBadgeText: { fontFamily: 'Sora_600SemiBold', fontSize: 11, color: '#1A7B3C' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  currentPrice: { fontFamily: 'Sora_800ExtraBold', fontSize: 32, color: '#1A7B3C' },
+  originalPrice: { fontFamily: 'Sora_500Medium', fontSize: 16, color: '#6B8A72', textDecorationLine: 'line-through' },
+  discountBadge: { backgroundColor: '#E8F5E9', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  discountText: { fontFamily: 'Sora_700Bold', fontSize: 11, color: '#1A7B3C' },
   badge: { backgroundColor: '#E8F5E9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   badgeText: { fontFamily: 'Sora_600SemiBold', fontSize: 11, color: Colors.primaryDark },
+
+  deviceCard: { backgroundColor: '#F4FBF6', borderRadius: 20, padding: 20, marginVertical: 16 },
+  deviceBadgeRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  deviceBadge: { backgroundColor: '#1A7B3C', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  deviceBadgeText: { fontFamily: 'Sora_700Bold', fontSize: 10, color: '#fff', letterSpacing: 0.5 },
+  deviceIllustration: { alignItems: 'center', paddingVertical: 12 },
+  deviceIllustrationSub: { fontFamily: 'Sora_700Bold', fontSize: 16, color: '#1A2E1E', marginTop: 8 },
+  deviceIllustrationSpec: { fontFamily: 'Sora_400Regular', fontSize: 12, color: '#6B8A72', marginTop: 4, textAlign: 'center' },
+  specsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 12, justifyContent: 'center' },
+  specChip: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#C8E6D0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
+  specChipText: { fontFamily: 'Sora_600SemiBold', fontSize: 11, color: '#1A7B3C' },
   
   description: { fontFamily: 'Sora_400Regular', fontSize: 14, color: Colors.textSecondary, lineHeight: 22, marginBottom: Spacing.xl },
 
@@ -219,18 +253,21 @@ const styles = StyleSheet.create({
   totalText: { fontFamily: 'Sora_700Bold', fontSize: 16, color: Colors.textPrimary },
   totalValue: { fontFamily: 'Sora_800ExtraBold', fontSize: 18, color: Colors.primary },
 
-  checkoutBtn: {
-    width: '100%',
-    height: 56,
-    backgroundColor: Colors.primary,
-    borderRadius: Spacing.radius.lg,
+  checkoutBtn: { 
+    backgroundColor: '#E65100',   // deep orange
+    height: 56, 
+    borderRadius: 18, 
+    alignItems: 'center', 
     justifyContent: 'center',
-    alignItems: 'center',
-    ...Spacing.shadows.sm,
+    shadowColor: '#E65100',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
     marginTop: Spacing.xl,
     marginBottom: Spacing.md
   },
-  checkoutBtnText: { fontFamily: 'Sora_700Bold', fontSize: 16, color: '#FFF' },
+  checkoutBtnText: { fontFamily: 'Sora_800ExtraBold', fontSize: 16, color: '#fff' },
   guaranteeText: { fontFamily: 'Sora_600SemiBold', fontSize: 10, color: Colors.textMuted, textAlign: 'center' }
 
 });

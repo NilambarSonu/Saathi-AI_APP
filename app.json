@@ -28,6 +28,7 @@
         "BLUETOOTH_ADMIN",
         "BLUETOOTH_SCAN",
         "BLUETOOTH_CONNECT",
+        "BLUETOOTH_ADVERTISE",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "RECORD_AUDIO",
@@ -46,7 +47,8 @@
         {
           "locationWhenInUsePermission": "Allow Saathi AI to use your location for field mapping."
         }
-      ]
+      ],
+      "react-native-ble-manager"
     ],
     "extra": {
       "router": {},

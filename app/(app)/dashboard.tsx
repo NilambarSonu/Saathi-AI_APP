@@ -5,7 +5,8 @@ import { Colors } from '../../constants/Colors';
 import { Spacing } from '../../constants/Spacing';
 import { useAuthStore } from '../../store/authStore';
 import LottieView from 'lottie-react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 
 const { width } = Dimensions.get('window');
 
@@ -18,16 +19,37 @@ export default function DashboardScreen() {
       
       {/* 1. Header */}
       <View style={styles.header}>
-        <View style={styles.headerTextContainer}>
-          <Text style={styles.greeting}>Good Morning,</Text>
-          <Text style={styles.name}>{user?.name || 'Farmer'} 👋</Text>
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.greeting}>Good Morning,</Text>
+            <Text style={styles.name}>{user?.name || 'Farmer'} 👋</Text>
+          </View>
+          <Pressable onPress={() => router.push('/profile')}>
+            <Image 
+              source={require('../../public/founder.png')} 
+              style={styles.avatar} 
+            />
+          </Pressable>
         </View>
-        <Pressable onPress={() => router.push('/profile')}>
-          <Image 
-            source={require('../../public/founder.png')} 
-            style={styles.avatar} 
-          />
-        </Pressable>
+
+        {/* 1.5 Glassmorphism Stat Pills */}
+        <View style={styles.statsContainer}>
+          <BlurView intensity={20} tint="dark" style={styles.statPill}>
+            <Ionicons name="leaf" size={16} color="#FFF" style={styles.statIcon} />
+            <Text style={styles.statValue}>127</Text>
+            <Text style={styles.statLabel}>Farms</Text>
+          </BlurView>
+          <BlurView intensity={20} tint="dark" style={styles.statPill}>
+            <Ionicons name="flask" size={16} color="#FFF" style={styles.statIcon} />
+            <Text style={styles.statValue}>284</Text>
+            <Text style={styles.statLabel}>Tests</Text>
+          </BlurView>
+          <BlurView intensity={20} tint="dark" style={styles.statPill}>
+            <MaterialCommunityIcons name="brain" size={16} color="#FFF" style={styles.statIcon} />
+            <Text style={styles.statValue}>195</Text>
+            <Text style={styles.statLabel}>AI Tips</Text>
+          </BlurView>
+        </View>
       </View>
 
       {/* 2. Live Connect Card */}
@@ -52,18 +74,7 @@ export default function DashboardScreen() {
         </View>
       </Pressable>
 
-      {/* 3. Awards Ticker */}
-      <View style={styles.tickerContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tickerScroll}>
-          {['🏆 State Level Winner', '⚡ < 60s Testing', '🌿 Zero Chemicals', '🗣 3 Lang AI', '🥇 Best Agritech'].map((badge, idx) => (
-            <View key={idx} style={styles.tickerBadge}>
-              <Text style={styles.tickerBadgeText}>{badge}</Text>
-            </View>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* 4. Soil Health Score Card */}
+      {/* 3. Soil Health Score Card */}
       <View style={styles.healthCard}>
         <View style={styles.healthCardLeft}>
           <View style={styles.ringContainer}>
@@ -84,6 +95,17 @@ export default function DashboardScreen() {
             <View style={styles.chip}><Text style={styles.chipText}>K: ↑</Text></View>
           </View>
         </View>
+      </View>
+
+      {/* 4. Awards Ticker */}
+      <View style={styles.tickerContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tickerScroll}>
+          {['🏆 State Level Winner', '⚡ < 60s Testing', '🌿 Zero Chemicals', '🗣 3 Lang AI', '🥇 Best Agritech'].map((badge, idx) => (
+            <View key={idx} style={styles.tickerBadge}>
+              <Text style={styles.tickerBadgeText}>{badge}</Text>
+            </View>
+          ))}
+        </ScrollView>
       </View>
 
       {/* 5. Quick Actions Grid */}
@@ -172,10 +194,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
   },
   header: {
+    marginBottom: Spacing.xl,
+    backgroundColor: Colors.primaryDark,
+    marginHorizontal: -Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: 10,
+    paddingBottom: Spacing.lg,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: Colors.primaryDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   headerTextContainer: {
     flex: 1,
@@ -183,18 +220,51 @@ const styles = StyleSheet.create({
   greeting: {
     fontFamily: 'Sora_400Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: 'rgba(255,255,255,0.8)',
   },
   name: {
     fontFamily: 'Sora_800ExtraBold',
     fontSize: 24,
-    color: Colors.textPrimary,
+    color: '#FFF',
   },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.border,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)'
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  statPill: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    padding: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  statIcon: {
+    marginBottom: 4,
+    opacity: 0.9,
+  },
+  statValue: {
+    fontFamily: 'Sora_800ExtraBold',
+    fontSize: 18,
+    color: '#FFF',
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.7)',
   },
   connectCard: {
     backgroundColor: Colors.primaryDark,
@@ -202,9 +272,12 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    ...Spacing.shadows.md,
-    shadowColor: Colors.primary,
     marginBottom: Spacing.lg,
+    shadowColor: '#1A7B3C',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.28,
+    shadowRadius: 20,
+    elevation: 8,
   },
   connectCardIconBox: {
     width: 56,
@@ -262,13 +335,17 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   healthCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: Spacing.radius.xl,
     padding: Spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.xl,
-    ...Spacing.shadows.sm,
+    shadowColor: '#1A7B3C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
   healthCardLeft: {
     marginRight: Spacing.lg,
@@ -321,10 +398,14 @@ const styles = StyleSheet.create({
   },
   gridTile: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: Spacing.radius.lg,
     padding: Spacing.lg,
-    ...Spacing.shadows.sm,
+    shadowColor: '#1A7B3C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
   tileIconBox: {
     width: 44,
@@ -366,10 +447,14 @@ const styles = StyleSheet.create({
   },
   recentCard: {
     width: 160,
-    backgroundColor: Colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: Spacing.radius.lg,
     padding: 14,
-    ...Spacing.shadows.sm,
+    shadowColor: '#1A7B3C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
   recentDate: {
     fontFamily: 'Sora_400Regular',
@@ -395,7 +480,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.xl,
     borderWidth: 1,
-    borderColor: '#C8E6D0'
+    borderColor: '#C8E6D0',
+    shadowColor: '#1A7B3C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
   promoContent: { flex: 1 },
   promoTitle: { fontFamily: 'Sora_700Bold', fontSize: 15, color: Colors.primaryDark, marginBottom: 4 },

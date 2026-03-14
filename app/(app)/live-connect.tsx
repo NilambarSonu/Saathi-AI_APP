@@ -12,8 +12,10 @@ import {
   connectDevice, 
   subscribeToSoilData, 
   disconnectDevice, 
-  setLogListener 
+  setLogListener,
+  isBLEAvailable
 } from '../../hooks/useBLE';
+import { Linking, TouchableOpacity } from 'react-native';
 
 export default function LiveConnectScreen() {
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'connecting' | 'connected' | 'completed'>('idle');
@@ -126,6 +128,24 @@ export default function LiveConnectScreen() {
         <Text style={styles.subtitle}>Pair with AGNI-SOIL-SENSOR</Text>
       </View>
 
+      {!isBLEAvailable() ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorIcon}>📡</Text>
+          <Text style={styles.errorTitle}>Bluetooth Not Available</Text>
+          <Text style={styles.errorBody}>
+            BLE device pairing requires a production build of the app. 
+            This feature is not available in Expo Go.{'\n\n'}
+            Please install the Saathi AI app from the Play Store / App Store to connect your Agni device.
+          </Text>
+          <TouchableOpacity 
+            style={styles.errorBtn}
+            onPress={() => Linking.openURL('https://saathiai.org')}
+          >
+            <Text style={styles.errorBtnText}>Learn More →</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+      <>
       <View style={styles.card}>
         <View style={styles.radarContainer}>
           {scanState === 'scanning' && (
@@ -234,6 +254,8 @@ export default function LiveConnectScreen() {
           />
         </View>
       )}
+      </>
+      )}
 
       <View style={{ height: 120 }} />
     </ScrollView>
@@ -247,6 +269,13 @@ const styles = StyleSheet.create({
   title: { fontFamily: 'Sora_800ExtraBold', fontSize: 24, color: Colors.textPrimary },
   subtitle: { fontFamily: 'Sora_400Regular', fontSize: 13, color: Colors.textSecondary },
   
+  errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, marginTop: 40, backgroundColor: Colors.surface, borderRadius: Spacing.radius.xxl, ...Spacing.shadows.md },
+  errorIcon: { fontSize: 56, marginBottom: 16 },
+  errorTitle: { fontFamily: 'Sora_800ExtraBold', fontSize: 20, color: '#1A2E1E', textAlign: 'center', marginBottom: 10 },
+  errorBody: { fontFamily: 'Sora_400Regular', fontSize: 14, color: '#6B8A72', textAlign: 'center', lineHeight: 22, marginBottom: 28 },
+  errorBtn: { height: 48, paddingHorizontal: 28, backgroundColor: '#1A7B3C', borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  errorBtnText: { fontFamily: 'Sora_700Bold', fontSize: 14, color: '#fff' },
+
   card: {
     backgroundColor: Colors.surface,
     borderRadius: Spacing.radius.xxl,

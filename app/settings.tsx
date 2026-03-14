@@ -8,7 +8,7 @@ import { useAuthStore } from '../store/authStore';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { setAuth } = useAuthStore();
+  const { clearUser } = useAuthStore();
   
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
@@ -27,7 +27,7 @@ export default function SettingsScreen() {
           style: "destructive",
           onPress: () => {
             // Mock delete
-            setAuth(null, null);
+            clearUser();
             router.replace('/(auth)/login');
           }
         }
