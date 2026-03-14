@@ -1,47 +1,88 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform, Image, ActivityIndicator } from 'react-native';
 import { Colors } from '../../constants/Colors';
 import { Spacing } from '../../constants/Spacing';
 import LottieView from 'lottie-react-native';
-
-interface Message {
-  id: string;
-  sender: 'ai' | 'user';
-  text: string;
-  timestamp: Date;
-}
+import { getChatSessions, createChatSession, sendMessage, ChatMessage, ChatSession } from '../../services/chat';
 
 export default function AIChatScreen() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const handleSend = () => {
-    if (!inputText.trim()) return;
+  // Load latest chat session on mount
+  useEffect(() => {
+    loadLatestSession();
+  }, []);
 
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      sender: 'user',
-      text: inputText.trim(),
-      timestamp: new Date()
-    };
+  const loadLatestSession = async () => {
+    try {
+      setIsLoadingHistory(true);
+      const sessions = await getChatSessions();
+      if (sessions && sessions.length > 0) {
+        // Load the most recent session
+        const latest = sessions[0];
+        setSessionId(latest.id);
+        if (latest.messages) {
+          setMessages(latest.messages.sort((a, b) => 
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          ));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load chat history:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
 
-    setMessages(prev => [...prev, userMsg]);
+  const handleSend = async () => {
+    if (!inputText.trim() || isTyping) return;
+
+    const userText = inputText.trim();
     setInputText('');
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'ai',
-        text: 'I am processing your request. How else can I assist with your farming needs today?',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, aiMsg]);
+    // Optimistically add user message to UI
+    const tempUserId = Date.now().toString();
+    const newMsg: ChatMessage = {
+      id: tempUserId,
+      sessionId: sessionId || 'temp',
+      role: 'user',
+      content: userText,
+      timestamp: new Date().toISOString()
+    };
+    
+    setMessages(prev => [...prev, newMsg]);
+
+    try {
+      let activeSessionId = sessionId;
+
+      // Create a session if one doesn't exist
+      if (!activeSessionId) {
+        const newSession = await createChatSession(
+          userText.substring(0, 30) + '...',
+          'en'
+        );
+        activeSessionId = newSession.id;
+        setSessionId(newSession.id);
+      }
+
+      // Send message to backend
+      const responseMsg = await sendMessage(activeSessionId, userText);
+      
+      // Add real AI response
+      setMessages(prev => [...prev, responseMsg]);
+      
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      // Optional: Add error message to UI
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const QuickAction = ({ icon, title }: { icon: string, title: string }) => (
@@ -92,7 +133,12 @@ export default function AIChatScreen() {
         contentContainerStyle={styles.chatScroll}
         onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
       >
-        {messages.length === 0 ? (
+        {isLoadingHistory ? (
+          <View style={styles.welcomeState}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={[styles.welcomeSubtitle, { marginTop: 16 }]}>Loading farm history...</Text>
+          </View>
+        ) : messages.length === 0 ? (
           <View style={styles.welcomeState}>
             <LottieView
               source={require('../../animations/chatbot.json')}
@@ -120,10 +166,10 @@ export default function AIChatScreen() {
               key={msg.id} 
               style={[
                 styles.messageRow,
-                msg.sender === 'user' ? styles.messageRowUser : styles.messageRowAI
+                msg.role === 'user' ? styles.messageRowUser : styles.messageRowAI
               ]}
             >
-              {msg.sender === 'ai' && (
+              {msg.role === 'ai' && (
                 <View style={styles.messageAvatarAI}>
                   <Text style={{ fontSize: 16 }}>🌱</Text>
                 </View>
@@ -132,20 +178,20 @@ export default function AIChatScreen() {
               <View 
                 style={[
                   styles.messageBubble,
-                  msg.sender === 'user' ? styles.messageBubbleUser : styles.messageBubbleAI
+                  msg.role === 'user' ? styles.messageBubbleUser : styles.messageBubbleAI
                 ]}
               >
                 <Text 
                   style={[
                     styles.messageText,
-                    msg.sender === 'user' ? styles.messageTextUser : styles.messageTextAI
+                    msg.role === 'user' ? styles.messageTextUser : styles.messageTextAI
                   ]}
                 >
-                  {msg.text}
+                  {msg.content}
                 </Text>
               </View>
 
-              {msg.sender === 'user' && (
+              {msg.role === 'user' && (
                 <View style={styles.messageAvatarUser}>
                   <Text style={{ fontSize: 16 }}>👨‍🌾</Text>
                 </View>
@@ -284,7 +330,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 16, borderBottomLeftRadius: 16,
   },
   messageBubbleUser: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
     borderTopLeftRadius: 16, borderTopRightRadius: 4,
     borderBottomRightRadius: 16, borderBottomLeftRadius: 16,
   },

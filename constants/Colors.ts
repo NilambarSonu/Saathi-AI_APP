@@ -1,13 +1,13 @@
 // constants/Colors.ts — define exactly as follows
 export const Colors = {
-  // Primary Greens
-  primary:        '#1A7B3C',   // main brand green
-  primaryDark:    '#14562A',   // darker shade for gradients
-  primaryDeep:    '#0D3B1D',   // darkest, used in headers
-  primaryLight:   '#4CAF6E',   // lighter green for highlights
+  // Primary Greens (Ported from saathiai.org Web)
+  primary:        '#1B4D3E',   // Forest Green (main brand)
+  primaryDark:    '#13382D',   // darker shade for gradients
+  primaryDeep:    '#0B211A',   // darkest, used in headers
+  primaryLight:   '#2E7D32',   // Emerald Soft (buttons, accents)
   
   // Background & Surface
-  background:     '#F4FBF6',   // app background (ultra-pale mint)
+  background:     '#F5F5F0',   // Warm White / Chat BG
   surface:        '#FFFFFF',   // cards, modals
   surfaceAlt:     '#E8F7ED',   // mint-tinted surface (feature tiles, chips)
   surfaceAlt2:    '#D0EDD8',   // slightly deeper mint

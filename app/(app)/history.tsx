@@ -5,7 +5,7 @@ import { Spacing } from '../../constants/Spacing';
 import LottieView from 'lottie-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { exportSoilReport } from '../../services/pdfExport';
-import { getAllSoilRecords, SoilTestRecord } from '../../database/datastorage';
+import { getSoilTests, SoilTest } from '../../services/soil';
 import { useAuthStore } from '../../store/authStore';
 
 const { width } = Dimensions.get('window');
@@ -19,17 +19,25 @@ const MOCK_HISTORY = [
 
 export default function HistoryScreen() {
   const [activeTab, setActiveTab] = useState<'trends' | 'logs'>('trends');
-  const [records, setRecords] = useState<SoilTestRecord[]>([]);
+  const [records, setRecords] = useState<SoilTest[]>([]);
   const { user } = useAuthStore();
   const [isExporting, setIsExporting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   React.useEffect(() => {
     loadRecords();
   }, []);
 
   const loadRecords = async () => {
-    const data = await getAllSoilRecords();
-    setRecords(data);
+    setIsLoading(true);
+    try {
+      const data = await getSoilTests();
+      setRecords(data);
+    } catch (e) {
+      console.log('Failed to load soil records:', e);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleExport = async () => {
@@ -137,15 +145,17 @@ export default function HistoryScreen() {
           </View>
         ) : (
           <View style={styles.logsContainer}>
-            {records.length > 0 ? records.map((item) => (
+            {isLoading ? (
+              <Text style={{ textAlign: 'center', marginTop: 20, color: Colors.textSecondary }}>Loading tests...</Text>
+            ) : records.length > 0 ? records.map((item) => (
               <Pressable key={item.id} style={styles.logCard}>
                 <View style={styles.logHeader}>
                   <View>
-                    <Text style={styles.logField}>Soil Test</Text>
-                    <Text style={styles.logDate}>{new Date(item.dateSaved).toLocaleString()}</Text>
+                    <Text style={styles.logField}>{item.locationDetails || 'Soil Test'}</Text>
+                    <Text style={styles.logDate}>{new Date(item.createdAt).toLocaleString()}</Text>
                   </View>
                   <View style={styles.phBadge}>
-                    <Text style={styles.phValue}>pH {item.data.ph.toFixed(1)}</Text>
+                    <Text style={styles.phValue}>pH {item.ph.toFixed(1)}</Text>
                   </View>
                 </View>
 
@@ -154,15 +164,15 @@ export default function HistoryScreen() {
                 <View style={styles.logGrid}>
                   <View style={styles.logStat}>
                     <Text style={styles.statLabel}>Nitrogen</Text>
-                    <Text style={styles.statValue}>{item.data.nitrogen} <Text style={{fontSize:10}}>ppm</Text></Text>
+                    <Text style={styles.statValue}>{item.n} <Text style={{fontSize:10}}>ppm</Text></Text>
                   </View>
                   <View style={styles.logStat}>
                     <Text style={styles.statLabel}>Phosphorus</Text>
-                    <Text style={styles.statValue}>{item.data.phosphorus} <Text style={{fontSize:10}}>ppm</Text></Text>
+                    <Text style={styles.statValue}>{item.p} <Text style={{fontSize:10}}>ppm</Text></Text>
                   </View>
                   <View style={styles.logStat}>
                     <Text style={styles.statLabel}>Potassium</Text>
-                    <Text style={styles.statValue}>{item.data.potassium} <Text style={{fontSize:10}}>ppm</Text></Text>
+                    <Text style={styles.statValue}>{item.k} <Text style={{fontSize:10}}>ppm</Text></Text>
                   </View>
                 </View>
               </Pressable>

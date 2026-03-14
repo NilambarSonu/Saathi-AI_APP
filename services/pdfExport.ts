@@ -1,9 +1,9 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { SoilTestRecord } from '../database/datastorage';
+import { SoilTest } from './soil';
 import { User } from '../services/auth';
 
-export async function exportSoilReport(tests: SoilTestRecord[], user: User) {
+export async function exportSoilReport(tests: SoilTest[], user: User) {
   const html = generateReportHTML(tests, user);
   const { uri } = await Print.printToFileAsync({ 
     html, 
@@ -17,15 +17,15 @@ export async function exportSoilReport(tests: SoilTestRecord[], user: User) {
   });
 }
 
-function generateReportHTML(tests: SoilTestRecord[], user: User): string {
+function generateReportHTML(tests: SoilTest[], user: User): string {
   const rows = tests.map(test => `
     <tr>
-      <td>${new Date(test.dateSaved).toLocaleDateString()}</td>
-      <td class="${test.data.ph >= 6 && test.data.ph <= 7.5 ? 'good' : 'warn'}">${parseFloat(test.data.ph.toString()).toFixed(1)}</td>
-      <td>${test.data.nitrogen}</td>
-      <td>${test.data.phosphorus}</td>
-      <td>${test.data.potassium}</td>
-      <td>${test.data.moisture}%</td>
+      <td>${new Date(test.createdAt).toLocaleDateString()}</td>
+      <td class="${test.ph >= 6 && test.ph <= 7.5 ? 'good' : 'warn'}">${parseFloat(test.ph.toString()).toFixed(1)}</td>
+      <td>${test.n}</td>
+      <td>${test.p}</td>
+      <td>${test.k}</td>
+      <td>${test.moisture}%</td>
     </tr>
   `).join('');
 

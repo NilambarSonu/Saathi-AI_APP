@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Animated } from 'react-native';
 import { Colors } from '../../constants/Colors';
 import { Spacing } from '../../constants/Spacing';
+import Button from '../../components/ui/Button';
+import FuturisticButton from '../../components/ui/FuturisticButton';
 import LottieView from 'lottie-react-native';
 import { Device } from 'react-native-ble-plx';
-import Button from '../../components/ui/Button';
 import { 
   startScanning, 
   stopScanning, 
@@ -178,12 +179,21 @@ export default function LiveConnectScreen() {
         <Text style={styles.logText}>{logMsg}</Text>
 
         {(scanState === 'idle' || scanState === 'scanning') && (
-          <Button 
-            title={scanState === 'idle' ? '📡 Scan for Agni Device' : 'Stop Scanning'}
-            variant={scanState === 'idle' ? 'primary' : 'secondary'}
-            onPress={handleScanToggle}
-            style={{ marginTop: Spacing.md }}
-          />
+          <View style={{ marginTop: Spacing.md }}>
+            {scanState === 'idle' ? (
+              <FuturisticButton 
+                title="Scan for Agni Device"
+                icon="📡"
+                onPress={handleScanToggle}
+              />
+            ) : (
+              <Button 
+                title="Stop Scanning"
+                variant="secondary"
+                onPress={handleScanToggle}
+              />
+            )}
+          </View>
         )}
       </View>
 
