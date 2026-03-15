@@ -9,6 +9,8 @@ export interface SoilTest {
   ph: number;
   moisture: number;
   temperature: number;
+  latitude?: number | null;
+  longitude?: number | null;
   deviceId?: string;
   locationDetails?: string;
   createdAt: string;

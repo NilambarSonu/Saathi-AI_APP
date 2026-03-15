@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Colors } from '../../constants/Colors';
 import { Spacing } from '../../constants/Spacing';
 import LottieView from 'lottie-react-native';
+import { useRouter } from 'expo-router';
 import { getChatSessions, createChatSession, sendMessage, ChatMessage, ChatSession } from '../../services/chat';
 
 export default function AIChatScreen() {
+  const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
@@ -85,6 +87,24 @@ export default function AIChatScreen() {
     }
   };
 
+  // ── Mic handler ──
+  const handleVoiceInput = () => {
+    Alert.alert(
+      '🎤 Voice Input',
+      'Voice input will be available in the next update. Please type your question.',
+      [{ text: 'OK' }]
+    );
+  };
+
+  // ── File attach handler ──
+  const handleFileAttach = async () => {
+    Alert.alert(
+      '📎 Attach File',
+      'File attachment (JSON, CSV, PDF) will be available in the next update.\n\nFor now, you can describe your soil test data in the chat.',
+      [{ text: 'OK' }]
+    );
+  };
+
   const QuickAction = ({ icon, title }: { icon: string, title: string }) => (
     <Pressable 
       style={styles.quickActionTile}
@@ -114,16 +134,15 @@ export default function AIChatScreen() {
         </View>
         
         <View style={styles.headerActions}>
-          <Pressable style={styles.headerActionBtn}>
+          <TouchableOpacity style={styles.headerActionBtn}>
             <Text style={{ fontSize: 20 }}>🌐</Text>
-          </Pressable>
-          <Pressable style={styles.headerActionBtn}>
-            <Image 
-              source={require('../../public/chat-sidebar-open.png')}
-              style={{ width: 20, height: 20, tintColor: Colors.textPrimary }} 
-              resizeMode="contain"
-            />
-          </Pressable>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={() => router.push('/(app)/chat-history')}
+          >
+            <Text style={{ fontSize: 20 }}>📋</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -161,9 +180,9 @@ export default function AIChatScreen() {
             </View>
           </View>
         ) : (
-          messages.map(msg => (
+          messages.map((msg, index) => (
             <View 
-              key={msg.id} 
+              key={msg.id ? `${msg.id}-${index}` : index.toString()} 
               style={[
                 styles.messageRow,
                 msg.role === 'user' ? styles.messageRowUser : styles.messageRowAI
@@ -215,30 +234,40 @@ export default function AIChatScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Input Bar */}
+      {/* Input Bar — always visible, never conditional */}
       <View style={styles.inputContainer}>
-        <Pressable style={styles.attachBtn}>
+        <TouchableOpacity style={styles.attachBtn} onPress={handleFileAttach}>
           <Text style={{ fontSize: 20 }}>📎</Text>
-        </Pressable>
+        </TouchableOpacity>
         
         <TextInput
           style={styles.input}
-          placeholder="Type your message..."
+          placeholder="Type your farming question..."
           placeholderTextColor={Colors.textMuted}
           value={inputText}
           onChangeText={setInputText}
           multiline
           maxLength={500}
+          returnKeyType="send"
+          onSubmitEditing={handleSend}
         />
 
         {inputText.trim() ? (
-          <Pressable style={styles.sendBtn} onPress={handleSend}>
-            <Text style={styles.sendIcon}>▶</Text>
-          </Pressable>
+          <TouchableOpacity
+            style={[styles.sendBtn, isTyping && { opacity: 0.6 }]}
+            onPress={handleSend}
+            disabled={isTyping}
+          >
+            {isTyping ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.sendIcon}>➤</Text>
+            )}
+          </TouchableOpacity>
         ) : (
-          <Pressable style={styles.micBtn}>
+          <TouchableOpacity style={styles.micBtn} onPress={handleVoiceInput}>
             <Text style={{ fontSize: 20 }}>🎤</Text>
-          </Pressable>
+          </TouchableOpacity>
         )}
       </View>
     </KeyboardAvoidingView>
@@ -344,7 +373,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
-    paddingBottom: Platform.OS === 'ios' ? 90 : Spacing.xl, // Give room for tab bar
+    // Must clear the floating tab bar (height ~68 + bottom ~24 = ~92px)
+    paddingBottom: Platform.OS === 'ios' ? 90 : 100,
     backgroundColor: Colors.surface,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,

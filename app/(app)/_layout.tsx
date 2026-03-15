@@ -1,33 +1,28 @@
 import { useEffect } from 'react';
-import { Tabs, Redirect, useRouter } from 'expo-router';
+import { Tabs, Redirect, useRouter, usePathname, Slot } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../constants/Colors';
 import { Spacing } from '../../constants/Spacing';
-import { View, Text, StyleSheet, Platform, Pressable } from 'react-native';
+import { View, Platform, StyleSheet } from 'react-native';
+import LiquidGlassTabBar from '../../components/navigation/LiquidGlassTabBar';
 import { registerForPushNotifications } from '../../services/notifications';
 import { registerDevice } from '../../services/auth';
 
-const TAB_HEIGHT = Platform.OS === 'ios' ? 88 : 68;
+export const TAB_BAR_BOTTOM_PADDING = 96;
 
-function TabIcon({ name, focused, customIcon }: { name: string; focused: boolean; customIcon?: boolean }) {
-  if (customIcon) {
-    return (
-      <View style={[styles.customIconContainer, focused && styles.customIconFocused]}>
-        <Text style={{ fontSize: 24 }}>{name}</Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.iconContainer}>
-      <Text style={[styles.icon, focused && styles.iconFocused]}>{name}</Text>
-    </View>
-  );
-}
+const getActiveTab = (pathname: string): string => {
+  if (pathname.includes('dashboard')) return 'dashboard';
+  if (pathname.includes('live-connect')) return 'live-connect';
+  if (pathname.includes('ai-chat')) return 'ai-chat';
+  if (pathname.includes('history')) return 'history';
+  if (pathname.includes('account')) return 'account';
+  return 'dashboard';
+};
 
 export default function AppLayout() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
-  const user = useAuthStore(s => s.user); // Get user object
+  const user = useAuthStore(s => s.user);
+  const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
@@ -53,94 +48,28 @@ export default function AppLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
+  const activeTab = getActiveTab(pathname);
+
+  const handleTabPress = (tabKey: string) => {
+    const routes: Record<string, string> = {
+      dashboard: '/(app)/dashboard',
+      'live-connect': '/(app)/live-connect',
+      'ai-chat': '/(app)/ai-chat',
+      history: '/(app)/history',
+      account: '/(app)/account',
+    };
+    router.push(routes[tabKey] as any);
+  };
+
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarShowLabel: true,
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textMuted,
-        tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.tabLabel,
-      }}
-    >
-      <Tabs.Screen
-        name="dashboard"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ focused }) => <TabIcon name="🏠" focused={focused} />,
-        }}
+    <View style={{ flex: 1, backgroundColor: Colors.bg1 }}>
+      <Slot />
+      <LiquidGlassTabBar
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
       />
-      <Tabs.Screen
-        name="live-connect"
-        options={{
-          title: 'Connect',
-          tabBarIcon: ({ focused }) => <TabIcon name="📡" focused={focused} customIcon />,
-        }}
-      />
-      <Tabs.Screen
-        name="ai-chat"
-        options={{
-          title: 'AI Chat',
-          tabBarIcon: ({ focused }) => <TabIcon name="🤖" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: 'History',
-          tabBarIcon: ({ focused }) => <TabIcon name="📊" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen name="about" options={{ href: null }} />
-    </Tabs>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  tabBar: {
-    position: 'absolute',
-    bottom: Spacing.xl,
-    left: Spacing.lg,
-    right: Spacing.lg,
-    height: TAB_HEIGHT,
-    backgroundColor: Colors.surface,
-    borderRadius: Spacing.radius.xxl,
-    borderTopWidth: 0,
-    ...Spacing.shadows.md,
-    elevation: 8,
-    paddingHorizontal: Spacing.sm,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-  },
-  tabLabel: {
-    fontFamily: 'Sora_600SemiBold',
-    fontSize: 10,
-    marginTop: 4,
-  },
-  iconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 32,
-    width: 32,
-  },
-  icon: {
-    fontSize: 20,
-    opacity: 0.5,
-  },
-  iconFocused: {
-    opacity: 1,
-  },
-  customIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -16, // Protrude out of the top of the tab bar
-    ...Spacing.shadows.sm,
-  },
-  customIconFocused: {
-    backgroundColor: Colors.primary,
-  }
-});
+const styles = StyleSheet.create({});
