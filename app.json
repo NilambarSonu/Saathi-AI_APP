@@ -20,7 +20,7 @@
         "NSMicrophoneUsageDescription": "Saathi AI uses the microphone for voice queries to the AI assistant."
       },
       "config": {
-        "googleMapsApiKey": "AIzaSyDASil-YPMWN7t1e07qaDHoxCCX4v054lE"
+        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
       }
     },
     "android": {
@@ -43,7 +43,7 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyDASil-YPMWN7t1e07qaDHoxCCX4v054lE"
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
         }
       }
     },
