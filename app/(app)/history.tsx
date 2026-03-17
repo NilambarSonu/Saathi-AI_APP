@@ -9,10 +9,12 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import MapView, { Marker } from 'react-native-maps';
+import { LineChart } from 'react-native-chart-kit';
 
 // Keep imports for real data
 import { getSoilTests, SoilTest } from '../../services/soil';
 import { exportSoilReport } from '../../services/pdfExport';
+import { getParameterTrend, getTestLocations, ParameterTrend, MapLocation } from '../../services/analytics';
 import { useAuthStore } from '../../store/authStore';
 
 const { width: W } = Dimensions.get('window');
@@ -64,29 +66,78 @@ export default function HistoryScreen() {
   const [isParameterOpen, setIsParameterOpen] = useState(false);
   const [selectedParam, setSelectedParam] = useState('Nitrogen (N)');
   
-  // Database Fetch Architecture Simulation
-  const [logs, setLogs] = useState<any[]>([]);
+  const [timeFilters] = useState(['Last 30 Days', 'Last 90 Days', 'Last Year', 'All Time']);
+  const [isTimeFilterOpen, setIsTimeFilterOpen] = useState(false);
+  const [timeFilter, setTimeFilter] = useState('Last 30 Days');
+
+  // Database Fetch Architecture Variables
+  const [logs, setLogs] = useState<SoilTest[]>([]);
+  const [trend, setTrend] = useState<ParameterTrend | null>(null);
+  const [locations, setLocations] = useState<MapLocation[]>([]);
 
   useEffect(() => {
-    // Simulate API fetch delay
-    const loadData = async () => {
-      await new Promise(r => setTimeout(r, 600));
-      setLogs([
-        { id: 1, date: 'Mar 11, 8:38 AM', ph: 5.8, npk: '54-12-28', lat: 37.78825, lng: -122.4324 },
-        { id: 2, date: 'Mar 10, 4:15 PM', ph: 6.2, npk: '48-15-22', lat: 37.78925, lng: -122.4344 },
-        { id: 3, date: 'Mar 08, 9:20 AM', ph: 5.5, npk: '60-10-30', lat: 37.78725, lng: -122.4314 },
-        { id: 4, date: 'Mar 05, 2:45 PM', ph: 6.8, npk: '45-18-25', lat: 37.79025, lng: -122.4354 },
-      ]);
-    };
-    loadData();
-  }, []);
+    getSoilTests().then(d => setLogs(Array.isArray(d) ? d : [])).catch(() => setLogs([]));
+    getTestLocations().then(d => setLocations(Array.isArray(d) ? d : [])).catch(() => setLocations([]));
+  }, [timeFilter]);
+
+  useEffect(() => {
+    let days = 30;
+    if (timeFilter === 'Last 90 Days') days = 90;
+    if (timeFilter === 'Last Year') days = 365;
+    if (timeFilter === 'All Time') days = 3650;
+
+    getParameterTrend(selectedParam, days).then(setTrend).catch(() => setTrend(null));
+  }, [selectedParam, timeFilter]);
 
   const handleExport = async () => {
+    if (!Array.isArray(logs) || logs.length === 0) {
+      alert("No soil tests available to export.");
+      return;
+    }
     setIsExporting(true);
-    setTimeout(() => setIsExporting(false), 2000); // Mock export
+    try {
+      if (user) {
+        await exportSoilReport(logs, user as any);
+      }
+    } catch(e) {
+      alert("Export failed");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  const parameters = ['Nitrogen (N)', 'Phosphorus (P)', 'Potassium (K)', 'pH Level'];
+  const getParamColor = (param: string) => {
+    if (param.includes('pH')) return '#2563EB'; // Blue
+    if (param.includes('Nitrogen')) return '#EF4444'; // Red
+    if (param.includes('Phosphorus')) return '#8B5CF6'; // Violet
+    if (param.includes('Potassium')) return '#F97316'; // Orange
+    if (param.includes('Moisture')) return '#86EFAC'; // Light Green
+    return '#16A34A';
+  };
+
+  const getChartData = () => {
+    if (!Array.isArray(logs) || logs.length === 0) {
+      return { labels: ['No Data'], datasets: [{ data: [0] }] };
+    }
+    // Take up to last 6 logs for chart clarity, chronologically
+    const recentLogs = [...logs].reverse().slice(-6);
+    
+    return {
+      labels: recentLogs.map(l => new Date(l.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })),
+      datasets: [{
+        data: recentLogs.map(l => {
+          if (selectedParam.includes('pH')) return l.ph || 0;
+          if (selectedParam.includes('Nitrogen')) return l.n || 0;
+          if (selectedParam.includes('Phosphorus')) return l.p || 0;
+          if (selectedParam.includes('Potassium')) return l.k || 0;
+          if (selectedParam.includes('Moisture')) return l.moisture || 0;
+          return 0;
+        })
+      }]
+    };
+  };
+
+  const parameters = ['Nitrogen (N)', 'Phosphorus (P)', 'Potassium (K)', 'pH Level', 'Moisture'];
 
   return (
     <View style={s.root}>
@@ -115,18 +166,38 @@ export default function HistoryScreen() {
 
         <View style={{ zIndex: 100 }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterScroll} contentContainerStyle={{ paddingRight: 16 }}>
-            <GlassCard style={s.filterPill}>
-              <Text style={s.filterText}>📅 Last 30 Days <Ionicons name="chevron-down" size={12} /></Text>
-            </GlassCard>
+            <TouchableOpacity onPress={() => { setIsTimeFilterOpen(!isTimeFilterOpen); setIsParameterOpen(false); }} activeOpacity={0.8}>
+              <GlassCard style={[s.filterPill, isTimeFilterOpen && { borderColor: C.greenBtn }]}>
+                <Text style={s.filterText}>📅 {timeFilter} <Ionicons name={isTimeFilterOpen ? "chevron-up" : "chevron-down"} size={12} /></Text>
+              </GlassCard>
+            </TouchableOpacity>
             
-            <TouchableOpacity onPress={() => setIsParameterOpen(!isParameterOpen)} activeOpacity={0.8}>
+            <TouchableOpacity onPress={() => { setIsParameterOpen(!isParameterOpen); setIsTimeFilterOpen(false); }} activeOpacity={0.8}>
               <GlassCard style={[s.filterPill, isParameterOpen && { borderColor: C.greenBtn }]}>
                 <Text style={s.filterText}>📊 {selectedParam} <Ionicons name={isParameterOpen ? "chevron-up" : "chevron-down"} size={12} /></Text>
               </GlassCard>
             </TouchableOpacity>
           </ScrollView>
 
-          {/* Functional Dropdown State */}
+          {/* Time Filter Dropdown State */}
+          {isTimeFilterOpen && (
+            <View style={[s.dropdownMenu, { left: 8 }]}>
+              {timeFilters.map((tf, index) => (
+                <TouchableOpacity 
+                  key={tf} 
+                  style={[s.dropdownItem, index !== timeFilters.length - 1 && s.dropdownItemBorder]}
+                  onPress={() => {
+                    setTimeFilter(tf);
+                    setIsTimeFilterOpen(false);
+                  }}
+                >
+                  <Text style={[s.dropdownText, timeFilter === tf && s.dropdownTextActive]}>{tf}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Parameter Dropdown State */}
           {isParameterOpen && (
             <View style={s.dropdownMenu}>
               {parameters.map((param, index) => (
@@ -146,34 +217,59 @@ export default function HistoryScreen() {
         </View>
 
         {/* ── 3. TREND ANALYSIS CARD ── */}
-        <GlassCard style={[s.sectionCard, { zIndex: 1 }]}>
-          <Text style={s.cardTitle}>{selectedParam} Trend</Text>
+        <GlassCard style={[s.sectionCard, { zIndex: 1, paddingHorizontal: 0 }]}>
+          <Text style={[s.cardTitle, { paddingHorizontal: 20 }]}>{selectedParam.includes('Nitrogen') ? 'Nitrogen Trend Analysis' : `${selectedParam} Trend Analysis`}</Text>
           
           <View style={s.chartPlaceholder}>
-            {/* Subtle Grid Background Simulation */}
-            <View style={s.gridH} />
-            <View style={[s.gridH, { top: '33%' }]} />
-            <View style={[s.gridH, { top: '66%' }]} />
-            <View style={s.gridV} />
-            <View style={[s.gridV, { left: '33%' }]} />
-            <View style={[s.gridV, { left: '66%' }]} />
-            
-            {/* Fake line chart */}
-            <Ionicons name="trending-up" size={80} color="rgba(22, 163, 74, 0.4)" style={{ position: 'absolute', opacity: 0.5 }} />
+            {(!logs || logs.length === 0) ? (
+              <>
+                <View style={s.gridH} /><View style={[s.gridH, { top: '33%' }]} /><View style={[s.gridH, { top: '66%' }]} />
+                <View style={s.gridV} /><View style={[s.gridV, { left: '33%' }]} /><View style={[s.gridV, { left: '66%' }]} />
+                <Ionicons name="trending-up" size={80} color={getParamColor(selectedParam)} style={{ position: 'absolute', opacity: 0.2 }} />
+                <Text style={{ position: 'absolute', fontFamily: 'Sora_600SemiBold', color: C.textSub }}>No Data Available</Text>
+              </>
+            ) : (
+              <LineChart
+                data={getChartData()}
+                width={W - 32} 
+                height={180}
+                withDots={true}
+                withInnerLines={false}
+                withOuterLines={false}
+                yAxisSuffix=""
+                yAxisLabel=""
+                chartConfig={{
+                  backgroundColor: 'transparent',
+                  backgroundGradientFrom: 'rgba(255,255,255,0)',
+                  backgroundGradientTo: 'rgba(255,255,255,0)',
+                  decimalPlaces: selectedParam.includes('pH') ? 1 : 0,
+                  color: (opacity = 1) => getParamColor(selectedParam),
+                  labelColor: (opacity = 1) => C.textSub,
+                  style: { borderRadius: 16 },
+                  propsForDots: {
+                    r: "5",
+                    strokeWidth: "2",
+                    stroke: "#FFFFFF"
+                  }
+                }}
+                bezier
+                style={{ marginVertical: 8, borderRadius: 16 }}
+              />
+            )}
           </View>
 
           {/* Flat Glass Stat Blocks */}
-          <View style={s.statsRow}>
+          <View style={[s.statsRow, { paddingHorizontal: 20 }]}>
             <View style={s.statBlock}>
-              <Text style={[s.statVal, { color: C.valGreen }]}>54.0</Text>
-              <Text style={s.statLbl}>Avg Nitrogen</Text>
+              <Text style={[s.statVal, { color: getParamColor(selectedParam) }]}>{trend?.averageValue.toFixed(1) || '--'}</Text>
+              <Text style={s.statLbl}>Avg {selectedParam.split(' ')[0]}</Text>
             </View>
             <View style={s.statBlock}>
-              <Text style={[s.statVal, { color: C.valBlue }]}>14</Text>
+              <Text style={[s.statVal, { color: C.valBlue }]}>{trend?.totalTests || '--'}</Text>
               <Text style={s.statLbl}>Total Tests</Text>
             </View>
             <View style={s.statBlock}>
-              <Text style={[s.statVal, { color: C.valGreen }]}>+79.4</Text>
+              <Text style={[s.statVal, { color: C.valGreen }]}>{trend && trend.improvementPercentage > 0 ? '+' : ''}{trend?.improvementPercentage || '--'}%</Text>
               <Text style={s.statLbl}>Improvement</Text>
             </View>
           </View>
@@ -187,20 +283,20 @@ export default function HistoryScreen() {
             <MapView 
               style={s.mapStyle}
               initialRegion={{
-                latitude: 37.78825,
-                longitude: -122.4324,
+                latitude: Array.isArray(locations) && locations.length > 0 ? locations[0].lat : 37.78825,
+                longitude: Array.isArray(locations) && locations.length > 0 ? locations[0].lng : -122.4324,
                 latitudeDelta: 0.015,
                 longitudeDelta: 0.0121,
               }}
               mapType="satellite"
             >
-              {logs.map((log) => (
+              {Array.isArray(locations) ? locations.map((loc) => (
                 <Marker 
-                  key={log.id} 
-                  coordinate={{ latitude: log.lat, longitude: log.lng }} 
-                  pinColor={log.ph < 6 ? '#EF4444' : log.ph > 7 ? '#3B82F6' : '#22C55E'} 
+                  key={loc.id} 
+                  coordinate={{ latitude: loc.lat, longitude: loc.lng }} 
+                  pinColor={loc.ph < 6 ? '#EF4444' : loc.ph > 7 ? '#3B82F6' : '#22C55E'} 
                 />
-              ))}
+              )) : null}
             </MapView>
           </View>
 
@@ -224,23 +320,25 @@ export default function HistoryScreen() {
         <Text style={[s.cardTitle, { marginLeft: 8, marginBottom: 12 }]}>Test History Log</Text>
         
         <View style={s.logsContainer}>
-          {logs.map((log) => (
+          {(Array.isArray(logs) ? logs : []).map((log) => (
             <GlassCard key={log.id} style={s.logRow}>
-              <Text style={s.logDate}>{log.date}</Text>
-              
-              <View style={s.phBadge}>
-                <Text style={s.phText}>pH {log.ph}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.logDate}>
+                  {new Date(log.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} — {new Date(log.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                  <Text style={[s.phText, log.ph < 6 ? {color: '#DC2626'} : log.ph > 7 ? {color: '#2563EB'} : {color: '#16A34A'}, { marginRight: 12 }]}>
+                    pH: {log.ph.toFixed(1)} ({log.ph < 6 ? 'Acidic' : log.ph > 7 ? 'Alkaline' : 'Neutral'})
+                  </Text>
+                  <Text style={s.npkText}>NPK: {log.n}-{log.p}-{log.k}</Text>
+                </View>
               </View>
-              
-              <View style={s.npkContainer}>
-                <Text style={s.npkText}>{log.npk}</Text>
-                <Ionicons name="chevron-forward" size={16} color={C.textSub} style={{ marginLeft: 8 }} />
-              </View>
+              <Ionicons name="chevron-forward" size={20} color={C.textSub} />
             </GlassCard>
           ))}
-          {logs.length === 0 && (
+          {(!Array.isArray(logs) || logs.length === 0) && (
             <Text style={{ textAlign: 'center', marginVertical: 20, color: C.textSub, fontFamily: 'Sora_400Regular' }}>
-              Loading logs...
+              No logs found for this period.
             </Text>
           )}
         </View>
@@ -340,10 +438,8 @@ const s = StyleSheet.create({
 
   // Trend Analysis
   chartPlaceholder: {
-    height: 150,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-    borderRadius: 16,
-    borderWidth: 1, borderColor: C.glassBorder,
+    height: 180,
+    backgroundColor: 'transparent',
     marginBottom: 16,
     overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center',

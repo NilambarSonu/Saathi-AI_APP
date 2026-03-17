@@ -115,3 +115,29 @@ export async function scheduleSyncCompleteAlert(count: number) {
     trigger: null,
   });
 }
+
+import { apiCall } from './api';
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  isRead: boolean;
+  type: string;
+  createdAt: string;
+}
+
+/**
+ * Fetch the current user's notifications from the database
+ */
+export async function getNotifications(): Promise<AppNotification[]> {
+  return apiCall<AppNotification[]>('/api/notifications');
+}
+
+/**
+ * Mark a notification as read
+ */
+export async function markNotificationRead(id: string): Promise<void> {
+  return apiCall<void>(`/api/notifications/${id}/read`, { method: 'POST' });
+}

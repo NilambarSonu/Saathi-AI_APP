@@ -18,6 +18,9 @@
         "NSBluetoothPeripheralUsageDescription": "Saathi AI uses Bluetooth to receive soil analysis data from Agni.",
         "NSLocationWhenInUseUsageDescription": "Saathi AI uses your location to tag soil test results to specific field coordinates.",
         "NSMicrophoneUsageDescription": "Saathi AI uses the microphone for voice queries to the AI assistant."
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyDASil-YPMWN7t1e07qaDHoxCCX4v054lE"
       }
     },
     "android": {
@@ -37,7 +40,12 @@
         "WAKE_LOCK",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
-      ]
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDASil-YPMWN7t1e07qaDHoxCCX4v054lE"
+        }
+      }
     },
     "plugins": [
       "expo-router",
@@ -46,6 +54,12 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Allow Saathi AI to use your location for field mapping."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow Saathi AI to access your microphone for voice questions."
         }
       ],
       "react-native-ble-manager"

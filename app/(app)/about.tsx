@@ -4,6 +4,7 @@ import {
   TextInput, Alert, ActivityIndicator, Platform, Image, Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import LottieView from 'lottie-react-native';
 import { Colors } from '../../constants/Colors';
 import { Spacing } from '../../constants/Spacing';
 import { apiCall } from '../../services/api';
@@ -18,19 +19,19 @@ const STATS = [
 
 const TECH_FEATURES = [
   {
-    icon: 'flask-outline',
+    animation: require('../../animations/Microscope.json'),
     color: Colors.primary,
     title: 'Advanced Sensors',
     desc: 'Multi-parameter soil probes measuring NPK, pH, moisture, EC, and temperature with lab-grade accuracy.',
   },
   {
-    icon: 'sparkles-outline',
+    animation: require('../../animations/Brain.json'),
     color: Colors.blue,
     title: 'AI Processing',
     desc: 'Gemini-powered recommendations analyzing your soil data to suggest optimal fertilizers and treatments.',
   },
   {
-    icon: 'language-outline',
+    animation: require('../../animations/chatbot.json'),
     color: Colors.amber,
     title: 'Language Support',
     desc: 'Full support for English, Hindi, Odia, and more — making precision farming accessible for every farmer.',
@@ -144,7 +145,7 @@ export default function AboutScreen() {
             {TECH_FEATURES.map((f, i) => (
               <View key={i} style={styles.techFeature}>
                 <View style={[styles.techIconBg, { backgroundColor: f.color + '20' }]}>
-                  <Ionicons name={f.icon as any} size={20} color={f.color} />
+                  <LottieView source={f.animation} autoPlay loop style={{ width: 40, height: 40 }} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.techTitle}>{f.title}</Text>
@@ -311,7 +312,7 @@ const styles = StyleSheet.create({
   techCardTitle: { fontFamily: 'Sora_700Bold', fontSize: 15, color: '#fff' },
   techCardBody: { padding: Spacing.lg, gap: 16 },
   techFeature: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
-  techIconBg: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  techIconBg: { width: 60, height: 60, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   techTitle: { fontFamily: 'Sora_700Bold', fontSize: 14, color: Colors.textPrimary, marginBottom: 4 },
   techDesc: { fontFamily: 'Sora_400Regular', fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
 

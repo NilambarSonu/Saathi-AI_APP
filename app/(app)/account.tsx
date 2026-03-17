@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  TextInput, Alert, ActivityIndicator, Switch, Platform
+  TextInput, Alert, ActivityIndicator, Switch, Platform, Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { Spacing } from '../../constants/Spacing';
 import { useAuthStore } from '../../store/authStore';
 import { apiCall } from '../../services/api';
 import { logout } from '../../services/auth';
+import { getUserProfile } from '../../services/user';
 
 // ─── Helpers ────────────────────────────────────────────────
 function getProviderLabel(provider?: string) {
@@ -45,6 +46,12 @@ function SectionCard({ title, icon, color, children }: {
 }
 
 // ─── Field Row ───────────────────────────────────────────────
+const getFirstName = (user: any): string => {
+  const raw = user?.name || user?.username || user?.email?.split('@')[0] || 'Farmer';
+  const n = raw.split(/[\s_]+/)[0];
+  return n.charAt(0).toUpperCase() + n.slice(1).toLowerCase();
+};
+
 function FieldRow({ label, value, onChangeText, readOnly, placeholder }: {
   label: string; value: string; onChangeText?: (v: string) => void;
   readOnly?: boolean; placeholder?: string;
@@ -125,7 +132,13 @@ export default function AccountScreen() {
   const isOAuthUser = user?.provider && user.provider !== 'local';
 
   useEffect(() => {
-    // Fetch AI pricing setting
+    // Fetch User Profile Data
+    getUserProfile().then(data => {
+      // Safely fold the data into our local state if it exists
+      if(data) setUser({ ...user!, ...data });
+    }).catch(() => {});
+
+    // Fetch AI setting
     apiCall<{ aiPricingEnabled: boolean }>('/api/settings')
       .then(data => setAiPricingEnabled(data.aiPricingEnabled))
       .catch(() => {});
@@ -216,9 +229,11 @@ export default function AccountScreen() {
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {(user?.name || user?.username || 'U')[0].toUpperCase()}
-              </Text>
+              {(user as any)?.avatar_url ? (
+                <Image source={{ uri: (user as any).avatar_url }} style={{ width: 64, height: 64, borderRadius: 32 }} />
+              ) : (
+                <Image source={{ uri: 'https://ui-avatars.com/api/?background=1A5C35&color=fff&name=' + encodeURIComponent(getFirstName(user)) }} style={{ width: 64, height: 64, borderRadius: 32 }} />
+              )}
             </View>
             <View style={styles.onlineDot} />
           </View>
@@ -229,7 +244,7 @@ export default function AccountScreen() {
                 <Text style={[styles.providerText, { color: provider.color }]}>{provider.label}</Text>
               </View>
             </View>
-            <Text style={styles.profileEmail}>{user?.email || 'No email'}</Text>
+            <Text style={styles.profileEmail} numberOfLines={1} ellipsizeMode="tail">{user?.email || 'No email'}</Text>
             {user?.location ? (
               <Text style={styles.profileLocation}>📍 {user.location}</Text>
             ) : null}
@@ -292,8 +307,8 @@ export default function AccountScreen() {
         {/* AI Settings */}
         <SectionCard title="AI Settings" icon="sparkles-outline" color={Colors.purple}>
           <ToggleRow
-            label="AI-Powered Pricing"
-            description="Enable AI to dynamically calculate soil test pricing. When disabled, no pricing is computed."
+            label="AI Pipeline Control"
+            description="Enable or disable automated AI analysis when syncing data from the Agni device."
             value={aiPricingEnabled}
             onToggle={handleAiPricingToggle}
             loading={aiPricingLoading}

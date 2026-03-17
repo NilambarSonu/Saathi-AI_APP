@@ -15,9 +15,39 @@ import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../constants/Colors';
 import { Shadows } from '../../constants/Shadows';
 import { Type } from '../../constants/Typography';
-import AgniPulseAnimation from '../../components/AgniPulseAnimation';
-import { getSoilTests, SoilTest } from '../../services/soil';
+import { Image, Modal } from 'react-native';
 import LottieView from 'lottie-react-native';
+import { getDashboardStats } from '../../services/analytics';
+import { getNotifications, AppNotification } from '../../services/notifications';
+
+function BouncingIndicator({ state }: { state: 'connecting' | 'connected' | 'disconnected' }) {
+  const y = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(y, { toValue: 6, duration: 800, useNativeDriver: true }),
+        Animated.timing(y, { toValue: 0, duration: 800, useNativeDriver: true })
+      ])
+    ).start();
+  }, []);
+
+  const color = state === 'connected' ? Colors.success : state === 'connecting' ? Colors.amber : Colors.error;
+
+  return (
+    <View style={{ alignItems: 'center', marginTop: 12 }}>
+      <Animated.View style={{ transform: [{ translateY: y }], width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+      {state === 'connecting' ? (
+        <Text style={{ ...Type.caption2, color, marginTop: 8, letterSpacing: 1 }} numberOfLines={1} ellipsizeMode="tail">
+          CONNECTING...
+        </Text>
+      ) : (
+        <Text style={{ ...Type.caption2, color, marginTop: 8, letterSpacing: 1 }} numberOfLines={1} ellipsizeMode="tail">
+          {state.toUpperCase()}
+        </Text>
+      )}
+    </View>
+  );
+}
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const getGreeting = () => {
   const h = new Date().getHours();
@@ -40,28 +70,28 @@ const getFirstName = (user: any): string => {
 };
 
 const FEATURES = [
-  { icon: 'zap',          color: '#1A5C35', bg: Colors.fillGreen,  title: 'Smart Fertilizer Calculation', subtitle: 'AI saves up to 30% on inputs', route: '/(app)/ai-chat' },
-  { icon: 'mic',          color: '#1565C0', bg: Colors.fillBlue,   title: 'Voice Advisory',               subtitle: 'Speak in Odia, Hindi, or English', route: '/(app)/ai-chat' },
-  { icon: 'cpu',          color: '#E65100', bg: Colors.fillAmber,  title: 'Agri-Science LLM',             subtitle: 'Custom AI trained on crop research', route: '/(app)/ai-chat' },
-  { icon: 'map',          color: '#6A1B9A', bg: Colors.fillPurple, title: 'Crop Planning',                subtitle: 'Market-driven advisory for max ROI', route: '/(app)/ai-chat' },
+  { icon: 'zap', color: '#1A5C35', bg: Colors.fillGreen, title: 'Smart Fertilizer Calculation', subtitle: 'AI saves up to 30% on inputs', route: '/(app)/ai-chat' },
+  { icon: 'mic', color: '#1565C0', bg: Colors.fillBlue, title: 'Voice Advisory', subtitle: 'Speak in Odia, Hindi, or English', route: '/(app)/ai-chat' },
+  { icon: 'cpu', color: '#E65100', bg: Colors.fillAmber, title: 'Agri-Science LLM', subtitle: 'Custom AI trained on crop research', route: '/(app)/ai-chat' },
+  { icon: 'map', color: '#6A1B9A', bg: Colors.fillPurple, title: 'Crop Planning', subtitle: 'Market-driven advisory for max ROI', route: '/(app)/ai-chat' },
 ];
 
 const HOW_STEPS = [
   {
     num: 1, numBg: '#d1fae5', numText: '#065f46',
-    icon: 'microscope' as const, iconColor: '#059669',
+    animation: require('../../animations/Microscope.json'),
     title: 'Scan Soil with Agni',
     body: 'Insert the Agni device into your field to instantly read real-time soil parameters.',
   },
   {
     num: 2, numBg: '#dbeafe', numText: '#1e40af',
-    icon: 'bluetooth' as const, iconColor: '#2563eb',
+    animation: require('../../animations/Bluetooth.json'),
     title: 'Connect to Saathi',
     body: 'Sync your sensor data securely via Bluetooth to the Saathi mobile app.',
   },
   {
     num: 3, numBg: '#fef3c7', numText: '#92400e',
-    icon: 'brain' as const, iconColor: '#d97706',
+    animation: require('../../animations/Brain.json'),
     title: 'Get AI Advice',
     body: 'Receive personalized crop plans and smart fertilizer recommendations.',
   },
@@ -129,21 +159,16 @@ function GlassCard({ style, children }: { style?: any; children: React.ReactNode
 export default function DashboardScreen() {
   const router = useRouter();
   const user = useAuthStore(s => s.user);
-  const [tests, setTests] = useState<SoilTest[]>([]);
-  const [stats, setStats] = useState({ farms: 1401, soilTests: 78, aiTips: 74 });
+  const [stats, setStats] = useState({ farms: 0, soilTests: 0, aiTips: 0 });
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   useEffect(() => {
-    getSoilTests()
-      .then(d => {
-        if (d?.length) {
-          setTests(d);
-          setStats({ farms: d.length, soilTests: d.length, aiTips: Math.floor(d.length * 0.9) });
-        }
-      })
-      .catch(() => {});
+    getDashboardStats().then(data => setStats(data || { farms: 0, soilTests: 0, aiTips: 0 })).catch(() => setStats({ farms: 0, soilTests: 0, aiTips: 0 }));
+    getNotifications().then(data => setNotifications(Array.isArray(data) ? data : [])).catch(() => {
+      setNotifications([]);
+    });
   }, []);
-
-  const latestTest = tests[0] ?? null;
 
   return (
     <View style={s.root}>
@@ -155,29 +180,67 @@ export default function DashboardScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} bounces>
-        
+
         {/* ── HEADER ── */}
         <View style={s.header}>
           <View>
-            <Text style={s.greeting}>{getGreeting()}</Text>
-            <Text style={s.name}>{getFirstName(user)}</Text>
+            <Text style={[s.greeting, { fontSize: 13, marginBottom: 2 }]}>{getGreeting()}</Text>
+            <Text style={[s.name, { fontSize: 28 }]}>{getFirstName(user)}</Text>
           </View>
           <View style={s.headerRight}>
-            <View style={[s.headerBtn, { backgroundColor: Colors.surface, ...Shadows.sm }]}>
+            <TouchableOpacity onPress={() => setIsNotifOpen(true)} style={[s.headerBtn, { backgroundColor: Colors.surface, ...Shadows.sm }]}>
               <Feather name="bell" size={20} color={Colors.label2} />
-            </View>
-            <View style={[s.headerBtn, { paddingHorizontal: 16, width: 'auto', backgroundColor: Colors.surface, ...Shadows.sm }]}>
-              <Text style={s.avatarText}>{getInitials(user)}</Text>
-            </View>
+              {(Array.isArray(notifications) ? notifications : []).some(n => !n.isRead) && <View style={s.notifDot} />}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/(app)/account')} style={[s.headerBtn, { backgroundColor: Colors.surface, ...Shadows.sm, padding: 0, overflow: 'hidden' }]}>
+              {(user as any)?.avatar_url ? (
+                <Image source={{ uri: (user as any).avatar_url }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+              ) : (
+                <Image source={{ uri: 'https://ui-avatars.com/api/?background=1A5C35&color=fff&name=' + encodeURIComponent(getFirstName(user)) }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+              )}
+            </TouchableOpacity>
           </View>
         </View>
+
+        {isNotifOpen && (
+          <View style={s.notifPanel}>
+            <View style={s.notifHeader}>
+              <Text style={s.notifTitle}>Notifications</Text>
+              <TouchableOpacity onPress={() => setIsNotifOpen(false)}>
+                <Ionicons name="close" size={24} color={Colors.label1} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ maxHeight: 300 }}>
+              {!(Array.isArray(notifications) && notifications.length > 0) ? (
+                <Text style={{ padding: 16, textAlign: 'center', color: Colors.label3 }}>No notifications yet.</Text>
+              ) : (
+                notifications.map(n => (
+                  <View key={n.id} style={s.notifItem}>
+                    <View style={[s.notifAvatar, { overflow: 'hidden' }]}>
+                      {(user as any)?.avatar_url ? (
+                        <Image source={{ uri: (user as any).avatar_url }} style={{ width: 40, height: 40 }} />
+                      ) : (
+                        <Image source={{ uri: 'https://ui-avatars.com/api/?background=1A5C35&color=fff&name=' + encodeURIComponent(getFirstName(user)) }} style={{ width: 40, height: 40 }} />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.notifItemUser}>{getFirstName(user)}</Text>
+                      <Text style={s.notifItemMsg}>{n.title}</Text>
+                      <Text style={s.notifTime}>{new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          </View>
+        )}
 
         {/* ── STATS ROW ── */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }} style={{ marginHorizontal: -20, marginBottom: 24 }}>
           {[
-            { label: 'FARMS', value: stats.farms.toLocaleString('en-IN') },
-            { label: 'TESTS', value: stats.soilTests.toString() },
-            { label: 'AI TIPS', value: stats.aiTips.toString() },
+            { label: 'FARMS', value: (stats?.farms || 0).toLocaleString('en-IN') },
+            { label: 'TESTS', value: (stats?.soilTests || 0).toString() },
+            { label: 'AI TIPS', value: (stats?.aiTips || 0).toString() },
           ].map((st, i) => (
             <View key={i} style={[s.statCard, Shadows.md]}>
               <Text style={s.statLabel}>{st.label}</Text>
@@ -191,7 +254,7 @@ export default function DashboardScreen() {
         <View style={[s.heroCard, Shadows.lg]}>
           {/* Deep dark gradient with slight tint */}
           <LinearGradient colors={['#0F1F17', '#152C22']} style={StyleSheet.absoluteFill} />
-          
+
           <View style={{ padding: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flex: 1, paddingRight: 20 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
@@ -211,8 +274,7 @@ export default function DashboardScreen() {
 
             {/* Agni Animated Graphic */}
             <View style={{ width: 80, height: 100, alignItems: 'center', justifyContent: 'center' }}>
-              <AgniPulseAnimation />
-              <Text style={{ ...Type.caption2, color: 'rgba(255,255,255,0.5)', marginTop: 12, letterSpacing: 2 }}>AGNI</Text>
+              <Image source={require('../../public/Agni_Device.png')} style={{ width: '100%', height: '100%', resizeMode: 'contain' }} />
             </View>
           </View>
         </View>
@@ -241,7 +303,7 @@ export default function DashboardScreen() {
             <Text style={{ ...Type.caption2, color: Colors.success }}>336X FASTER</Text>
           </View>
           <View style={{ height: 8, backgroundColor: Colors.sep2, borderRadius: 4, overflow: 'hidden' }}>
-            <LinearGradient colors={['#A7F3D0', Colors.success]} start={{x:0, y:0}} end={{x:1, y:0}} style={{ width: '98%', height: '100%', borderRadius: 4 }} />
+            <LinearGradient colors={['#A7F3D0', Colors.success]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width: '98%', height: '100%', borderRadius: 4 }} />
           </View>
         </GlassCard>
 
@@ -272,8 +334,8 @@ export default function DashboardScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }} style={{ marginHorizontal: -20, marginBottom: 8 }}>
           {HOW_STEPS.map((step, i) => (
             <GlassCard key={i} style={{ width: 280, marginRight: 16, padding: 24, alignItems: 'flex-start', ...Shadows.md }}>
-              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: step.numBg, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-                <Text style={{ ...Type.title3, color: step.numText }}>{step.num}</Text>
+              <View style={{ width: 64, height: 64, marginBottom: 20 }}>
+                <LottieView source={step.animation} autoPlay loop style={{ width: '100%', height: '100%' }} />
               </View>
               <Text style={{ ...Type.headline, color: Colors.label1, marginBottom: 10 }}>{step.title}</Text>
               <Text style={{ ...Type.callout, color: Colors.label2 }}>{step.body}</Text>
@@ -347,14 +409,14 @@ const s = StyleSheet.create({
   },
   heroCard: {
     borderRadius: 24,
-    borderWidth: 1, 
+    borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     marginBottom: 28,
     overflow: 'hidden',
   },
   heroBtn: {
-    flexDirection: 'row', alignItems: 'center', 
-    paddingHorizontal: 20, paddingVertical: 12, 
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 12,
     borderRadius: 100, overflow: 'hidden', alignSelf: 'flex-start',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)'
   },
@@ -385,4 +447,25 @@ const s = StyleSheet.create({
   },
   sectionTitle: { ...Type.title2, color: Colors.label1 },
   sectionAction: { ...Type.subheadline, color: Colors.success },
+
+  // Notifications
+  notifDot: {
+    position: 'absolute', top: 12, right: 12,
+    width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.error
+  },
+  notifPanel: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 24,
+    ...Shadows.md,
+    borderWidth: 1, borderColor: Colors.sep2,
+  },
+  notifHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  notifTitle: { ...Type.title3, color: Colors.label1 },
+  notifItem: { flexDirection: 'row', marginBottom: 16, alignItems: 'center' },
+  notifAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  notifItemUser: { ...Type.headline, color: Colors.label1 },
+  notifItemMsg: { ...Type.subheadline, color: Colors.label2 },
+  notifTime: { ...Type.caption2, color: Colors.label3, marginTop: 4 },
 });

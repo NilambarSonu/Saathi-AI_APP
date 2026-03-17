@@ -64,10 +64,12 @@ export default function AppLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: Colors.bg1 }}>
       <Slot />
-      <LiquidGlassTabBar
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
+      {activeTab !== 'ai-chat' && (
+        <LiquidGlassTabBar
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      )}
     </View>
   );
 }

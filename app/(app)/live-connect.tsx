@@ -31,8 +31,8 @@ const C = {
   textDark: '#022C22',   // Deep dark green
   textSub:  '#475569',   // Slate
   
-  purple:   '#7C3AED',   // Vivid Purple for actions
-  purpleLight: '#EDE9FE',
+  purple:   '#1A5C35',   // Brand Green
+  purpleLight: '#E8F5EE', // Light brand green
   
   white:    '#FFFFFF',
   
@@ -67,6 +67,7 @@ export default function LiveConnectScreen() {
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'connecting' | 'connected' | 'completed'>('idle');
   const [logMsg, setLogMsg] = useState('Make sure Agni device is powered on');
   const [devices, setDevices] = useState<Device[]>([]);
+  const [showSoilData, setShowSoilData] = useState(false);
   
   // Animation values for radar rings
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -191,15 +192,15 @@ export default function LiveConnectScreen() {
         {!isBLEAvailable() ? (
           <GlassCard style={{ padding: 24, alignItems: 'center', marginTop: 40 }}>
             <Text style={{ fontSize: 40, marginBottom: 16 }}>📡</Text>
-            <Text style={{ fontFamily: 'Sora_800ExtraBold', color: C.textDark, fontSize: 18, marginBottom: 10 }}>Bluetooth Not Available</Text>
+            <Text style={{ fontFamily: 'Sora_800ExtraBold', color: C.textDark, fontSize: 18, marginBottom: 10 }}>Bluetooth is disabled</Text>
             <Text style={{ fontFamily: 'Sora_400Regular', color: C.textSub, textAlign: 'center', marginBottom: 20 }}>
-              BLE device pairing requires a physical device. This feature is not available in current environment.
+              Bluetooth is disabled. Please enable Bluetooth to connect device.
             </Text>
             <TouchableOpacity 
-              style={[s.purpleBtn, { alignSelf: 'center', paddingHorizontal: 30 }]}
-              onPress={() => Linking.openURL('https://saathiai.org')}
+              style={[s.purpleBtn, { alignSelf: 'center', paddingHorizontal: 30, opacity: 0.5 }]}
+              disabled
             >
-              <Text style={s.purpleBtnText}>Learn More</Text>
+              <Text style={s.purpleBtnText}>Scan Disabled</Text>
             </TouchableOpacity>
           </GlassCard>
         ) : (
@@ -224,7 +225,10 @@ export default function LiveConnectScreen() {
                       autoPlay loop={false} style={{ width: 60, height: 60 }}
                     />
                   ) : (
-                    <Ionicons name="bluetooth" size={32} color={C.white} />
+                    <LottieView
+                      source={require('../../animations/Bluetooth-icon.json')}
+                      autoPlay loop style={{ width: 50, height: 50, transform: [{ scale: 1.5 }] }}
+                    />
                   )}
                 </View>
               </View>
@@ -264,22 +268,24 @@ export default function LiveConnectScreen() {
                 </View>
               )}
 
-              {/* CTA Button */}
-              {scanState !== 'completed' && scanState !== 'connected' && (
+              {/* CTA Buttons */}
+              <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginTop: (scanState === 'scanning' || devices.length > 0) ? 0 : 20 }}>
                 <TouchableOpacity 
-                  style={[s.purpleBtn, scanState === 'connecting' && { opacity: 0.7 }]}
+                  style={[s.purpleBtn, { flex: 1 }, scanState === 'connecting' && { opacity: 0.7 }]}
                   onPress={handleScanToggle}
                   disabled={scanState === 'connecting'}
                 >
-                  <MaterialCommunityIcons 
-                    name={scanState === 'scanning' ? "stop-circle-outline" : "radar"} 
-                    size={20} color={C.white} 
-                  />
                   <Text style={s.purpleBtnText}>
-                    {scanState === 'scanning' ? "Stop Scanning" : "Scan for Agni Device"}
+                    {scanState === 'scanning' ? "STOP" : scanState === 'connected' ? "CONNECTED" : "CONNECT"}
                   </Text>
                 </TouchableOpacity>
-              )}
+                <TouchableOpacity 
+                  style={[s.secondaryBtn, { flex: 1 }]}
+                  onPress={() => setShowSoilData(!showSoilData)}
+                >
+                  <Text style={[s.purpleBtnText, { color: C.purple }]}>SOIL DATA</Text>
+                </TouchableOpacity>
+              </View>
             </GlassCard>
 
             {/* ── 3. QUICK START GUIDE ── */}
@@ -324,29 +330,31 @@ export default function LiveConnectScreen() {
             )}
 
             {/* ── 4. SOIL DATA (Empty or Filled) ── */}
-            {scanState !== 'completed' ? (
-              <GlassCard style={s.dataCardEmpty}>
-                <Text style={s.sectionTitle}>Soil Analysis Data</Text>
-                <View style={s.emptyIconCircle}>
-                  <MaterialCommunityIcons name="file-search-outline" size={32} color={C.purple} />
-                </View>
-                <Text style={s.emptyTitle}>No soil data available</Text>
-                <Text style={s.emptySub}>Connect your Agni device to view analysis</Text>
-              </GlassCard>
-            ) : (
-              <GlassCard style={s.dataCardFilled}>
-                <Text style={[s.sectionTitle, { marginBottom: 16 }]}>Soil Analysis Complete 🌱</Text>
-                <View style={s.dataGrid}>
-                  <View style={s.dataBox}><Text style={s.dataVal}>6.8</Text><Text style={s.dataLbl}>pH Level</Text></View>
-                  <View style={s.dataBox}><Text style={s.dataVal}>45%</Text><Text style={s.dataLbl}>Moisture</Text></View>
-                  <View style={s.dataBox}><Text style={s.dataVal}>82</Text><Text style={s.dataLbl}>N (ppm)</Text></View>
-                  <View style={s.dataBox}><Text style={s.dataVal}>34</Text><Text style={s.dataLbl}>P (ppm)</Text></View>
-                </View>
-                <TouchableOpacity style={[s.purpleBtn, { marginTop: 16 }]} onPress={() => router.push('/(app)/ai-chat')}>
-                  <MaterialCommunityIcons name="robot-outline" size={20} color={C.white} />
-                  <Text style={s.purpleBtnText}>Get AI Advisory</Text>
-                </TouchableOpacity>
-              </GlassCard>
+            {showSoilData && (
+              scanState !== 'completed' ? (
+                <GlassCard style={s.dataCardEmpty}>
+                  <Text style={s.sectionTitle}>Soil Analysis Data</Text>
+                  <View style={s.emptyIconCircle}>
+                    <MaterialCommunityIcons name="file-search-outline" size={32} color={C.purple} />
+                  </View>
+                  <Text style={s.emptyTitle}>No soil data available</Text>
+                  <Text style={s.emptySub}>Connect your Agni device to view analysis</Text>
+                </GlassCard>
+              ) : (
+                <GlassCard style={s.dataCardFilled}>
+                  <Text style={[s.sectionTitle, { marginBottom: 16 }]}>Soil Analysis Complete 🌱</Text>
+                  <View style={s.dataGrid}>
+                    <View style={s.dataBox}><Text style={s.dataVal}>6.8</Text><Text style={s.dataLbl}>pH Level</Text></View>
+                    <View style={s.dataBox}><Text style={s.dataVal}>45%</Text><Text style={s.dataLbl}>Moisture</Text></View>
+                    <View style={s.dataBox}><Text style={s.dataVal}>82</Text><Text style={s.dataLbl}>N (ppm)</Text></View>
+                    <View style={s.dataBox}><Text style={s.dataVal}>34</Text><Text style={s.dataLbl}>P (ppm)</Text></View>
+                  </View>
+                  <TouchableOpacity style={[s.purpleBtn, { marginTop: 16 }]} onPress={() => router.push('/(app)/ai-chat')}>
+                    <MaterialCommunityIcons name="robot-outline" size={20} color={C.white} />
+                    <Text style={s.purpleBtnText}>Get AI Advisory</Text>
+                  </TouchableOpacity>
+                </GlassCard>
+              )
             )}
           </>
         )}
@@ -385,7 +393,7 @@ const s = StyleSheet.create({
   },
   radarRing: {
     position: 'absolute', width: 72, height: 72, borderRadius: 36,
-    borderWidth: 2, borderColor: C.purple, backgroundColor: 'transparent',
+    borderWidth: 2, borderColor: 'rgba(26, 92, 53, 0.4)', backgroundColor: 'transparent',
   },
   heroStatusArea: { alignItems: 'center', marginBottom: 24, minHeight: 48 },
   heroStatusTitle: { fontFamily: 'Sora_800ExtraBold', fontSize: 18, color: C.textDark, marginBottom: 4 },
@@ -400,6 +408,11 @@ const s = StyleSheet.create({
       ios: { shadowColor: C.purple, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 },
       android: { elevation: 6 }
     })
+  },
+  secondaryBtn: {
+    width: '100%', height: 56, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.4)',
+    borderWidth: 1, borderColor: C.purple,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
   purpleBtnText: { fontFamily: 'Sora_700Bold', fontSize: 16, color: C.white },
 
