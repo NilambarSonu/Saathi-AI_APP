@@ -10,6 +10,7 @@ import { loginWithCredentials } from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../constants/Colors';
 import * as WebBrowser from 'expo-web-browser';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
@@ -30,9 +31,17 @@ export default function LoginScreen() {
       setUser(response.user);
       router.replace('/(app)');
     } catch (err: any) {
+      const rawMessage = err?.message || '';
+      const message =
+        rawMessage === 'INVALID_AUTH_TOKEN' || rawMessage === 'INVALID_REFRESH_TOKEN' || rawMessage === 'INVALID_AUTH_USER'
+          ? 'Server returned an invalid login response. Please try again in a minute.'
+          : rawMessage === 'NETWORK_REQUEST_FAILED'
+            ? 'Network request failed. Please check internet and backend server status.'
+            : rawMessage || 'Invalid credentials. Please try again.';
+
       Alert.alert(
         'Login Failed',
-        err.message || 'Invalid credentials. Please try again.'
+        message
       );
     } finally {
       setIsLoading(false);
@@ -47,6 +56,11 @@ export default function LoginScreen() {
     } catch (err) {
       Alert.alert('Social Auth Error', 'Could not open login page.');
     }
+  }
+
+  async function handleShowOnboardingAgain() {
+    await AsyncStorage.multiRemove(['saathi_has_onboarded', 'hasOnboarded']);
+    router.replace('/(onboarding)');
   }
 
   return (
@@ -82,6 +96,10 @@ export default function LoginScreen() {
               <Text style={styles.tabText}>Register</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity onPress={handleShowOnboardingAgain} style={styles.onboardingLinkBtn}>
+            <Text style={styles.onboardingLinkText}>Show onboarding screens again</Text>
+          </TouchableOpacity>
 
           {/* Form */}
           <Text style={styles.label}>USERNAME OR EMAIL</Text>
@@ -179,6 +197,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceAlt,
     borderRadius: 12, padding: 4,
     marginBottom: 24,
+  },
+  onboardingLinkBtn: {
+    alignSelf: 'center',
+    marginBottom: 18,
+    paddingVertical: 4,
+  },
+  onboardingLinkText: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 12,
+    color: Colors.primary,
   },
   tab: { flex: 1, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
   tabActive: { backgroundColor: Colors.surface, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },

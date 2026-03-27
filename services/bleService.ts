@@ -24,13 +24,11 @@ import type {
 } from 'react-native-ble-plx';
 import { saveSoilRecord, SoilData } from '../database/datastorage';
 
-let bluetoothStateApi: any = null;
+let legacyBleManager: any = null;
 try {
-  const bluetoothStateModule = require('react-native-bluetooth-state-manager');
-  bluetoothStateApi = bluetoothStateModule.BluetoothStateManager ?? null;
+  legacyBleManager = require('react-native-ble-manager').default ?? null;
 } catch {
-  // In Expo Go this native module is unavailable; keep null and use safe fallback paths.
-  console.warn('[BLE] react-native-bluetooth-state-manager native module unavailable.');
+  console.warn('[BLE] react-native-ble-manager native module unavailable.');
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -146,6 +144,7 @@ class BLEService {
   private _isClosing         = false;
   private _transferCount     = 0;
   private _callbacks:        BLECallbacks | null = null;
+  private _lastBtState:      BleState | null = null;
 
   // Enhancement 5 — scan dedup
   private _isScanning = false;
@@ -197,7 +196,10 @@ class BLEService {
     this._btStateSubscription?.remove();
 
     this._btStateSubscription = m.onStateChange((state) => {
-      this._log('info', `Bluetooth state: ${state}`);
+      if (this._lastBtState !== state) {
+        this._lastBtState = state;
+        this._log('info', `Bluetooth state: ${state}`);
+      }
       callbacks.onBluetoothState?.(state);
     }, true /* emit current state immediately */);
   }
@@ -210,19 +212,32 @@ class BLEService {
 
   async requestEnableBluetooth(): Promise<boolean> {
     if (Platform.OS !== 'android') return this.isBluetoothPoweredOn();
-    if (!bluetoothStateApi) {
-      // Expo Go / missing native module: cannot open Android BT enable dialog.
-      this._log('info', 'System Bluetooth enable dialog is unavailable in this build. Use a dev build or APK.');
+
+    // If already on, continue immediately.
+    if (await this.isBluetoothPoweredOn()) return true;
+
+    if (!legacyBleManager) {
+      this._log('info', 'System Bluetooth enable dialog is unavailable in this build. Please enable Bluetooth manually.');
       return false;
     }
 
     try {
-      const state = await bluetoothStateApi.getState();
-      if (state === 'PoweredOn') return true;
+      // Safe no-op if already started.
+      await legacyBleManager.start({ showAlert: false });
+    } catch {
+      // Continue — start may already be initialized.
+    }
 
-      this._log('info', 'Bluetooth is OFF. Opening system enable prompt…');
-      await bluetoothStateApi.requestToEnable();
-      return (await bluetoothStateApi.getState()) === 'PoweredOn';
+    try {
+      this._log('info', 'Bluetooth is OFF. Opening system enable dialog…');
+      await legacyBleManager.enableBluetooth();
+
+      // Wait briefly for adapter state to settle to PoweredOn.
+      for (let i = 0; i < 8; i++) {
+        if (await this.isBluetoothPoweredOn()) return true;
+        await new Promise(r => setTimeout(r, 250));
+      }
+      return false;
     } catch {
       // User denied/dismissed the dialog. This is a non-error UX path.
       this._log('info', 'Bluetooth enable request dismissed by user.');
@@ -234,11 +249,17 @@ class BLEService {
   async requestAndroidPermissions(): Promise<void> {
     if (Platform.OS !== 'android') return;
 
-    const results = await PermissionsAndroid.requestMultiple([
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-      PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-    ]);
+    const sdkInt = Number(Platform.Version);
+    const permissions = sdkInt >= 31
+      ? [
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        ]
+      : [
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        ];
+
+    const results = await PermissionsAndroid.requestMultiple(permissions);
 
     const denied = Object.entries(results)
       .filter(([, r]) => r !== PermissionsAndroid.RESULTS.GRANTED)
@@ -543,6 +564,14 @@ class BLEService {
 
   // ── Disconnect (full teardown) ─────────────────────────────────────────────
   async disconnect(): Promise<void> {
+    const hadActiveResources = Boolean(
+      this._charSubscription ||
+      this._btStateSubscription ||
+      this._appStateListener ||
+      this._device ||
+      this._isScanning
+    );
+
     this._isClosing = true;
     this._isScanning = false;
     this._clearTransferTimer();
@@ -577,9 +606,12 @@ class BLEService {
     this._transferCount     = 0;
     this._reconnectAttempts = 0;
     this._appState          = 'active';
+    this._lastBtState       = null;
     this._callbacks         = null;
 
-    this._log('info', 'Disconnected and all resources released.');
+    if (hadActiveResources) {
+      this._log('info', 'Disconnected and all resources released.');
+    }
   }
 
   // ── Public state ─────────────────────────────────────────────────────────

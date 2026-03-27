@@ -3,6 +3,7 @@
     "name": "Saathi AI",
     "slug": "saathi-ai",
     "version": "2.0.0",
+    "scheme": "org.saathiai.app",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "splash": {

@@ -62,19 +62,19 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }
 
   // Fallback to Live API
-  return apiCall<DashboardStats>('/api/analytics/dashboard');
+  return apiCall<DashboardStats>('/analytics/dashboard');
 }
 
 /**
  * Fetch trend data for a specific parameter (e.g. Nitrogen, pH)
  */
 export async function getParameterTrend(parameterName: string, days: number = 30): Promise<ParameterTrend> {
-  return apiCall<ParameterTrend>(`/api/analytics/trend?parameter=${encodeURIComponent(parameterName)}&days=${days}`);
+  return apiCall<ParameterTrend>(`/analytics/trend?parameter=${encodeURIComponent(parameterName)}&days=${days}`);
 }
 
 /**
  * Fetch geographic locations of all tests for the Map
  */
 export async function getTestLocations(): Promise<MapLocation[]> {
-  return apiCall<MapLocation[]>('/api/analytics/locations');
+  return apiCall<MapLocation[]>('/analytics/locations');
 }

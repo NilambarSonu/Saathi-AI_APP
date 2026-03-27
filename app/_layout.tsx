@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Stack, router, useRouter } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Platform } from 'react-native';
+import { SoilMarkersProvider } from '../context/SoilMarkersContext';
 import * as Linking from 'expo-linking';
 import { useFonts } from 'expo-font';
 import { 
@@ -61,24 +62,14 @@ export default function RootLayout() {
           } catch (err) {
             console.warn('[Push Register Error]', err);
           }
-
-          router.replace('/(app)');
+          // Intentionally omitting router.replace() here
+          // The visual splash screen handles actual screen redirection.
         } else {
           clearUser();
-          // Check if first time launch
-          const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-          const hasOnboarded = await AsyncStorage.getItem('saathi_has_onboarded');
-          
-          if (!hasOnboarded) {
-            router.replace('/(onboarding)');
-          } else {
-            router.replace('/(auth)/login');
-          }
         }
       } catch (err) {
         console.error('[App Init]', err);
         clearUser();
-        router.replace('/(auth)/login');
       } finally {
         if (fontsLoaded) {
           SplashScreen.hideAsync();
@@ -142,18 +133,19 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, [navigationRouter]);
 
-  if (!fontsLoaded) {
-    return null;
-  }
+  // Render the stack immediately to let Expo Router match the path, 
+  // relying on SplashScreen.preventAutoHideAsync() to hide the view until fonts load.
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="splash" options={{ animation: 'fade' }} />
-        <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
-        <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
-        <Stack.Screen name="(app)" options={{ animation: 'fade' }} />
-      </Stack>
-    </GestureHandlerRootView>
+    <SoilMarkersProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
+          <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
+          <Stack.Screen name="(app)" options={{ animation: 'fade' }} />
+        </Stack>
+      </GestureHandlerRootView>
+    </SoilMarkersProvider>
   );
 }

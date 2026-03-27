@@ -20,6 +20,7 @@ import LottieView from 'lottie-react-native';
 import { getDashboardStats } from '../../services/analytics';
 import { getNotifications, AppNotification } from '../../services/notifications';
 import { tabBarY, hideTabBar, showTabBar } from '../../constants/Animations';
+import SwipePage from '../../components/navigation/SwipePage';
 
 function BouncingIndicator({ state }: { state: 'connecting' | 'connected' | 'disconnected' }) {
   const y = useRef(new Animated.Value(0)).current;
@@ -288,7 +289,8 @@ export default function DashboardScreen() {
 
 
   return (
-    <View style={s.root}>
+    <SwipePage leftRoute="/(app)/connect">
+      <View style={s.root}>
       {/* ── MESH BACKGROUND ── */}
       <View style={StyleSheet.absoluteFill}>
         <LinearGradient colors={[Colors.bg0, Colors.bg1, Colors.surface]} style={StyleSheet.absoluteFill} />
@@ -487,7 +489,8 @@ export default function DashboardScreen() {
           </Text>
         </View>
       </ScrollView>
-    </View>
+      </View>
+    </SwipePage>
   );
 }
 

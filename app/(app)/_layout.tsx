@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, Animated, Dimensions } from 'react-native';
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs, Redirect, useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
@@ -8,6 +8,7 @@ import { registerForPushNotifications } from '../../services/notifications';
 import { registerDevice } from '../../services/auth';
 import { tabBarY } from '../../constants/Animations';
 import * as NavigationBar from 'expo-navigation-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -123,6 +124,7 @@ const styles = StyleSheet.create({
 export default function AppLayout() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const user = useAuthStore(s => s.user);
+  const router = useRouter();
 
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -150,6 +152,16 @@ export default function AppLayout() {
     }
     setupPushNotifications();
   }, [user?.id]);
+
+  useEffect(() => {
+    async function restorePendingBLEIntent() {
+      const hasIntent = await AsyncStorage.getItem('saathi_ble_connect_intent');
+      if (hasIntent === '1') {
+        router.replace('/(app)/connect');
+      }
+    }
+    restorePendingBLEIntent();
+  }, [router]);
 
   if (!isAuthenticated) {
     return <Redirect href="/(auth)/login" />;

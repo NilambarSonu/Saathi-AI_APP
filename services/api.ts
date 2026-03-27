@@ -1,68 +1,15 @@
-import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
-// Core API configuration
-export const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://saathiai.org';
-const API_ROOT = `${API_BASE}/api`;
-const ASYNC_ACCESS_TOKEN_KEY = 'saathi_token';
+// ─── Constants & Configuration ───────────────────────────────────────────────
+export const API_BASE = 'https://saathiai.org';
+export const API_ROOT = `${API_BASE}/api`;
+
+const ASYNC_ACCESS_TOKEN_KEY = 'saathi_access_token';
 const ASYNC_REFRESH_TOKEN_KEY = 'saathi_refresh_token';
-const PENDING_SOIL_QUEUE_KEY = 'pending_soil_queue_v1';
+const PENDING_SOIL_QUEUE_KEY = 'pending_soil_queue_v2';
 
-export const SAATHI_SYSTEM_INSTRUCTION = `
-You are Saathi AI — an expert agricultural intelligence system designed for Indian farmers.
-
-CORE OBJECTIVE:
-Provide accurate, actionable, and farmer-friendly recommendations based on soil data.
-
-STRICT RULES:
-- Always prioritize ORGANIC farming solutions first
-- Only suggest CHEMICAL fertilizers if organic options are not available
-- Use ONLY commonly available fertilizers in India (Urea, DAP, MOP, SSP, Vermicompost, FYM)
-- Always give quantities in KG per ACRE
-- Keep response SHORT, CLEAR, and PRACTICAL
-
-RESPONSE STYLE:
-- Use simple language (farmer-friendly)
-- Use emojis for clarity
-- Max 8–10 bullet points
-- NO markdown, NO bold, NO special symbols like *
-
-OUTPUT STRUCTURE:
-🌱 Soil Health Status
-✅ Good Things
-❌ Problems
-💡 Solutions (Organic first → Chemical alternative)
-📅 When to apply
-🎯 Expected result
-
-SMART BEHAVIOR:
-- If pH < 5.5 → suggest liming (soil acidity fix)
-- If Nitrogen low → recommend compost/vermicompost first
-- If moisture low → suggest irrigation strategy
-- If temperature high → suggest mulching
-
-CONTEXT AWARE:
-- If user asks general question → answer normally
-- If soil data exists → personalize recommendations
-
-NEVER:
-- Suggest external experts
-- Give vague answers
-- Use complex scientific terms
-`;
-
-async function getStoredAccessToken(): Promise<string | null> {
-  const secureToken = await SecureStore.getItemAsync('saathi_access_token');
-  if (secureToken) return secureToken;
-  return AsyncStorage.getItem(ASYNC_ACCESS_TOKEN_KEY);
-}
-
-async function getStoredRefreshToken(): Promise<string | null> {
-  const secureRefresh = await SecureStore.getItemAsync('saathi_refresh_token');
-  if (secureRefresh) return secureRefresh;
-  return AsyncStorage.getItem(ASYNC_REFRESH_TOKEN_KEY);
-}
-
+// ─── Network & Timeout Helpers ───────────────────────────────────────────────
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('REQUEST_TIMEOUT')), timeoutMs);
@@ -79,145 +26,73 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
-async function isInternetAvailable(): Promise<boolean> {
+/** Check if internet access is available via a fast ping to the API */
+export async function isInternetAvailable(): Promise<boolean> {
   try {
     const probe = await withTimeout(
-      fetch(`${API_ROOT}/config`, { method: 'GET' }),
-      3500
+      fetch(`${API_ROOT}/health`, { method: 'GET' }).catch(() => ({ ok: false })),
+      3000
     );
-    return probe.ok;
+    return (probe as Response).ok !== false; // If backend responds with any status, network is structurally up
   } catch {
     return false;
   }
 }
 
-type PendingSoilPayload = {
-  data: Record<string, any>;
-  queuedAt: string;
-};
-
-async function getPendingSoilQueue(): Promise<PendingSoilPayload[]> {
-  try {
-    const raw = await AsyncStorage.getItem(PENDING_SOIL_QUEUE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+// ─── Authentication Handlers ─────────────────────────────────────────────────
+export async function getStoredAccessToken(): Promise<string | null> {
+  // Check SecureStore first, fallback to AsyncStorage
+  const secureToken = await SecureStore.getItemAsync(ASYNC_ACCESS_TOKEN_KEY);
+  if (secureToken) return secureToken;
+  return AsyncStorage.getItem(ASYNC_ACCESS_TOKEN_KEY);
 }
 
-async function setPendingSoilQueue(queue: PendingSoilPayload[]): Promise<void> {
-  await AsyncStorage.setItem(PENDING_SOIL_QUEUE_KEY, JSON.stringify(queue));
+export async function getStoredRefreshToken(): Promise<string | null> {
+  const secureRefresh = await SecureStore.getItemAsync(ASYNC_REFRESH_TOKEN_KEY);
+  if (secureRefresh) return secureRefresh;
+  return AsyncStorage.getItem(ASYNC_REFRESH_TOKEN_KEY);
 }
 
-/**
- * Core API call function
- * Automatically attaches JWT token from secure storage
- * Automatically retries with refresh token on 401
- */
-export async function apiCall<T = any>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const token = await getStoredAccessToken();
-  
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'x-client-type': 'mobile',           // tells backend this is the app
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(options.headers as Record<string, string> || {}),
-  };
-
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  // Token expired — try refresh
-  if (response.status === 401 && token) {
-    const refreshed = await tryRefreshToken();
-    if (refreshed) {
-      // Retry original request with new token
-      const newToken = await SecureStore.getItemAsync('saathi_access_token');
-      const retryResponse = await fetch(`${API_BASE}${endpoint}`, {
-        ...options,
-        headers: {
-          ...headers,
-          Authorization: `Bearer ${newToken}`,
-        },
-      });
-      if (!retryResponse.ok) {
-        throw new Error(await retryResponse.text());
-      }
-      return retryResponse.json();
-    } else {
-      // Refresh also failed — user must log in again
-      await clearAuthTokens();
-      throw new Error('SESSION_EXPIRED');
-    }
+export async function saveAuthTokens(token: string, refreshToken?: string): Promise<void> {
+  if (typeof token !== 'string' || token.trim().length === 0) {
+    throw new Error('INVALID_AUTH_TOKEN');
   }
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    let errorMessage: string;
-    try {
-      const errorJson = JSON.parse(errorText);
-      errorMessage = errorJson.error || errorJson.message || 'Request failed';
-    } catch {
-      errorMessage = errorText || `HTTP ${response.status}`;
-    }
-    throw new Error(errorMessage);
-  }
-
-  // Handle empty responses (204 No Content etc.)
-  const contentType = response.headers.get('content-type');
-  if (!contentType || !contentType.includes('application/json')) {
-    return {} as T;
-  }
-
-  return response.json();
-}
-
-/**
- * Save auth tokens securely after login/register
- */
-export async function saveAuthTokens(token: string, refreshToken: string): Promise<void> {
-  await SecureStore.setItemAsync('saathi_access_token', token);
-  await SecureStore.setItemAsync('saathi_refresh_token', refreshToken);
+  await SecureStore.setItemAsync(ASYNC_ACCESS_TOKEN_KEY, token);
   await AsyncStorage.setItem(ASYNC_ACCESS_TOKEN_KEY, token);
-  await AsyncStorage.setItem(ASYNC_REFRESH_TOKEN_KEY, refreshToken);
+
+  if (refreshToken) {
+    if (typeof refreshToken !== 'string') {
+      throw new Error('INVALID_REFRESH_TOKEN');
+    }
+    await SecureStore.setItemAsync(ASYNC_REFRESH_TOKEN_KEY, refreshToken);
+    await AsyncStorage.setItem(ASYNC_REFRESH_TOKEN_KEY, refreshToken);
+  }
 }
 
-/**
- * Clear all auth tokens (logout)
- */
 export async function clearAuthTokens(): Promise<void> {
-  await SecureStore.deleteItemAsync('saathi_access_token');
-  await SecureStore.deleteItemAsync('saathi_refresh_token');
+  await SecureStore.deleteItemAsync(ASYNC_ACCESS_TOKEN_KEY);
+  await SecureStore.deleteItemAsync(ASYNC_REFRESH_TOKEN_KEY);
   await AsyncStorage.removeItem(ASYNC_ACCESS_TOKEN_KEY);
   await AsyncStorage.removeItem(ASYNC_REFRESH_TOKEN_KEY);
 }
 
-/**
- * Attempt to refresh the access token using the refresh token
- * Returns true if successful, false otherwise
- */
-async function tryRefreshToken(): Promise<boolean> {
+// ─── Token Refresh Agent ─────────────────────────────────────────────────────
+async function generateRefreshToken(): Promise<boolean> {
   const refreshToken = await getStoredRefreshToken();
   if (!refreshToken) return false;
 
   try {
-    const response = await fetch(`${API_BASE}/api/auth/refresh`, {
+    const response = await fetch(`${API_ROOT}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
     });
 
     if (!response.ok) return false;
-
     const data = await response.json();
-    if (data.token && data.refreshToken) {
+    
+    if (data.token) {
       await saveAuthTokens(data.token, data.refreshToken);
       return true;
     }
@@ -227,99 +102,206 @@ async function tryRefreshToken(): Promise<boolean> {
   }
 }
 
-export const api = {
-  async chat(message: string, token?: string, extra?: Record<string, any>) {
-    const authToken = token || (await getStoredAccessToken()) || undefined;
+// ─── Core Universal API Caller ───────────────────────────────────────────────
+export async function apiCall<T = any>(
+  endpoint: string, // must start with '/' e.g. '/chat'
+  options: RequestInit = {}
+): Promise<T> {
+  const token = await getStoredAccessToken();
+  
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-client-type': 'mobile-app', 
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers as Record<string, string> || {}),
+  };
 
-    const res = await fetch(`${API_ROOT}/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authToken && { Authorization: `Bearer ${authToken}` }),
-      },
-      body: JSON.stringify({
-        message,
-        systemInstruction: SAATHI_SYSTEM_INSTRUCTION,
-        ...extra,
-      }),
-    });
+  const url = `${API_ROOT}${endpoint}`;
+  let response: Response;
+  try {
+    response = await fetch(url, { ...options, headers });
+  } catch {
+    throw new Error('NETWORK_REQUEST_FAILED');
+  }
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data?.error || data?.message || 'Chat request failed');
+  // 1. Soft Refresh if token expired
+  if (response.status === 401 && token) {
+    const refreshed = await generateRefreshToken();
+    if (refreshed) {
+      const newToken = await getStoredAccessToken();
+      headers['Authorization'] = `Bearer ${newToken}`;
+      try {
+        response = await fetch(url, { ...options, headers });
+      } catch {
+        throw new Error('NETWORK_REQUEST_FAILED');
+      }
+    } else {
+      await clearAuthTokens();
+      throw new Error('SESSION_EXPIRED');
     }
-    return data;
+  }
+
+  // 2. Error mapping 
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = `HTTP Error ${response.status}`;
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorMessage = errorJson.error || errorJson.message || errorMessage;
+    } catch {
+      errorMessage = errorText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
+
+  // 3. Prevent crashing on empty response (204 No Content)
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    return {} as T;
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetch soil history using the same user-scoped query pattern as live web.
+ */
+export async function fetchSoilHistory<T = any[]>(userId: string): Promise<T> {
+  const normalizedUserId = typeof userId === 'string' ? userId.trim() : '';
+  if (!normalizedUserId) return [] as T;
+
+  const token = await getStoredAccessToken();
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    'x-client-type': 'mobile-app',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const endpoints = [
+    `${API_BASE}/api/soil-tests?userId=${encodeURIComponent(normalizedUserId)}`,
+    `${API_BASE}/api/soil-tests/${encodeURIComponent(normalizedUserId)}`,
+    `${API_BASE}/api/soil-tests`,
+  ];
+
+  let lastError = 'Failed to fetch soil tests';
+
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, { method: 'GET', headers });
+      if (!res.ok) {
+        lastError = `Failed to fetch soil tests (HTTP ${res.status})`;
+        continue;
+      }
+
+      const contentType = (res.headers.get('content-type') || '').toLowerCase();
+      if (!contentType.includes('application/json')) {
+        const raw = await res.text();
+        lastError = `Soil history endpoint returned non-JSON (${contentType || 'unknown'})`;
+        console.warn('[fetchSoilHistory] Non-JSON response from', url, raw.slice(0, 200));
+        continue;
+      }
+
+      const payload = await res.json();
+
+      if (Array.isArray(payload)) {
+        return payload as T;
+      }
+      if (Array.isArray(payload?.data)) {
+        return payload.data as T;
+      }
+      if (Array.isArray(payload?.tests)) {
+        return payload.tests as T;
+      }
+
+      return [] as T;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'Failed to fetch soil tests';
+    }
+  }
+
+  throw new Error(lastError);
+}
+
+// ─── Offline Queue Syncing ───────────────────────────────────────────────────
+type PendingSoilPayload = { data: Record<string, any>; queuedAt: string };
+
+export async function getPendingSoilQueue(): Promise<PendingSoilPayload[]> {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_SOIL_QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+async function setPendingSoilQueue(queue: PendingSoilPayload[]): Promise<void> {
+  await AsyncStorage.setItem(PENDING_SOIL_QUEUE_KEY, JSON.stringify(queue));
+}
+
+// ─── Endpoints ───────────────────────────────────────────────────────────────
+export const api = {
+  /**
+   * Send a chat message to the internal AI system.
+   * Mobile App → Backend API → AI Waterfall
+   */
+  chat: async (message: string): Promise<{ response: string }> => {
+    return apiCall<{ response: string }>('/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
   },
 
-  async uploadSoil(data: any, token?: string) {
-    const authToken = token || (await getStoredAccessToken());
-    if (!authToken) throw new Error('AUTH_REQUIRED');
-
-    const res = await fetch(`${API_ROOT}/analyze-soil-file`, {
+  /**
+   * Upload and analyze attachments (JSON, images)
+   */
+  uploadSoil: async (data: any): Promise<any> => {
+    return apiCall('/analyze-soil-file', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`,
-      },
       body: JSON.stringify(data),
     });
-
-    const json = await res.json();
-    if (!res.ok) {
-      throw new Error(json?.error || json?.message || 'Soil analysis failed');
-    }
-    return json;
   },
 
-  async sendSoilData(soilData: Record<string, any>, token?: string) {
-    const online = await isInternetAvailable();
-    if (!online) {
+  /**
+   * Process native BLE soil packets -> Backend recommendation engine
+   */
+  soilTests: async (soilData: Record<string, any>): Promise<{ recommendations: any[], pricing?: any, queued?: boolean }> => {
+    const isOnline = await isInternetAvailable();
+    
+    if (!isOnline) {
+      // Offline fallback: store request locally
       const queue = await getPendingSoilQueue();
       queue.push({ data: soilData, queuedAt: new Date().toISOString() });
       await setPendingSoilQueue(queue);
-      return { queued: true, message: 'Saved locally. Will sync when internet is available.' };
+      return { recommendations: [], queued: true };
     }
 
-    const authToken = token || (await getStoredAccessToken());
-    if (!authToken) throw new Error('AUTH_REQUIRED');
-
-    const res = await fetch(`${API_ROOT}/soil-tests`, {
+    return apiCall<{ recommendations: any[], pricing?: any }>('/soil-tests', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`,
-      },
       body: JSON.stringify(soilData),
     });
-
-    const json = await res.json();
-    if (!res.ok) {
-      throw new Error(json?.error || json?.message || 'Soil pipeline request failed');
-    }
-    return json;
   },
 
-  async flushSoilQueue(token?: string) {
-    const online = await isInternetAvailable();
-    if (!online) return { synced: 0, pending: (await getPendingSoilQueue()).length };
-
+  /**
+   * Flush all generated soil data that were saved locally when offline
+   */
+  flushSoilQueue: async (): Promise<{ synced: number, pending: number }> => {
     const queue = await getPendingSoilQueue();
-    if (!queue.length) return { synced: 0, pending: 0 };
+    if (!queue.length || !(await isInternetAvailable())) {
+      return { synced: 0, pending: queue.length };
+    }
 
     let synced = 0;
     const remaining: PendingSoilPayload[] = [];
+    
     for (const item of queue) {
       try {
-        await this.sendSoilData(item.data, token);
-        synced += 1;
-      } catch {
+        await apiCall('/soil-tests', { method: 'POST', body: JSON.stringify(item.data) });
+        synced++;
+      } catch (err) {
         remaining.push(item);
       }
     }
 
     await setPendingSoilQueue(remaining);
     return { synced, pending: remaining.length };
-  },
-
-  getPendingSoilQueue,
+  }
 };

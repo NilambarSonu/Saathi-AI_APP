@@ -52,7 +52,10 @@ export default function OnboardingScreen() {
   const translateX = useSharedValue(0);
 
   const completeOnboarding = async () => {
-    await AsyncStorage.setItem('hasOnboarded', 'true');
+    await AsyncStorage.multiSet([
+      ['hasOnboarded', 'true'],
+      ['saathi_has_onboarded', 'true'],
+    ]);
     router.replace('/(auth)/login');
   };
 

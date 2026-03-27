@@ -12,9 +12,13 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { State as BleState } from 'react-native-ble-plx';
 import { bleService, BLEStatus, LogEntry } from '../services/bleService';
 import type { SoilData } from '../database/datastorage';
+
+const BLE_CONNECT_INTENT_KEY = 'saathi_ble_connect_intent';
+import { useSoil } from './useSoil';
 
 export type { BLEStatus, LogEntry };
 
@@ -52,6 +56,14 @@ export function useBLE(): UseBLEReturn {
   const [logs,            setLogs]            = useState<LogEntry[]>([]);
   const [permissionDenied,setPermissionDenied]= useState(false);
 
+  // Hook into the SaaS backend processor
+  const soilAPI = useSoil();
+  const processSoilDataRef = useRef(soilAPI.processSoilData);
+
+  useEffect(() => {
+    processSoilDataRef.current = soilAPI.processSoilData;
+  }, [soilAPI.processSoilData]);
+
   const isMounted = useRef(true);
   const connectIntentRef = useRef(false);
   const scanBootRef = useRef(false);
@@ -71,7 +83,10 @@ export function useBLE(): UseBLEReturn {
   }, []);
 
   const handleData = useCallback((data: SoilData) => {
-    if (isMounted.current) setSoilData(data);
+    if (isMounted.current) {
+      setSoilData(data);
+      processSoilDataRef.current(data);
+    }
   }, []);
 
   // ── Mount / unmount ────────────────────────────────────────────────────
@@ -89,6 +104,7 @@ export function useBLE(): UseBLEReturn {
 
       bleService.startListening();
       connectIntentRef.current = false;
+      await AsyncStorage.removeItem(BLE_CONNECT_INTENT_KEY);
     } catch (err: any) {
       const msg = err?.message ?? '';
 
@@ -129,12 +145,25 @@ export function useBLE(): UseBLEReturn {
       onBluetoothState: handleBluetoothState,
     });
 
+    void (async () => {
+      const hasIntent = await AsyncStorage.getItem(BLE_CONNECT_INTENT_KEY);
+      if (hasIntent !== '1') return;
+
+      connectIntentRef.current = true;
+      const isOn = await bleService.isBluetoothPoweredOn();
+      if (isOn) {
+        void beginScan();
+      } else {
+        safeSetStatus('bluetooth_off');
+      }
+    })();
+
     return () => {
       isMounted.current = false;
       bleService.disconnect().catch(() => {});
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [safeSetStatus, addLog, handleBluetoothState]);
+  }, []);
 
   // ── Connect ────────────────────────────────────────────────────────────
   const connect = useCallback(async () => {
@@ -145,6 +174,7 @@ export function useBLE(): UseBLEReturn {
     setLogs([]);
     setPermissionDenied(false);
     connectIntentRef.current = true;
+    await AsyncStorage.setItem(BLE_CONNECT_INTENT_KEY, '1');
 
     try {
       // 1. Permissions
@@ -157,6 +187,7 @@ export function useBLE(): UseBLEReturn {
         const enabled = await bleService.requestEnableBluetooth();
         if (!enabled) {
           connectIntentRef.current = false;
+          await AsyncStorage.removeItem(BLE_CONNECT_INTENT_KEY);
           safeSetStatus('idle');
           return;
         }
@@ -185,6 +216,7 @@ export function useBLE(): UseBLEReturn {
   // ── Disconnect ─────────────────────────────────────────────────────────
   const disconnect = useCallback(async () => {
     connectIntentRef.current = false;
+    await AsyncStorage.removeItem(BLE_CONNECT_INTENT_KEY);
     await bleService.disconnect();
     if (isMounted.current) {
       setStatus('idle');

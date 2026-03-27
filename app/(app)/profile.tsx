@@ -11,6 +11,7 @@ import { useAuthStore } from '../../store/authStore';
 import { apiCall } from '../../services/api';
 import { logout } from '../../services/auth';
 import { getUserProfile } from '../../services/user';
+import SwipePage from '../../components/navigation/SwipePage';
 
 // ─── Helpers ────────────────────────────────────────────────
 function getProviderLabel(provider?: string) {
@@ -216,7 +217,8 @@ export default function AccountScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SwipePage rightRoute="/(app)/history">
+      <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Account</Text>
@@ -340,7 +342,8 @@ export default function AccountScreen() {
 
         <View style={{ height: 120 }} />
       </ScrollView>
-    </View>
+      </View>
+    </SwipePage>
   );
 }
 

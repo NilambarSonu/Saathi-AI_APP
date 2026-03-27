@@ -49,9 +49,11 @@ export default function SplashScreen() {
 
     // 5. Navigate exactly at 2.2 seconds based on state
     const timer = setTimeout(async () => {
-      const hasOnboarded = await AsyncStorage.getItem('hasOnboarded');
+      const hasOnboarded = await AsyncStorage.getItem('saathi_has_onboarded');
+      const legacyHasOnboarded = await AsyncStorage.getItem('hasOnboarded');
+      const isOnboarded = hasOnboarded === 'true' || legacyHasOnboarded === 'true';
       
-      if (hasOnboarded !== 'true') {
+      if (!isOnboarded) {
         router.replace('/(onboarding)');
       } else if (!isAuthenticated) {
         router.replace('/(auth)/login');
