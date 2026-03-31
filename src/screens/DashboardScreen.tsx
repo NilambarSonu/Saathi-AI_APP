@@ -20,7 +20,6 @@ import LottieView from 'lottie-react-native';
 import { getDashboardStats } from '../../src/core/services/analytics';
 import { getNotifications, AppNotification } from '../../src/core/services/notifications';
 import { tabBarY, hideTabBar, showTabBar } from '../../constants/Animations';
-import { hideTabBar, showTabBar } from '../../constants/Animations';
 
 function BouncingIndicator({ state }: { state: 'connecting' | 'connected' | 'disconnected' }) {
   const y = useRef(new Animated.Value(0)).current;
