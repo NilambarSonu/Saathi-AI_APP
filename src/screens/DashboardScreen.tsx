@@ -19,6 +19,7 @@ import { Image, Modal } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { getDashboardStats } from '../../src/core/services/analytics';
 import { getNotifications, AppNotification } from '../../src/core/services/notifications';
+import { useNavigationStore } from '../store/navigationStore';
 import { tabBarY, hideTabBar, showTabBar } from '../../constants/Animations';
 
 function BouncingIndicator({ state }: { state: 'connecting' | 'connected' | 'disconnected' }) {
@@ -73,10 +74,10 @@ const getFirstName = (user: any): string => {
 };
 
 const FEATURES = [
-  { icon: 'trending-up', color: '#21db6eff', bg: Colors.fillGreen, title: 'Instant Analysis', subtitle: 'Get comprehensive soil health data in seconds with our Agni device.', route: '/(app)/chat' },
-  { icon: 'brain', color: '#2787f6ff', bg: Colors.fillBlue, title: 'Local Language', subtitle: 'Receive recommendations in Odia, Hindi, or English with voice support.', route: '/(app)/chat' },
-  { icon: 'microscope', color: '#eab329ff', bg: Colors.fillAmber, title: 'Sustainable Farming', subtitle: 'AI-powered organic fertilizer recommendations for better crop yield.', route: '/(app)/chat' },
-  { icon: 'map-marker-radius', color: '#c438e4ff', bg: Colors.fillPurple, title: 'Field Mapping', subtitle: 'Visualize your soil data on interactive maps for better field management.', route: '/(app)/chat' },
+  { icon: 'trending-up', color: '#21db6eff', bg: Colors.fillGreen, title: 'Instant Analysis', subtitle: 'Get comprehensive soil health data in seconds with our Agni device.', tabIndex: 2 },
+  { icon: 'brain', color: '#2787f6ff', bg: Colors.fillBlue, title: 'Local Language', subtitle: 'Receive recommendations in Odia, Hindi, or English with voice support.', tabIndex: 2 },
+  { icon: 'microscope', color: '#eab329ff', bg: Colors.fillAmber, title: 'Sustainable Farming', subtitle: 'AI-powered organic fertilizer recommendations for better crop yield.', tabIndex: 2 },
+  { icon: 'map-marker-radius', color: '#c438e4ff', bg: Colors.fillPurple, title: 'Field Mapping', subtitle: 'Visualize your soil data on interactive maps for better field management.', tabIndex: 2 },
 ];
 
 const HOW_STEPS = [
@@ -324,7 +325,7 @@ export default function DashboardScreen() {
               <Feather name="bell" size={20} color={Colors.label2} />
               {(Array.isArray(notifications) ? notifications : []).some(n => !n.isRead) && <View style={s.notifDot} />}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/(app)/profile')} style={[s.headerBtn, { backgroundColor: Colors.surface, ...Shadows.sm, padding: 0, overflow: 'hidden' }]}>
+            <TouchableOpacity onPress={() => useNavigationStore.getState().setCurrentIndex(4)} style={[s.headerBtn, { backgroundColor: Colors.surface, ...Shadows.sm, padding: 0, overflow: 'hidden' }]}>
               {(user as any)?.avatar_url ? (
                 <Image source={{ uri: (user as any).avatar_url }} style={{ width: 44, height: 44, borderRadius: 22 }} />
               ) : (
@@ -402,7 +403,7 @@ export default function DashboardScreen() {
               <Text style={{ fontSize: 14, fontFamily: 'Sora_500Medium', color: '#4A4A4A', lineHeight: 24, marginBottom: 24 }}>
                 Pair your soil sensor instantly for real-time insights.
               </Text>
-              <TouchableOpacity onPress={() => router.push('/(app)/connect')} style={{ alignSelf: 'flex-start' }}>
+              <TouchableOpacity onPress={() => useNavigationStore.getState().setCurrentIndex(1)} style={{ alignSelf: 'flex-start' }}>
                 <LinearGradient colors={['#FF5F6D', '#FFC371']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[s.heroBtn, { borderWidth: 0, paddingHorizontal: 24 }]}>
                   <Text style={{ fontSize: 16, fontFamily: 'Sora_600SemiBold', color: '#FFFFFF', marginRight: 10 }}>Pair Device</Text>
                   <Feather name="arrow-right" size={18} color="#FFFFFF" />
@@ -451,7 +452,7 @@ export default function DashboardScreen() {
         <GlassCard style={{ marginBottom: 32, paddingVertical: 8, ...Shadows.md }}>
           {FEATURES.map((f, i) => (
             <View key={i}>
-              <TouchableOpacity onPress={() => router.push(f.route as any)} style={s.featureRow}>
+              <TouchableOpacity onPress={() => useNavigationStore.getState().setCurrentIndex(f.tabIndex)} style={s.featureRow}>
                 <View style={[s.featureIconBox, { backgroundColor: f.bg }]}>
                   <MaterialCommunityIcons name={f.icon as any} size={20} color={f.color} />
                 </View>

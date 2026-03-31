@@ -155,7 +155,7 @@ export default function AIChatScreen() {
       {/* Header */}
       <Animated.View entering={FadeInDown.duration(400)} style={s.header}>
         <View style={s.headerLeft}>
-          <TouchableOpacity style={s.backBtn} onPress={() => { Haptics.selectionAsync(); useNavigationStore.getState().setCurrentIndex(1); }}>
+          <TouchableOpacity style={s.backBtn} onPress={() => { Haptics.selectionAsync(); useNavigationStore.getState().setCurrentIndex(0); }}>
               <Ionicons name="chevron-back" size={24} color="#0D1F12" />
             </TouchableOpacity>
             <View style={s.headerTitleContainer}>

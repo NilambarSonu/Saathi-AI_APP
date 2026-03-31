@@ -1,127 +1,107 @@
-import React, { ReactNode, useState, useEffect } from 'react';
-import { StyleSheet, Dimensions } from 'react-native';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withSpring, 
+import React, { useState } from "react";
+import { Dimensions, View, StyleSheet } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
   runOnJS,
-  cancelAnimation
-} from 'react-native-reanimated';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { useNavigationStore } from '../../../store/navigationStore';
+} from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
-interface SwipeContainerProps {
-  children: ReactNode[];
-}
+type SwipeContainerProps = {
+  screens: React.FC<any>[];
+  initialIndex?: number;
+  onIndexChange?: (index: number) => void;
+};
 
-export default function SwipeContainer({ children }: SwipeContainerProps) {
-  const translateX = useSharedValue(0);
-  const context = useSharedValue({ x: 0 });
-  
-  const currentIndex = useNavigationStore(s => s.currentIndex);
-  const setCurrentIndex = useNavigationStore(s => s.setCurrentIndex);
-  
-  const [mountedScreens, setMountedScreens] = useState<Set<number>>(new Set([currentIndex]));
+export default function SwipeContainer({
+  screens,
+  initialIndex = 0,
+  onIndexChange,
+}: SwipeContainerProps) {
+  const currentIndex = useSharedValue(initialIndex);
+  const translateX = useSharedValue(-initialIndex * SCREEN_WIDTH);
 
-  useEffect(() => {
-    // Mount the current screen and its neighbors for smooth swiping
-    setMountedScreens(prev => {
-      const newSet = new Set(prev);
-      newSet.add(currentIndex);
-      if (currentIndex > 0) newSet.add(currentIndex - 1);
-      if (currentIndex < children.length - 1) newSet.add(currentIndex + 1);
-      return newSet;
-    });
-  }, [currentIndex, children.length]);
-  
-  // Sync the animated value when currentIndex changes (e.g. from tab bar tap)
-  useEffect(() => {
-    translateX.value = withSpring(-currentIndex * SCREEN_WIDTH, {
-      damping: 25,
-      stiffness: 220,
-      mass: 0.8,
-    });
-  }, [currentIndex]);
-  
-  const onIndexChange = (index: number) => {
-    if (index !== currentIndex) {
-      setCurrentIndex(index);
+  // Helper to notify the parent when the index changes
+  const notifyIndexChange = (index: number) => {
+    if (onIndexChange) {
+      onIndexChange(index);
     }
   };
 
-  const MAX_INDEX = children.length - 1;
+  const gesture = Gesture.Pan()
+    // Increase hit slop to prevent conflicts with vertical scroll views
+    .activeOffsetX([-20, 20])
+    .onUpdate((e) => {
+      let newTranslate = -currentIndex.value * SCREEN_WIDTH + e.translationX;
 
-  const panGesture = Gesture.Pan()
-    // Configure to only trigger on prominent horizontal swipes
-    .activeOffsetX([-15, 15])
-    .failOffsetY([-30, 30])
-    .onStart(() => {
-      context.value = { x: translateX.value };
-      cancelAnimation(translateX);
-    })
-    .onUpdate((event) => {
-      let newTranslateX = context.value.x + event.translationX;
-      
-      // Rubber banding effect at boundary edges
-      if (newTranslateX > 0) {
-        newTranslateX = newTranslateX * 0.25; 
-      } else if (newTranslateX < -MAX_INDEX * SCREEN_WIDTH) {
-        const overscroll = -MAX_INDEX * SCREEN_WIDTH - newTranslateX;
-        newTranslateX = -MAX_INDEX * SCREEN_WIDTH - overscroll * 0.25;
+      // Add resistance at edges
+      if (currentIndex.value === 0 && e.translationX > 0) {
+        newTranslate = e.translationX * 0.3;
       }
-      
-      translateX.value = newTranslateX;
+      if (currentIndex.value === screens.length - 1 && e.translationX < 0) {
+        newTranslate =
+          -currentIndex.value * SCREEN_WIDTH + e.translationX * 0.3;
+      }
+
+      translateX.value = newTranslate;
     })
-    .onEnd((event) => {
-      const distance = event.translationX;
-      const velocity = event.velocityX;
-      
-      let nextIndex = currentIndex;
-      
-      // Determine if swipe should change the screen
-      if (velocity < -500 || distance < -SCREEN_WIDTH / 3) {
-        nextIndex = Math.min(currentIndex + 1, MAX_INDEX);
-      } else if (velocity > 500 || distance > SCREEN_WIDTH / 3) {
-        nextIndex = Math.max(currentIndex - 1, 0);
+    .onEnd((e) => {
+      const velocity = e.velocityX;
+
+      if (velocity < -500 && currentIndex.value < screens.length - 1) {
+        currentIndex.value += 1;
+      } else if (velocity > 500 && currentIndex.value > 0) {
+        currentIndex.value -= 1;
       } else {
-        // Did not cross threshold, bounce back to current
-        nextIndex = currentIndex;
+        // If slow swipe, check if we passed half the screen
+        const dragLimit = SCREEN_WIDTH / 2;
+        if (e.translationX < -dragLimit && currentIndex.value < screens.length - 1) {
+          currentIndex.value += 1;
+        } else if (e.translationX > dragLimit && currentIndex.value > 0) {
+          currentIndex.value -= 1;
+        }
       }
-      
-      runOnJS(onIndexChange)(nextIndex);
-      
-      // Animate to proper position using the velocity for fluid movement
-      translateX.value = withSpring(-nextIndex * SCREEN_WIDTH, {
-        damping: 25,
-        stiffness: 220,
-        mass: 0.8,
-        velocity: velocity
+
+      runOnJS(notifyIndexChange)(currentIndex.value);
+
+      translateX.value = withSpring(-currentIndex.value * SCREEN_WIDTH, {
+        damping: 20,
+        stiffness: 120,
+        mass: 0.5,
       });
     });
 
   const animatedStyle = useAnimatedStyle(() => {
+    // Premium parallax scale effect
+    const offset = Math.abs(translateX.value % SCREEN_WIDTH);
+    const scale = 0.98 + (offset / SCREEN_WIDTH) * 0.02;
+
     return {
-      transform: [{ translateX: translateX.value }],
-      width: SCREEN_WIDTH * children.length,
+      transform: [
+        { translateX: translateX.value },
+        // Uncomment if you want the scale parallax
+        // { scale }
+      ],
     };
   });
 
   return (
-    <GestureDetector gesture={panGesture}>
-      <Animated.View style={[styles.container, animatedStyle]}>
-        {children.map((child, index) => {
-          const isMounted = mountedScreens.has(index);
-          return (
-            <Animated.View 
-              key={index} 
-              style={[styles.screen, { width: SCREEN_WIDTH }]}
-            >
-              {isMounted ? child : null}
-            </Animated.View>
-          );
-        })}
+    <GestureDetector gesture={gesture}>
+      <Animated.View
+        style={[
+          styles.container,
+          { width: SCREEN_WIDTH * screens.length },
+          animatedStyle,
+        ]}
+      >
+        {screens.map((ScreenComponent, index) => (
+          <View style={styles.screenWrapper} key={index}>
+            <ScreenComponent />
+          </View>
+        ))}
       </Animated.View>
     </GestureDetector>
   );
@@ -130,10 +110,10 @@ export default function SwipeContainer({ children }: SwipeContainerProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: "row",
   },
-  screen: {
+  screenWrapper: {
+    width: SCREEN_WIDTH,
     flex: 1,
-    height: '100%',
-  }
+  },
 });
