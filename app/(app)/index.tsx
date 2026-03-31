@@ -1,129 +1,209 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import React, { useRef, useCallback } from 'react';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  Platform,
+} from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolate,
+  Extrapolation,
+  type SharedValue,
+} from 'react-native-reanimated';
 
-// Zustand Store
 import { useNavigationStore } from '../../src/store/navigationStore';
 
-// Screens
 import DashboardScreen from '../../src/screens/DashboardScreen';
-import ConnectScreen from '../../src/screens/ConnectScreen';
-import ChatScreen from '../../src/screens/ChatScreen';
-import HistoryScreen from '../../src/screens/HistoryScreen';
-import ProfileScreen from '../../src/screens/ProfileScreen';
+import ConnectScreen   from '../../src/screens/ConnectScreen';
+import ChatScreen      from '../../src/screens/ChatScreen';
+import HistoryScreen   from '../../src/screens/HistoryScreen';
+import ProfileScreen   from '../../src/screens/ProfileScreen';
 
-// Core Swiper
-import SwipeContainer from '../../src/shared/components/navigation/SwipeContainer';
+import SwipeContainer, {
+  type SwipeContainerHandle,
+} from '../../src/shared/components/navigation/SwipeContainer';
+
+const SCREENS = [
+  DashboardScreen,
+  ConnectScreen,
+  ChatScreen,
+  HistoryScreen,
+  ProfileScreen,
+] as const;
+
+const TABS = [
+  { icon: 'home-outline',  lib: 'Ionicons',               label: 'HOME'    },
+  { icon: 'hubspot',       lib: 'MaterialCommunityIcons',  label: 'CONNECT' },
+  { icon: 'sparkles',      lib: 'Ionicons',               label: 'AI CHAT' },
+  { icon: 'history',       lib: 'MaterialCommunityIcons',  label: 'HISTORY' },
+  { icon: 'person-outline',lib: 'Ionicons',               label: 'PROFILE' },
+] as const;
 
 export default function AppIndex() {
   const { currentIndex, setCurrentIndex } = useNavigationStore();
+  const swipeRef = useRef<SwipeContainerHandle>(null);
 
-  // Expose the 5 screens
-  const screens = [
-    DashboardScreen,
-    ConnectScreen,
-    ChatScreen,
-    HistoryScreen,
-    ProfileScreen
-  ];
+  // ── Active index as a shared value so tab bar highlights update on UI thread ─
+  const activeIdx = useSharedValue(currentIndex);
+
+  // ── Called by swipe gesture (already on JS thread) ──────────────────────────
+  const handleSwipeChange = useCallback(
+    (index: number) => {
+      activeIdx.value = index;
+      setCurrentIndex(index);    // sync Zustand for other consumers
+    },
+    [setCurrentIndex]
+  );
+
+  // ── Called by tab bar tap — INSTANT, no Zustand round-trip ──────────────────
+  const handleTabPress = useCallback(
+    (index: number) => {
+      activeIdx.value = index;         // update highlight immediately (UI thread)
+      swipeRef.current?.scrollTo(index); // animate strip (UI thread)
+      // setCurrentIndex is called inside scrollTo → onIndexChange, no need here
+    },
+    []
+  );
+
+  // Chat tab hides the tab bar
+  const isChat = currentIndex === 2;
 
   return (
-    <View style={s.container}>
+    <View style={s.root}>
       <SwipeContainer
-        screens={screens}
+        ref={swipeRef}
+        screens={SCREENS as any}
         initialIndex={currentIndex}
-        onIndexChange={setCurrentIndex}
+        onIndexChange={handleSwipeChange}
       />
-      
-      {/* Floating Tab Bar purely managing index */}
-      {currentIndex !== 2 && ( // Hide on Chat (index 2)
-        <Animated.View style={s.tabContainer}>
-          <BlurView intensity={90} tint="light" style={s.tabPill}>
-            <TabItem icon="home-outline" lib={Ionicons} label="HOME" idx={0} currentIdx={currentIndex} onPress={setCurrentIndex} />
-            <TabItem icon="hubspot" lib={MaterialCommunityIcons} label="CONNECT" idx={1} currentIdx={currentIndex} onPress={setCurrentIndex} />
-            <TabItem icon="sparkles" lib={Ionicons} label="AI CHAT" idx={2} currentIdx={currentIndex} onPress={setCurrentIndex} />
-            <TabItem icon="history" lib={MaterialCommunityIcons} label="HISTORY" idx={3} currentIdx={currentIndex} onPress={setCurrentIndex} />
-            <TabItem icon="person-outline" lib={Ionicons} label="PROFILE" idx={4} currentIdx={currentIndex} onPress={setCurrentIndex} />
+
+      {!isChat && (
+        <View style={s.tabContainer}>
+          <BlurView intensity={85} tint="light" style={s.pill}>
+            {TABS.map((tab, idx) => (
+              <TabItem
+                key={idx}
+                tab={tab}
+                idx={idx}
+                activeIdx={activeIdx}
+                onPress={handleTabPress}
+              />
+            ))}
           </BlurView>
-        </Animated.View>
+        </View>
       )}
     </View>
   );
 }
 
-function TabItem({ icon, lib: IconLib, label, idx, currentIdx, onPress }: any) {
-  const isFocused = idx === currentIdx;
-  
+// ── Tab item: reads activeIdx from shared value → highlights update on UI thread
+function TabItem({
+  tab,
+  idx,
+  activeIdx,
+  onPress,
+}: {
+  tab: (typeof TABS)[number];
+  idx: number;
+  activeIdx: SharedValue<number>;
+  onPress: (idx: number) => void;
+}) {
+  const IconLib =
+    tab.lib === 'Ionicons' ? Ionicons : MaterialCommunityIcons;
+
+  // Animated dot indicator under the active tab
+  const dotStyle = useAnimatedStyle(() => {
+    const focused = interpolate(
+      Math.abs(activeIdx.value - idx),
+      [0, 0.5, 1],
+      [1, 0.4, 0],
+      Extrapolation.CLAMP
+    );
+    return { opacity: focused, transform: [{ scaleX: focused }] };
+  });
+
+  // Icon scale when active
+  const iconStyle = useAnimatedStyle(() => {
+    const scale = interpolate(
+      Math.abs(activeIdx.value - idx),
+      [0, 1],
+      [1.1, 1],
+      Extrapolation.CLAMP
+    );
+    return { transform: [{ scale }] };
+  });
+
   return (
-    <TouchableOpacity 
-      onPress={() => onPress(idx)} 
-      style={s.tabItem} 
-      activeOpacity={0.8}
+    <TouchableOpacity
+      onPress={() => onPress(idx)}
+      style={s.tabItem}
+      activeOpacity={0.75}
     >
-      <View style={[s.iconBox, isFocused && s.activeIconBox]}>
-         <View style={{ position: 'relative' }}>
-          <IconLib name={icon} size={24} color={isFocused ? '#1A5C35' : '#8A9E8E'} />
-          {isFocused && (
-            <View style={{
-              position: 'absolute', top: -2, right: -2,
-              width: 6, height: 6, borderRadius: 3,
-              backgroundColor: '#69e417ff', 
-              borderWidth: 1, borderColor: '#111'
-            }} />
-          )}
-        </View>
-      </View>
-      <Text style={[s.tabLabel, { color: isFocused ? '#1A5C35' : '#8A9E8E' }]}>
-        {label}
-      </Text>
+      <Animated.View style={[s.iconBox, iconStyle]}>
+        <IconLib
+          name={tab.icon as any}
+          size={24}
+          color="#1A5C35"
+        />
+      </Animated.View>
+      <Text style={s.tabLabel}>{tab.label}</Text>
+      {/* Active indicator dot */}
+      <Animated.View style={[s.dot, dotStyle]} />
     </TouchableOpacity>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' }, 
+  root: { flex: 1, backgroundColor: '#000' },
+
   tabContainer: {
     position: 'absolute',
-    bottom: 35,
-    left: 20,
-    right: 20,
-    alignItems: 'center',
+    bottom: Platform.OS === 'android' ? 18 : 30,
+    left: 16,
+    right: 16,
     zIndex: 1000,
   },
-  tabPill: {
+  pill: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(240, 253, 244, 0.6)', 
-    borderRadius: 35,
+    backgroundColor: 'rgba(240, 253, 244, 0.55)',
+    borderRadius: 36,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    width: '100%',
-    justifyContent: 'space-around',
+    paddingVertical: 6,
     borderWidth: 1.5,
-    borderColor: 'rgba(167, 243, 208, 0.3)',
+    borderColor: 'rgba(167, 243, 208, 0.35)',
     overflow: 'hidden',
   },
+
   tabItem: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
+    paddingVertical: 4,
   },
   iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 25,
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  activeIconBox: {
-    backgroundColor: 'transparent',
-    transform: [{ scale: 1.15 }],
   },
   tabLabel: {
     fontSize: 9,
     fontFamily: 'Sora_700Bold',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
+    color: '#1A5C35',
+    marginTop: 1,
+  },
+  dot: {
+    width: 14,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#38B000',
+    marginTop: 2,
   },
 });

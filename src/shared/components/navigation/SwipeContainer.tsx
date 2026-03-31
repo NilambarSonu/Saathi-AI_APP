@@ -1,5 +1,10 @@
-import React, { useEffect, useRef } from "react";
-import { Dimensions, View, StyleSheet } from "react-native";
+import React, {
+  useEffect,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
+import { Dimensions, StyleSheet } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -13,12 +18,17 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-// Spring config: feels premium like Instagram/CRED — fast settle, no bounce
+// Tight spring — settles fast, no bounce, feels premium
 const SPRING_CONFIG = {
-  damping: 22,
-  stiffness: 180,
-  mass: 0.4,
-  overshootClamping: true, // prevents overshoot during fast velocity swipes
+  damping: 26,
+  stiffness: 220,
+  mass: 0.35,
+  overshootClamping: true,
+};
+
+export type SwipeContainerHandle = {
+  /** Jump to a tab instantly without going through Zustand/React state. Zero lag. */
+  scrollTo: (index: number) => void;
 };
 
 type SwipeContainerProps = {
@@ -27,174 +37,144 @@ type SwipeContainerProps = {
   onIndexChange?: (index: number) => void;
 };
 
-export default function SwipeContainer({
-  screens,
-  initialIndex = 0,
-  onIndexChange,
-}: SwipeContainerProps) {
-  // UI-thread source of truth — never stale
-  const currentIndex = useSharedValue(initialIndex);
-  const translateX = useSharedValue(-initialIndex * SCREEN_WIDTH);
+const SwipeContainer = forwardRef<SwipeContainerHandle, SwipeContainerProps>(
+  function SwipeContainer({ screens, initialIndex = 0, onIndexChange }, ref) {
+    // ── Shared Values — UI-thread source of truth ─────────────────────────
+    const currentIndex = useSharedValue(initialIndex);
+    const translateX = useSharedValue(-initialIndex * SCREEN_WIDTH);
 
-  // JS-thread: track the "last committed" index to fix race conditions
-  // during rapid swipes. We only call onIndexChange when gesture properly ends.
-  const pendingIndexRef = useRef(initialIndex);
+    // ── Stable JS-side refs (no stale closures) ────────────────────────────
+    const committedIndexRef = useRef(initialIndex);
+    const onIndexChangeRef = useRef(onIndexChange);
+    useEffect(() => {
+      onIndexChangeRef.current = onIndexChange;
+    }, [onIndexChange]);
 
-  // Stable callback ref — avoids re-creating gesture when parent re-renders
-  const onIndexChangeRef = useRef(onIndexChange);
-  useEffect(() => {
-    onIndexChangeRef.current = onIndexChange;
-  }, [onIndexChange]);
+    // ── Imperative API: called directly by tab bar tap ─────────────────────
+    // This runs SYNCHRONOUSLY — no Zustand round-trip, no useEffect delay
+    useImperativeHandle(ref, () => ({
+      scrollTo(index: number) {
+        const clamped = Math.max(0, Math.min(screens.length - 1, index));
+        currentIndex.value = clamped;
+        translateX.value = withSpring(-clamped * SCREEN_WIDTH, SPRING_CONFIG);
+        committedIndexRef.current = clamped;
+        // Notify parent (Zustand) AFTER animation starts, not before
+        onIndexChangeRef.current?.(clamped);
+      },
+    }));
 
-  // Sync from parent (e.g. tab bar tap changes store → SwipeContainer must follow)
-  useEffect(() => {
-    if (initialIndex !== pendingIndexRef.current) {
-      pendingIndexRef.current = initialIndex;
-      currentIndex.value = initialIndex;
-      translateX.value = withSpring(-initialIndex * SCREEN_WIDTH, SPRING_CONFIG);
-    }
-  }, [initialIndex]);
-
-  // ─── Notify parent (stable, never causes race) ───────────────────────────
-  const commitIndex = (index: number) => {
-    pendingIndexRef.current = index;
-    onIndexChangeRef.current?.(index);
-  };
-
-  // ─── Gesture ─────────────────────────────────────────────────────────────
-  const gesture = Gesture.Pan()
-    .activeOffsetX([-15, 15])      // start tracking horizontal pan
-    .failOffsetY([-20, 20])        // cancel if vertical pan — lets ScrollViews work
-    .onUpdate((e) => {
-      let base = -currentIndex.value * SCREEN_WIDTH + e.translationX;
-
-      // Rubber-band resistance at edges
-      if (currentIndex.value === 0 && e.translationX > 0) {
-        base = e.translationX * 0.25;
-      } else if (currentIndex.value === screens.length - 1 && e.translationX < 0) {
-        base = -(currentIndex.value * SCREEN_WIDTH) + e.translationX * 0.25;
-      }
-
-      translateX.value = base;
-    })
-    .onEnd((e) => {
-      const velocity = e.velocityX;
-      const VELOCITY_THRESHOLD = 400;
-      const DRAG_THRESHOLD = SCREEN_WIDTH * 0.38;
-
-      let nextIndex = currentIndex.value;
-
-      // Velocity-based: fast flick always commits
-      if (velocity < -VELOCITY_THRESHOLD && nextIndex < screens.length - 1) {
-        nextIndex = nextIndex + 1;
-      } else if (velocity > VELOCITY_THRESHOLD && nextIndex > 0) {
-        nextIndex = nextIndex - 1;
-      } else {
-        // Slow drag: commit if dragged past 38% of screen
-        if (e.translationX < -DRAG_THRESHOLD && nextIndex < screens.length - 1) {
-          nextIndex = nextIndex + 1;
-        } else if (e.translationX > DRAG_THRESHOLD && nextIndex > 0) {
-          nextIndex = nextIndex - 1;
-        }
-      }
-
-      // Clamp to valid range
-      nextIndex = Math.max(0, Math.min(screens.length - 1, nextIndex));
-
-      // Update UI-thread value immediately — zero lag
-      currentIndex.value = nextIndex;
-
-      // Animate to final position
-      translateX.value = withSpring(-nextIndex * SCREEN_WIDTH, SPRING_CONFIG);
-
-      // Notify JS thread ONCE with the definitive final index
-      // Using runOnJS with a stable ref avoids any stale closure / race issues
-      runOnJS(commitIndex)(nextIndex);
-    });
-
-  // ─── Animated strip style ─────────────────────────────────────────────────
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: translateX.value }],
+    // ── Notify JS after a swipe gesture commits ────────────────────────────
+    const commitIndex = (index: number) => {
+      committedIndexRef.current = index;
+      onIndexChangeRef.current?.(index);
     };
-  });
 
-  // ─── Per-screen scale/opacity parallax (optional premium feel) ───────────
-  return (
-    <GestureDetector gesture={gesture}>
-      <Animated.View
-        style={[
-          styles.container,
-          { width: SCREEN_WIDTH * screens.length },
-          animatedStyle,
-        ]}
-      >
-        {screens.map((ScreenComponent, index) => (
-          <ScreenSlide
-            key={index}
-            index={index}
-            translateX={translateX}
-            totalScreens={screens.length}
-          >
-            <ScreenComponent />
-          </ScreenSlide>
-        ))}
-      </Animated.View>
-    </GestureDetector>
-  );
-}
+    // ── Pan Gesture ────────────────────────────────────────────────────────
+    const gesture = Gesture.Pan()
+      .activeOffsetX([-14, 14])    // start tracking before ScrollViews intercept
+      .failOffsetY([-22, 22])      // yield to vertical scroll
+      .onUpdate((e) => {
+        const base = -currentIndex.value * SCREEN_WIDTH + e.translationX;
 
-// ─── Individual screen slide with subtle parallax ─────────────────────────────
+        // Rubber-band at edges
+        if (currentIndex.value === 0 && e.translationX > 0) {
+          translateX.value = e.translationX * 0.2;
+        } else if (
+          currentIndex.value === screens.length - 1 &&
+          e.translationX < 0
+        ) {
+          translateX.value =
+            -(currentIndex.value * SCREEN_WIDTH) + e.translationX * 0.2;
+        } else {
+          translateX.value = base;
+        }
+      })
+      .onEnd((e) => {
+        const VELOCITY_THRESHOLD = 350;
+        const DRAG_THRESHOLD = SCREEN_WIDTH * 0.36;
+        let next = currentIndex.value;
+
+        if (e.velocityX < -VELOCITY_THRESHOLD && next < screens.length - 1) {
+          next += 1;
+        } else if (e.velocityX > VELOCITY_THRESHOLD && next > 0) {
+          next -= 1;
+        } else if (e.translationX < -DRAG_THRESHOLD && next < screens.length - 1) {
+          next += 1;
+        } else if (e.translationX > DRAG_THRESHOLD && next > 0) {
+          next -= 1;
+        }
+
+        next = Math.max(0, Math.min(screens.length - 1, next));
+
+        // Update UI thread immediately — zero lag before animation starts
+        currentIndex.value = next;
+        translateX.value = withSpring(-next * SCREEN_WIDTH, SPRING_CONFIG);
+
+        // Notify JS thread once, stably
+        runOnJS(commitIndex)(next);
+      });
+
+    // ── Outer strip animated style ─────────────────────────────────────────
+    const stripStyle = useAnimatedStyle(() => ({
+      transform: [{ translateX: translateX.value }],
+    }));
+
+    return (
+      <GestureDetector gesture={gesture}>
+        <Animated.View
+          style={[
+            styles.strip,
+            { width: SCREEN_WIDTH * screens.length },
+            stripStyle,
+          ]}
+        >
+          {screens.map((ScreenComponent, index) => (
+            <ScreenSlide key={index} index={index} translateX={translateX}>
+              <ScreenComponent />
+            </ScreenSlide>
+          ))}
+        </Animated.View>
+      </GestureDetector>
+    );
+  }
+);
+
+export default SwipeContainer;
+
+// ── Per-screen slide — scale + opacity depth effect ───────────────────────────
 function ScreenSlide({
   index,
   translateX,
-  totalScreens,
   children,
 }: {
   index: number;
   translateX: SharedValue<number>;
-  totalScreens: number;
   children: React.ReactNode;
 }) {
-  const animatedStyle = useAnimatedStyle(() => {
-    // The screen's offset from center in percentage (0 = fully centered)
-    const screenCenter = -index * SCREEN_WIDTH;
-    const diff = translateX.value - screenCenter;
-    const progress = diff / SCREEN_WIDTH; // -1 (left) to +1 (right)
+  const style = useAnimatedStyle(() => {
+    const center = -index * SCREEN_WIDTH;
+    const progress = (translateX.value - center) / SCREEN_WIDTH;
+    const abs = Math.abs(progress);
 
-    // Scale: 1 when centered, 0.96 when off-screen
-    const scale = interpolate(
-      Math.abs(progress),
-      [0, 1],
-      [1, 0.96],
-      Extrapolation.CLAMP
-    );
-
-    // Opacity: 1 when centered, 0.7 when off-screen — depth effect
-    const opacity = interpolate(
-      Math.abs(progress),
-      [0, 1],
-      [1, 0.75],
-      Extrapolation.CLAMP
-    );
+    const scale = interpolate(abs, [0, 1], [1, 0.97], Extrapolation.CLAMP);
+    const opacity = interpolate(abs, [0, 1], [1, 0.78], Extrapolation.CLAMP);
 
     return { transform: [{ scale }], opacity };
   });
 
   return (
-    <Animated.View style={[styles.screenWrapper, animatedStyle]}>
-      {children}
-    </Animated.View>
+    <Animated.View style={[styles.slide, style]}>{children}</Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  strip: {
     flex: 1,
     flexDirection: "row",
   },
-  screenWrapper: {
+  slide: {
     width: SCREEN_WIDTH,
     flex: 1,
+    overflow: "hidden",
   },
 });

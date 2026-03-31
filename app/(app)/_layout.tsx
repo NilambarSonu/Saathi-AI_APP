@@ -1,44 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { View, Platform, AppState, AppStateStatus } from 'react-native';
-import { Stack, Redirect, useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Platform } from 'react-native';
+import { Stack, Redirect } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { registerForPushNotifications } from '../../src/core/services/notifications';
 import { registerDevice } from '../../src/features/auth/services/auth';
+
+// expo-navigation-bar setVisibilityAsync is safe with edge-to-edge.
+// The unsupported APIs (setPositionAsync, setBehaviorAsync) have been removed.
 import * as NavigationBar from 'expo-navigation-bar';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AppLayout() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const user = useAuthStore(s => s.user);
-  const router = useRouter();
 
-  // Task 3: Immersive Navigation Bar hiding safely
+  // Hide the Android system navigation bar once.
+  // setVisibilityAsync is the only NavigationBar call that works in
+  // edge-to-edge mode. setPositionAsync / setBehaviorAsync throw WARNs there.
   useEffect(() => {
     if (Platform.OS === 'android') {
-      const hideNavigationBar = async () => {
-        try {
-          await NavigationBar.setPositionAsync('absolute');
-          await NavigationBar.setVisibilityAsync('hidden');
-          await NavigationBar.setBehaviorAsync('overlay-swipe');
-        } catch (e) {
-          // Ignore
-        }
-      };
-
-      hideNavigationBar();
-
-      const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-        if (nextAppState === 'active') {
-          hideNavigationBar();
-        }
-      });
-
-      const interval = setInterval(hideNavigationBar, 4000); // Polling backup
-
-      return () => {
-        subscription.remove();
-        clearInterval(interval);
-      };
+      NavigationBar.setVisibilityAsync('hidden').catch(() => {});
     }
   }, []);
 
