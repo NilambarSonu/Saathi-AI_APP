@@ -13,6 +13,7 @@ export interface User {
   email?: string;
   phone?: string | null;
   location?: string | null;
+  avatar?: string | null;
   avatar_url?: string | null;
   profile_picture?: string | null;
   profile_image?: string | null;

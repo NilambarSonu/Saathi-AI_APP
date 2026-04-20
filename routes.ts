@@ -818,6 +818,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user profile endpoint
+  app.get("/api/user", authenticateToken, async (req, res) => {
+    try {
+      // 1. VERIFY AUTH MIDDLEWARE (authenticateToken does this)
+      // 2. ATTACH USER TO REQUEST (req.user is populated by authenticateToken)
+      const decodedParam = (req as any).user;
+      
+      // 3. FETCH USER FROM DB
+      // Just in case we need to fetch the absolutely fresh version
+      const user = await storage.getUser(decodedParam.id);
+
+      // 5. ADD DEBUG LOGS
+      console.log("USER FROM DB:", user);
+      
+      // 7. HANDLE EDGE CASE
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // 4. RETURN CORRECT RESPONSE
+      res.json({
+        id: user.id || (user as any)._id,
+        email: user.email,
+        username: user.username,
+        farms: (user as any).farms || []
+      });
+    } catch (error: any) {
+      console.error(`Get user error: ${error.message}`);
+      res.status(500).json({ error: "Failed to get user profile" });
+    }
+  });
+
   // Update user profile endpoint
   app.put("/api/user", authenticateToken, async (req, res) => {
     try {

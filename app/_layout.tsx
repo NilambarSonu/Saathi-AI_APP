@@ -44,23 +44,30 @@ export default function RootLayout() {
   useEffect(() => {
     async function initializeApp() {
       try {
-        // ── Load persisted token first ─────────────────────────────────────
         const { getStoredAccessToken } = await import('../src/core/services/api');
         const token = await getStoredAccessToken();
-        console.log('[App Init] Loaded token:', token ? token.slice(0, 20) + '…' : 'NONE');
+        console.log("TOKEN:", token);
 
-        if (!token) {
-          clearUser();
-          return;
-        }
-
-        // ── Verify token is still valid by fetching user profile ──────────
-        const user = await checkAuthStatus();
-        
-        if (user) {
-          // ✅ Use login() — not setUser() — to populate BOTH user AND token
-          login(user, token);
-          console.log('[App Init] Auth restored for user:', user.id);
+        if (token) {
+          useAuthStore.setState({ isAuthenticated: true, token });
+          
+          try {
+            const { apiCall } = await import('../src/core/services/api');
+            const data = await apiCall('/user');
+            console.log("USER DATA:", data);
+            
+            const user = data.user || data;
+            if (user && (user.id || user._id)) {
+              useAuthStore.getState().setUser({
+                id: user.id || user._id,
+                name: user.username || user.name,
+                email: user.email,
+                avatar: user.profile_picture || user.avatar_url
+              });
+            }
+          } catch (e) {
+            console.log("Failed to load user profile on startup:", e);
+          }
           
           // Register device for push notifications (skip on Expo Go)
           try {
@@ -78,16 +85,14 @@ export default function RootLayout() {
           } catch (err) {
             console.warn('[Push Register Error]', err);
           }
-          // Intentionally omitting router.replace() here
-          // The visual splash screen handles actual screen redirection.
         } else {
-          console.log('[App Init] Token invalid or expired — clearing auth');
-          clearUser();
+          useAuthStore.setState({ isAuthenticated: false });
         }
       } catch (err) {
         console.error('[App Init]', err);
-        clearUser();
+        useAuthStore.setState({ isAuthenticated: false });
       } finally {
+        useAuthStore.setState({ isLoading: false });
         if (fontsLoaded) {
           SplashScreen.hideAsync();
         }
@@ -125,15 +130,23 @@ export default function RootLayout() {
       console.log('[Deep Link] Token extracted:', token.slice(0, 20) + '…');
 
       try {
-        const { saveAuthTokens } = await import('../src/core/services/api');
-        const { checkAuthStatus: verifyAuth } = await import('../src/features/auth/services/auth');
+        const { saveAuthTokens, apiCall } = await import('../src/core/services/api');
         // Store token first so apiCall can use it
         await saveAuthTokens(token, refreshToken);
-        const user = await verifyAuth();
-        if (user) {
-          // ✅ Use login() to populate BOTH user AND token in the store
-          login(user, token);
-          console.log('[Deep Link] Auth complete for user:', user.id);
+        console.log("TOKEN:", token);
+
+        const data = await apiCall('/user');
+        console.log("USER DATA:", data);
+        
+        const user = data.user || data;
+        if (user && (user.id || user._id)) {
+          useAuthStore.getState().setUser({
+            id: user.id || user._id,
+            name: user.username || user.name,
+            email: user.email,
+            avatar: user.profile_picture || user.avatar_url
+          });
+          console.log('[Deep Link] Auth complete for user:', userData.id || userData._id);
           router.replace('/(app)');
         } else {
           console.warn('[Deep Link] Could not fetch user profile after token save');

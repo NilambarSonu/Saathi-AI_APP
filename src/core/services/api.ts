@@ -6,15 +6,15 @@ export const API_HOST = "https://saathiai.org";
 export const API_ROOT = API_BASE;
 
 // ─── Canonical storage keys — MUST match store/authStore.ts TOKEN_KEY ────────
-const ACCESS_TOKEN_KEY = 'saathi_access_token';
+const TOKEN_KEY = 'saathi_access_token';
 const REFRESH_TOKEN_KEY = 'saathi_refresh_token';
 
 export async function getStoredAccessToken(): Promise<string | null> {
   // Primary: SecureStore (most secure, survives app restarts)
-  const secureToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+  const secureToken = await SecureStore.getItemAsync(TOKEN_KEY);
   if (secureToken) return secureToken;
   // Fallback: AsyncStorage (less secure but spans RN bridge restarts)
-  return AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+  return AsyncStorage.getItem(TOKEN_KEY);
 }
 
 export async function getStoredRefreshToken(): Promise<string | null> {
@@ -28,9 +28,9 @@ export async function saveAuthTokens(token: string, refreshToken?: string): Prom
     throw new Error('INVALID_AUTH_TOKEN');
   }
 
-  await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, token);
-  await AsyncStorage.setItem(ACCESS_TOKEN_KEY, token);
-  console.log('[API] TOKEN saved — key:', ACCESS_TOKEN_KEY, '| preview:', token.slice(0, 20) + '…');
+  await SecureStore.setItemAsync(TOKEN_KEY, token);
+  await AsyncStorage.setItem(TOKEN_KEY, token);
+  console.log('[API] TOKEN saved — key:', TOKEN_KEY, '| preview:', token.slice(0, 20) + '…');
 
   if (refreshToken) {
     if (typeof refreshToken !== 'string') {
@@ -42,9 +42,9 @@ export async function saveAuthTokens(token: string, refreshToken?: string): Prom
 }
 
 export async function clearAuthTokens(): Promise<void> {
-  await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+  await SecureStore.deleteItemAsync(TOKEN_KEY);
   await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
-  await AsyncStorage.removeItem(ACCESS_TOKEN_KEY);
+  await AsyncStorage.removeItem(TOKEN_KEY);
   await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
@@ -67,7 +67,7 @@ export async function apiCall<T = any>(
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
+      'Authorization': token ? `Bearer ${token}` : "",
       ...(options.headers as Record<string, string> || {})
     }
   });
