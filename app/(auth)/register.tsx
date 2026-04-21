@@ -7,7 +7,7 @@ import {
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { loginWithSocialProvider, registerAccount } from '../../src/features/auth/services/auth';
+import { registerAccount, startSocialAuth } from '../../src/features/auth/services/auth';
 import { Colors } from '../../constants/Colors';
 import { useAuthStore } from '../../store/authStore';
 
@@ -27,7 +27,9 @@ export default function RegisterScreen() {
       // Opens the system browser. When the backend redirects back to
       // saathiai://auth/callback?token=…, the Linking listener in _layout.tsx
       // catches the URL, parses the token, and navigates to /(app).
-      await loginWithSocialProvider(provider);
+      const session = await startSocialAuth(provider);
+      login(session.user, session.token);
+      router.replace('/(app)');
     } catch (err: any) {
       Alert.alert('Social Auth Error', err?.message || 'Could not complete social login.');
     } finally {

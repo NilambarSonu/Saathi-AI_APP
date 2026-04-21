@@ -14,7 +14,7 @@
  * 10.  Transfer watchdog         — 10 s timer resets buffer if FILE_END never arrives
  */
 
-import { Platform, PermissionsAndroid, AppState, type AppStateStatus } from 'react-native';
+import { Platform, PermissionsAndroid, AppState, type AppStateStatus, NativeModules } from 'react-native';
 import Constants from 'expo-constants';
 import type {
   BleManager as BleManagerType,
@@ -200,34 +200,17 @@ class BLEService {
   }
 
   async isBluetoothPoweredOn(): Promise<boolean> {
-    const m = this._getManager();
-    if (!m) return false;
-    return (await m.state()) === 'PoweredOn';
+    return (await this.getBluetoothState()) === 'PoweredOn';
   }
 
-  async requestEnableBluetooth(): Promise<boolean> {
-    if (Platform.OS !== 'android') return this.isBluetoothPoweredOn();
-
-    // If already on, continue immediately.
-    if (await this.isBluetoothPoweredOn()) return true;
-
+  async getBluetoothState(): Promise<BleState | null> {
     const m = this._getManager();
-    if (!m) return false;
+    if (!m) return null;
 
     try {
-      this._log('info', 'Bluetooth is OFF. Opening system enable dialog…');
-      await m.enable();
-
-      // Wait briefly for adapter state to settle to PoweredOn.
-      for (let i = 0; i < 8; i++) {
-        if (await this.isBluetoothPoweredOn()) return true;
-        await new Promise(r => setTimeout(r, 250));
-      }
-      return false;
+      return await m.state();
     } catch {
-      // User denied/dismissed the dialog. This is a non-error UX path.
-      this._log('info', 'Bluetooth enable request dismissed by user.');
-      return false;
+      return null;
     }
   }
 
@@ -235,15 +218,11 @@ class BLEService {
   async requestAndroidPermissions(): Promise<void> {
     if (Platform.OS !== 'android') return;
 
-    const sdkInt = Number(Platform.Version);
-    const permissions = sdkInt >= 31
-      ? [
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-        ]
-      : [
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        ];
+    const permissions = [
+      PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+    ].filter(Boolean) as string[];
 
     const results = await PermissionsAndroid.requestMultiple(permissions);
 
@@ -274,9 +253,35 @@ class BLEService {
     if (!m) throw new Error('BLE not available in this environment.');
 
     // Check Bluetooth is ON before scanning
-    const currentState = await m.state();
+    let currentState = await this.getBluetoothState();
     if (currentState !== 'PoweredOn') {
-      throw new Error(`BT_NOT_READY:${currentState}`);
+      if (Platform.OS === 'android') {
+        try {
+          this._log('info', 'Bluetooth is OFF. Prompting system popup to enable...');
+          const { BluetoothManager } = NativeModules;
+          
+          // Request system dialog
+          if (BluetoothManager && BluetoothManager.enableBluetooth) {
+            await BluetoothManager.enableBluetooth();
+          } else {
+            // Fallback for when NativeModules isn't accessible
+            await m.enable();
+          }
+
+          // Delay slightly to ensure hardware state updates
+          await new Promise(r => setTimeout(r, 1500));
+          currentState = await this.getBluetoothState();
+
+          if (currentState !== 'PoweredOn') {
+            // Re-read once after delay if state takes longer to reflect
+            throw new Error(`BT_NOT_READY:${currentState}`);
+          }
+        } catch (err: any) {
+          throw new Error('BT_NOT_READY:User denied Bluetooth permissions to turn on.');
+        }
+      } else {
+        throw new Error(`BT_NOT_READY:${currentState}`);
+      }
     }
 
     // Safety: stop any lingering scan
@@ -296,8 +301,8 @@ class BLEService {
 
       // Enhancement 3: scan for our service UUID; the manager filters at protocol level
       m.startDeviceScan(
-        [SERVICE_UUID],           // filter by service UUID (best match)
-        { allowDuplicates: false },
+        null,
+        null,
         async (error, device) => {
           if (error) {
             clearTimeout(scanTimer);
@@ -309,6 +314,10 @@ class BLEService {
           }
 
           if (!device) return;
+
+          if (device.name) {
+            console.log(device.name);
+          }
 
           // Enhancement 3 fallback: also match by name/localName
           const nameMatch =

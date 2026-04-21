@@ -1,20 +1,70 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 
-export const API_BASE = "https://saathiai.org/api";
-export const API_HOST = "https://saathiai.org"; 
+export const API_BASE = 'https://saathiai.org/api';
+export const API_HOST = 'https://saathiai.org';
 export const API_ROOT = API_BASE;
 
-// ─── Canonical storage keys — MUST match store/authStore.ts TOKEN_KEY ────────
-const TOKEN_KEY = 'auth_token';
+const TOKEN_KEY = 'saathi_access_token';
 const REFRESH_TOKEN_KEY = 'saathi_refresh_token';
+const USER_ID_KEYS = ['user_id', 'userId'] as const;
+const LEGACY_TOKEN_KEYS = ['auth_token', 'access_token'] as const;
+const JSON_HEADERS = {
+  'Content-Type': 'application/json',
+};
+
+export interface ChatSession {
+  id: string;
+  title?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  lastMessageAt?: string | null;
+  messageCount?: number | null;
+  language?: string | null;
+}
+
+export interface ChatSessionMessage {
+  id: string;
+  text: string;
+  sender: string;
+  timestamp: string;
+  sessionId: string;
+}
+
+type PendingSoilPayload = { data: Record<string, any>; queuedAt: string };
+
+const PENDING_SOIL_QUEUE_KEY = 'pending_soil_queue_v2';
+
+function normalizeEndpoint(endpoint: string): string {
+  if (!endpoint) return '';
+  if (endpoint.startsWith('/api/')) return endpoint.slice(4);
+  if (endpoint.startsWith('/')) return endpoint;
+  return `/${endpoint}`;
+}
+
+async function removeKeys(
+  storage: { removeItem: (key: string) => Promise<void> },
+  keys: readonly string[]
+): Promise<void> {
+  await Promise.all(keys.map((key) => storage.removeItem(key).catch(() => {})));
+}
 
 export async function getStoredAccessToken(): Promise<string | null> {
-  // Primary: SecureStore (most secure, survives app restarts)
   const secureToken = await SecureStore.getItemAsync(TOKEN_KEY);
   if (secureToken) return secureToken;
-  // Fallback: AsyncStorage (less secure but spans RN bridge restarts)
-  return AsyncStorage.getItem(TOKEN_KEY);
+
+  const asyncToken = await AsyncStorage.getItem(TOKEN_KEY);
+  if (asyncToken) return asyncToken;
+
+  for (const key of LEGACY_TOKEN_KEYS) {
+    const legacySecureToken = await SecureStore.getItemAsync(key);
+    if (legacySecureToken) return legacySecureToken;
+
+    const legacyAsyncToken = await AsyncStorage.getItem(key);
+    if (legacyAsyncToken) return legacyAsyncToken;
+  }
+
+  return null;
 }
 
 export async function getStoredRefreshToken(): Promise<string | null> {
@@ -23,14 +73,35 @@ export async function getStoredRefreshToken(): Promise<string | null> {
   return AsyncStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
+export async function getStoredUserId(): Promise<string | null> {
+  for (const key of USER_ID_KEYS) {
+    const secureValue = await SecureStore.getItemAsync(key);
+    if (secureValue) return secureValue;
+  }
+
+  for (const key of USER_ID_KEYS) {
+    const asyncValue = await AsyncStorage.getItem(key);
+    if (asyncValue) return asyncValue;
+  }
+
+  return null;
+}
+
 export async function saveAuthTokens(token: string, refreshToken?: string): Promise<void> {
   if (typeof token !== 'string' || token.trim().length === 0) {
     throw new Error('INVALID_AUTH_TOKEN');
   }
 
+  await removeKeys(
+    {
+      removeItem: (key) => SecureStore.deleteItemAsync(key),
+    },
+    LEGACY_TOKEN_KEYS
+  );
   await SecureStore.setItemAsync(TOKEN_KEY, token);
+
   await AsyncStorage.setItem(TOKEN_KEY, token);
-  console.log('[API] TOKEN saved — key:', TOKEN_KEY, '| preview:', token.slice(0, 20) + '…');
+  await Promise.all(LEGACY_TOKEN_KEYS.map((key) => AsyncStorage.removeItem(key)));
 
   if (refreshToken) {
     if (typeof refreshToken !== 'string') {
@@ -41,63 +112,62 @@ export async function saveAuthTokens(token: string, refreshToken?: string): Prom
   }
 }
 
-export async function clearAuthTokens(): Promise<void> {
-  await SecureStore.deleteItemAsync(TOKEN_KEY);
-  await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
-  await AsyncStorage.removeItem(TOKEN_KEY);
-  await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
+export async function saveUserId(userId: string): Promise<void> {
+  if (!userId) return;
+
+  await Promise.all(USER_ID_KEYS.map((key) => SecureStore.setItemAsync(key, userId)));
+  await Promise.all(USER_ID_KEYS.map((key) => AsyncStorage.setItem(key, userId)));
 }
 
-export async function apiCall<T = any>(
-  endpoint: string, 
-  options: RequestInit = {}
-): Promise<T> {
-  // Fix 2: Read token from SecureStore on EVERY call
-  const token = await SecureStore.getItemAsync('auth_token');
-  
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string> || {})
+export async function clearAuthTokens(): Promise<void> {
+  await removeKeys(
+    {
+      removeItem: (key) => SecureStore.deleteItemAsync(key),
+    },
+    [TOKEN_KEY, REFRESH_TOKEN_KEY, ...LEGACY_TOKEN_KEYS, ...USER_ID_KEYS]
+  );
+
+  await Promise.all(
+    [TOKEN_KEY, REFRESH_TOKEN_KEY, ...LEGACY_TOKEN_KEYS, ...USER_ID_KEYS].map((key) =>
+      AsyncStorage.removeItem(key).catch(() => {})
+    )
+  );
+}
+
+export async function apiCall<T = any>(endpoint: string, options: RequestInit = {}): Promise<T | null> {
+  const token = await getStoredAccessToken();
+  const headers = {
+    ...JSON_HEADERS,
+    ...(options.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const endpointPath = endpoint.startsWith('/api')
-    ? endpoint.replace('/api', '')
-    : endpoint.startsWith('/')
-      ? endpoint
-      : `/${endpoint}`;
-
-  const response = await fetch(`${API_BASE}${endpointPath}`, {
+  const response = await fetch(`${API_BASE}${normalizeEndpoint(endpoint)}`, {
     ...options,
-    headers
+    headers,
   });
 
-  const contentType = (response.headers.get('content-type') || '').toLowerCase();
-  
   if (!response.ok) {
-     let errorMessage = `HTTP Error ${response.status}`;
-     if (contentType.includes('application/json')) {
-        try {
-           const errPayload = await response.json();
-           errorMessage = errPayload.error || errPayload.message || errPayload.details || errorMessage;
-        } catch {}
-     } else {
-        try {
-           const errText = await response.text();
-           errorMessage = errText || errorMessage;
-        } catch {}
-     }
-     throw new Error(errorMessage);
-  }
-  
-  if (!contentType.includes('application/json')) {
-    return {} as T;
+    if (response.status === 401) {
+      await clearAuthTokens().catch(() => {});
+      return null;
+    }
+
+    const text = await response.text();
+    throw new Error(text || `Request failed with status ${response.status}`);
   }
 
-  return response.json();
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return (await response.json()) as T;
+  }
+
+  const text = await response.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return text as T;
+  }
 }
 
 export async function fetchSoilHistory<T = any[]>(userId: string): Promise<T> {
@@ -106,7 +176,7 @@ export async function fetchSoilHistory<T = any[]>(userId: string): Promise<T> {
 
   try {
     const payload = await apiCall(`/soil-tests/${encodeURIComponent(normalizedUserId)}`);
-    return payload as T;
+    return (payload ?? []) as T;
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : 'Failed to fetch soil tests');
   }
@@ -114,22 +184,20 @@ export async function fetchSoilHistory<T = any[]>(userId: string): Promise<T> {
 
 export async function isInternetAvailable(): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE}/health`, { method: 'GET' });
-    return response.ok !== false;
+    await apiCall('/health', { method: 'GET' });
+    return true;
   } catch {
     return false;
   }
 }
 
-// ─── Offline Queue Syncing ───────────────────────────────────────────────────
-type PendingSoilPayload = { data: Record<string, any>; queuedAt: string };
-const PENDING_SOIL_QUEUE_KEY = 'pending_soil_queue_v2';
-
 export async function getPendingSoilQueue(): Promise<PendingSoilPayload[]> {
   try {
     const raw = await AsyncStorage.getItem(PENDING_SOIL_QUEUE_KEY);
     return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 async function setPendingSoilQueue(queue: PendingSoilPayload[]): Promise<void> {
@@ -144,6 +212,40 @@ export const api = {
     });
   },
 
+  getChatSessions: async (): Promise<ChatSession[]> => {
+    const data = await apiCall<any>('/chat/sessions');
+    return Array.isArray(data)
+      ? data
+      : Array.isArray(data?.sessions)
+        ? data.sessions
+        : [];
+  },
+
+  createChatSession: async (payload: { title: string; language?: string }): Promise<ChatSession> => {
+    const data = await apiCall<any>('/chat/sessions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return (data?.session ?? data) as ChatSession;
+  },
+
+  deleteChatSession: async (sessionId: string): Promise<void> => {
+    await apiCall(`/chat/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  getChatSessionMessages: async (sessionId: string): Promise<ChatSessionMessage[]> => {
+    if (!sessionId) return [];
+
+    const data = await apiCall<any>(`/chat/sessions/${encodeURIComponent(sessionId)}/messages`);
+    return Array.isArray(data)
+      ? data
+      : Array.isArray(data?.messages)
+        ? data.messages
+        : [];
+  },
+
   uploadSoil: async (data: any): Promise<any> => {
     return apiCall('/analyze-soil-file', {
       method: 'POST',
@@ -151,7 +253,9 @@ export const api = {
     });
   },
 
-  soilTests: async (soilData: Record<string, any>): Promise<{ recommendations: any[], pricing?: any, queued?: boolean }> => {
+  soilTests: async (
+    soilData: Record<string, any>
+  ): Promise<{ recommendations: any[]; pricing?: any; queued?: boolean }> => {
     const isOnline = await isInternetAvailable();
     if (!isOnline) {
       const queue = await getPendingSoilQueue();
@@ -160,13 +264,13 @@ export const api = {
       return { recommendations: [], queued: true };
     }
 
-    return apiCall<{ recommendations: any[], pricing?: any }>('/soil-tests', {
+    return apiCall<{ recommendations: any[]; pricing?: any }>('/soil-tests', {
       method: 'POST',
       body: JSON.stringify(soilData),
     });
   },
 
-  flushSoilQueue: async (): Promise<{ synced: number, pending: number }> => {
+  flushSoilQueue: async (): Promise<{ synced: number; pending: number }> => {
     const queue = await getPendingSoilQueue();
     if (!queue.length || !(await isInternetAvailable())) {
       return { synced: 0, pending: queue.length };
@@ -174,17 +278,20 @@ export const api = {
 
     let synced = 0;
     const remaining: PendingSoilPayload[] = [];
-    
+
     for (const item of queue) {
       try {
-        await apiCall('/soil-tests', { method: 'POST', body: JSON.stringify(item.data) });
+        await apiCall('/soil-tests', {
+          method: 'POST',
+          body: JSON.stringify(item.data),
+        });
         synced++;
-      } catch (err) {
+      } catch {
         remaining.push(item);
       }
     }
 
     await setPendingSoilQueue(remaining);
     return { synced, pending: remaining.length };
-  }
+  },
 };

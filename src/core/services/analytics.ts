@@ -1,10 +1,11 @@
-import { apiCall, fetchSoilHistory } from './api';
-import { useAuthStore } from '../../../store/authStore';
+import { apiCall } from './api';
 
 export interface DashboardStats {
   farms: number;
-  soilTests: number;
+  tests: number;
   aiTips: number;
+  yearsExperience?: number;
+  partnersCount?: number;
 }
 
 export interface ParameterTrend {
@@ -24,22 +25,21 @@ export interface MapLocation {
 
 /**
  * Dashboard stats.
- * Backend contract: GET /api/soil-tests/:userId
- * farms = response.length (each unique test = one farm record)
+ * Backend contract: GET /api/stats
  */
 export async function getDashboardStats(): Promise<DashboardStats> {
-  try {
-    const user = useAuthStore.getState().user;
-    if (!user?.id) return { farms: 0, soilTests: 0, aiTips: 0 };
-
-    const tests = await fetchSoilHistory<any[]>(user.id);
-    const totalTests = Array.isArray(tests) ? tests.length : 0;
-
-    // farms = number of soil test records returned by the API
-    return { farms: totalTests, soilTests: totalTests, aiTips: totalTests };
-  } catch {
-    return { farms: 0, soilTests: 0, aiTips: 0 };
+  const stats = await apiCall<any>('/stats') as any;
+  if (__DEV__) {
+    console.log('[Stats] Raw /stats response:', stats);
   }
+
+  return {
+    farms: Number(stats?.farmsAnalyzed ?? 0),
+    tests: Number(stats?.soilTests ?? 0),
+    aiTips: Number(stats?.recommendations ?? 0),
+    yearsExperience: Number(stats?.yearsExperience ?? 0),
+    partnersCount: Number(stats?.partnersCount ?? 0),
+  };
 }
 
 /**

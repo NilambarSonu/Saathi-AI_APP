@@ -1,1005 +1,731 @@
-/**
- * history.tsx — Saathi AI History & Analytics Dashboard
- * Persistent + Real-Time Hybrid Marker System
- *
- * Sources:
- *  - Permanent: getSoilTests() via API → stored in SoilMarkersContext + AsyncStorage
- *  - Live: BLE scan → written to SoilMarkersContext by connect.tsx
- *  - Both are merged and deduplicated before rendering on the map
- */
-import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { hideTabBar, showTabBar } from '../../constants/Animations';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Dimensions, Platform, Modal, ActivityIndicator, Pressable,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Dimensions,
+  Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  SlideInDown,
-  SlideOutUp,
-  Layout,
-} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { LineChart } from 'react-native-chart-kit';
-
-// Services
+import { hideTabBar, showTabBar } from '../../constants/Animations';
 import { SoilTest } from '../../src/features/soil_analysis/services/soil';
 import { exportSoilReport } from '../../src/core/services/pdfExport';
 import { getParameterTrend, ParameterTrend } from '../../src/core/services/analytics';
 import { fetchSoilHistory } from '../../src/core/services/api';
 import { useAuthStore } from '../../store/authStore';
+import { useSoilMarkers } from '../../context/SoilMarkersContext';
 
-// Persistent hybrid marker system
-import { useSoilMarkers, SoilMarker } from '../../context/SoilMarkersContext';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const { width: W } = Dimensions.get('window');
+const COLORS = {
+  backgroundTop: '#E0F5E9',
+  backgroundBottom: '#FFFFFF',
+  title: '#022C22',
+  subtitle: '#475569',
+  card: 'rgba(255,255,255,0.92)',
+  border: 'rgba(255,255,255,0.9)',
+  accent: '#059669',
+  warningBg: '#FFFBEB',
+  warningBorder: '#FDE68A',
+  warningText: '#92400E',
+};
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function safeNumber(value: unknown, fallback = 0): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
+const PARAMETERS = ['Nitrogen (N)', 'Phosphorus (P)', 'Potassium (K)', 'pH Level', 'Moisture'] as const;
+const TIME_FILTERS = ['Last 30 Days', 'Last 90 Days', 'Last Year', 'All Time'] as const;
+
+type ParameterName = (typeof PARAMETERS)[number];
+type TimeFilter = (typeof TIME_FILTERS)[number];
+
+type HistoryMarker = {
+  id: string;
+  latitude: number;
+  longitude: number;
+  timestamp: string;
+  n: number;
+  p: number;
+  k: number;
+  ph: number;
+  moisture: number;
+};
+
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function formatMetric(value: unknown, digits = 1): string {
-  const n = Number(value);
-  return Number.isFinite(n) ? n.toFixed(digits) : '--';
+function parseIsoDate(value: unknown): string | null {
+  if (!value) return null;
+  const parsed = new Date(value as any);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
 }
 
-function parseDateLabel(value: unknown): string {
-  const date = new Date(value as any);
-  return Number.isNaN(date.getTime())
-    ? 'N/A'
-    : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+function safeDateLabel(value: unknown): string {
+  const iso = parseIsoDate(value);
+  if (!iso) return 'N/A';
+
+  return new Date(iso).toLocaleDateString('en-IN', {
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
-function formatFullDate(value: unknown): string {
-  const date = new Date(value as any);
-  if (Number.isNaN(date.getTime())) return 'Unknown Date';
-  return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} — ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+function safeDateTimeLabel(value: unknown): string {
+  const iso = parseIsoDate(value);
+  if (!iso) return 'Unknown date';
+
+  return new Date(iso).toLocaleString('en-IN', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
-function normalizeToIso(value: unknown): string {
-  const date = new Date(value as any);
-  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+function getLogMetric(log: SoilTest, parameter: ParameterName): number {
+  if (parameter === 'pH Level') return toNumber(log.ph);
+  if (parameter === 'Nitrogen (N)') return toNumber(log.n);
+  if (parameter === 'Phosphorus (P)') return toNumber(log.p);
+  if (parameter === 'Potassium (K)') return toNumber(log.k);
+  return toNumber(log.moisture);
 }
 
-function pickFirstString(...values: unknown[]): string {
-  for (const value of values) {
-    if (typeof value === 'string' && value.trim().length > 0) return value;
-    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-  }
-  return '';
+function getParamColor(parameter: ParameterName): string {
+  if (parameter === 'pH Level') return '#2563EB';
+  if (parameter === 'Nitrogen (N)') return '#EF4444';
+  if (parameter === 'Phosphorus (P)') return '#8B5CF6';
+  if (parameter === 'Potassium (K)') return '#F97316';
+  return '#16A34A';
 }
 
-function normalizeSoilTestRow(raw: any, index: number, userId?: string): SoilTest {
-  const createdAt = normalizeToIso(
-    raw?.createdAt ?? raw?.created_at ?? raw?.testDate ?? raw?.timestamp ?? raw?.date
-  );
+function normalizeSoilLog(raw: any, index: number, fallbackUserId: string): SoilTest | null {
+  const createdAt =
+    parseIsoDate(raw?.testDate) ||
+    parseIsoDate(raw?.createdAt) ||
+    parseIsoDate(raw?.created_at) ||
+    parseIsoDate(raw?.timestamp) ||
+    parseIsoDate(raw?.date);
 
-  const latitude = Number(raw?.latitude ?? raw?.lat);
-  const longitude = Number(raw?.longitude ?? raw?.lng ?? raw?.lon);
+  if (!createdAt) return null;
 
-  const id =
-    pickFirstString(raw?.id, raw?._id, raw?.testId, raw?.soilTestId) ||
-    `${createdAt}-${Number.isFinite(latitude) ? latitude.toFixed(6) : 'na'}-${Number.isFinite(longitude) ? longitude.toFixed(6) : 'na'}-${index}`;
+  const latitude = raw?.latitude ?? raw?.lat;
+  const longitude = raw?.longitude ?? raw?.lng ?? raw?.lon;
+  const id = String(raw?.id || raw?._id || raw?.soilTestId || `${createdAt}-${index}`);
 
   return {
     id,
-    userId:
-      pickFirstString(raw?.userId, raw?.user_id, raw?.user?.id, userId) ||
-      'unknown',
-    n: safeNumber(raw?.n ?? raw?.nitrogen),
-    p: safeNumber(raw?.p ?? raw?.phosphorus),
-    k: safeNumber(raw?.k ?? raw?.potassium),
-    ph: safeNumber(raw?.ph ?? raw?.pH),
-    moisture: safeNumber(raw?.moisture ?? raw?.soilMoisture),
-    temperature: safeNumber(raw?.temperature ?? raw?.temp),
-    latitude: Number.isFinite(latitude) ? latitude : null,
-    longitude: Number.isFinite(longitude) ? longitude : null,
-    deviceId: pickFirstString(raw?.deviceId, raw?.device_id) || undefined,
-    locationDetails: pickFirstString(raw?.locationDetails, raw?.location, raw?.address) || undefined,
+    userId: String(raw?.userId || raw?.user_id || raw?.user?.id || fallbackUserId),
+    n: toNumber(raw?.n ?? raw?.nitrogen),
+    p: toNumber(raw?.p ?? raw?.phosphorus),
+    k: toNumber(raw?.k ?? raw?.potassium),
+    ph: toNumber(raw?.ph ?? raw?.pH),
+    moisture: toNumber(raw?.moisture ?? raw?.soilMoisture),
+    temperature: toNumber(raw?.temperature ?? raw?.temp),
+    latitude: Number.isFinite(Number(latitude)) ? Number(latitude) : null,
+    longitude: Number.isFinite(Number(longitude)) ? Number(longitude) : null,
+    deviceId: raw?.deviceId || raw?.device_id || undefined,
+    locationDetails:
+      raw?.locationDetails || raw?.location || raw?.address || raw?.fieldName || undefined,
     createdAt,
   };
 }
 
-function markerDedupKey(marker: Pick<SoilMarker, 'latitude' | 'longitude' | 'timestamp'>): string {
-  return `${Number(marker.latitude).toFixed(6)}-${Number(marker.longitude).toFixed(6)}-${marker.timestamp}`;
+function buildMarkers(logs: SoilTest[]): HistoryMarker[] {
+  return logs
+    .filter(
+      (log) => Number.isFinite(Number(log.latitude)) && Number.isFinite(Number(log.longitude))
+    )
+    .map((log) => ({
+      id: log.id,
+      latitude: Number(log.latitude),
+      longitude: Number(log.longitude),
+      timestamp: log.createdAt,
+      n: toNumber(log.n),
+      p: toNumber(log.p),
+      k: toNumber(log.k),
+      ph: toNumber(log.ph),
+      moisture: toNumber(log.moisture),
+    }));
 }
 
-// ─── Design Tokens ────────────────────────────────────────────────────────────
-const C = {
-  bgLight:  '#E0F5E9',
-  bgWhite:  '#FFFFFF',
-  textDark: '#022C22',
-  textSub:  '#475569',
-  greenBtn: '#059669',
-  valGreen: '#16A34A',
-  valBlue:  '#2563EB',
-  glass:       'rgba(255, 255, 255, 0.4)',
-  glassBorder: 'rgba(255, 255, 255, 0.8)',
-};
-
-// ─── pH pin color ──────────────────────────────────────────────────────────────
-function phPinColor(ph: number): string {
-  if (ph < 6.5) return '#EF4444'; // Acidic → red
-  if (ph > 7.5) return '#3B82F6'; // Alkaline → blue
-  return '#22C55E';               // Neutral → green
-}
-
-function phLabel(ph: number): string {
-  if (ph < 6.5) return 'Acidic';
-  if (ph > 7.5) return 'Alkaline';
-  return 'Neutral';
-}
-
-function markerPinColor(marker: SoilMarker): string {
-  if (marker.source === 'ble') return '#F59E0B'; // BLE live scan -> orange
-  const ph = safeNumber(marker.ph);
-  if (ph < 6.5) return '#EF4444'; // API acidic -> red
-  if (ph > 7.5) return '#3B82F6'; // API alkaline -> blue
-  return '#22C55E';               // API neutral -> green
-}
-
-// ─── Pure Glass Card ──────────────────────────────────────────────────────────
-function GlassCard({ style, children }: { style?: any; children: React.ReactNode }) {
-  if (Platform.OS === 'android') {
-    return <View style={[gc.card, gc.cardAndroid, style]}>{children}</View>;
-  }
-  return (
-    <BlurView intensity={60} tint="light" style={[gc.card, style]}>
-      {children}
-    </BlurView>
-  );
-}
-const gc = StyleSheet.create({
-  card: {
-    backgroundColor: C.glass,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: C.glassBorder,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8 },
-      android: { elevation: 2 }
-    })
-  },
-  cardAndroid: { backgroundColor: '#F8FBFA' },
-});
-
-// ─── Marker Detail Modal ──────────────────────────────────────────────────────
-function MarkerDetailModal({
-  marker,
-  onClose,
-}: {
-  marker: SoilMarker | null;
-  onClose: () => void;
-}) {
-  if (!marker) return null;
-
-  const ph = safeNumber(marker.ph);
-  const color = phPinColor(ph);
-
-  return (
-    <Modal
-      transparent
-      animationType="fade"
-      visible={!!marker}
-      onRequestClose={onClose}
-    >
-      <Pressable style={dm.overlay} onPress={onClose}>
-        <Pressable style={dm.sheet} onPress={(e) => e.stopPropagation()}>
-          {/* Source badge */}
-          <View style={[dm.sourceBadge, { backgroundColor: marker.source === 'api' ? '#EFF6FF' : '#F0FDF4' }]}>
-            <Ionicons
-              name={marker.source === 'api' ? 'cloud-outline' : 'bluetooth-outline'}
-              size={13}
-              color={marker.source === 'api' ? '#2563EB' : '#16A34A'}
-            />
-            <Text style={[dm.sourceText, { color: marker.source === 'api' ? '#2563EB' : '#16A34A' }]}>
-              {marker.source === 'api' ? 'API Record' : 'BLE Live Scan'}
-            </Text>
-          </View>
-
-          <Text style={dm.title}>Soil Test Details</Text>
-          <Text style={dm.date}>{formatFullDate(marker.timestamp)}</Text>
-
-          {/* pH big display */}
-          <View style={[dm.phBlock, { borderColor: color }]}>
-            <Text style={[dm.phValue, { color }]}>pH {formatMetric(ph, 1)}</Text>
-            <Text style={[dm.phLabel, { color }]}>{phLabel(ph)}</Text>
-          </View>
-
-          {/* NPK row */}
-          <View style={dm.npkRow}>
-            {[
-              { label: 'N', value: marker.n, color: '#22C55E' },
-              { label: 'P', value: marker.p, color: '#6366F1' },
-              { label: 'K', value: marker.k, color: '#EAB308' },
-            ].map(({ label, value, color: c }) => (
-              <View key={label} style={dm.npkBlock}>
-                <Text style={[dm.npkVal, { color: c }]}>{formatMetric(value, 0)}</Text>
-                <Text style={dm.npkLbl}>{label} (mg/kg)</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Moisture / Temp */}
-          {(marker.moisture != null || marker.temperature != null) && (
-            <View style={dm.extraRow}>
-              {marker.moisture != null && (
-                <View style={dm.extraBlock}>
-                  <Ionicons name="water-outline" size={16} color="#3B82F6" />
-                  <Text style={dm.extraVal}>{formatMetric(marker.moisture, 1)}%</Text>
-                  <Text style={dm.extraLbl}>Moisture</Text>
-                </View>
-              )}
-              {marker.temperature != null && (
-                <View style={dm.extraBlock}>
-                  <Ionicons name="thermometer-outline" size={16} color="#F97316" />
-                  <Text style={dm.extraVal}>{formatMetric(marker.temperature, 1)}°C</Text>
-                  <Text style={dm.extraLbl}>Temperature</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Coordinates */}
-          <Text style={dm.coords}>
-            📍 {marker.latitude.toFixed(5)}, {marker.longitude.toFixed(5)}
-          </Text>
-
-          <TouchableOpacity style={dm.closeBtn} onPress={onClose}>
-            <Text style={dm.closeBtnText}>Close</Text>
-          </TouchableOpacity>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-const dm = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    paddingBottom: 40,
-    gap: 12,
-  },
-  sourceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 100,
-  },
-  sourceText: { fontFamily: 'Sora_600SemiBold', fontSize: 12 },
-  title: { fontFamily: 'Sora_800ExtraBold', fontSize: 20, color: C.textDark },
-  date:  { fontFamily: 'Sora_400Regular', fontSize: 12, color: C.textSub },
-  phBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 1.5,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(255,255,255,0.6)',
-  },
-  phValue: { fontFamily: 'Sora_800ExtraBold', fontSize: 26 },
-  phLabel: { fontFamily: 'Sora_500Medium', fontSize: 14 },
-  npkRow: { flexDirection: 'row', gap: 8 },
-  npkBlock: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    padding: 12,
-    alignItems: 'center',
-  },
-  npkVal: { fontFamily: 'Sora_700Bold', fontSize: 18 },
-  npkLbl: { fontFamily: 'Sora_400Regular', fontSize: 10, color: C.textSub, marginTop: 2 },
-  extraRow: { flexDirection: 'row', gap: 8 },
-  extraBlock: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 10,
-  },
-  extraVal: { fontFamily: 'Sora_700Bold', fontSize: 15, color: C.textDark },
-  extraLbl: { fontFamily: 'Sora_400Regular', fontSize: 11, color: C.textSub },
-  coords: { fontFamily: 'Sora_400Regular', fontSize: 12, color: C.textSub, textAlign: 'center' },
-  closeBtn: {
-    backgroundColor: C.greenBtn,
-    borderRadius: 100,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  closeBtnText: { fontFamily: 'Sora_700Bold', fontSize: 15, color: '#FFF' },
-});
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function HistoryScreen() {
-  const { user } = useAuthStore();
-  const { soilMarkers, addSoilMarkers, clearMarkers, isLoadingMarkers } = useSoilMarkers();
-
-  const [isExporting, setIsExporting] = useState(false);
-  const [isParameterOpen, setIsParameterOpen] = useState(false);
-  const [selectedParam, setSelectedParam] = useState('Nitrogen (N)');
-
-  const [timeFilters] = useState(['Last 30 Days', 'Last 90 Days', 'Last Year', 'All Time']);
-  const [isTimeFilterOpen, setIsTimeFilterOpen] = useState(false);
-  const [timeFilter, setTimeFilter] = useState('Last 30 Days');
-
-  // Raw soil test logs from the API
+  const { user, token } = useAuthStore();
+  const { clearMarkers } = useSoilMarkers();
   const [logs, setLogs] = useState<SoilTest[]>([]);
-  const [loadingLogs, setLoadingLogs] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
   const [trend, setTrend] = useState<ParameterTrend | null>(null);
-
-  // Selected marker for detail modal
-  const [selectedMarker, setSelectedMarker] = useState<SoilMarker | null>(null);
+  const [selectedParameter, setSelectedParameter] = useState<ParameterName>('Nitrogen (N)');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('Last 30 Days');
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [loadingTrend, setLoadingTrend] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [mapMode, setMapMode] = useState<'google' | 'osm'>('google');
-  const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Prevent re-adding API markers on every re-render
-  const apiSyncedRef = useRef(false);
-
-  // ── Fetch soil tests from API ────────────────────────────────────────────
   useEffect(() => {
-    if (!user?.id) {
+    if (!token || !user?.id) {
       setLogs([]);
+      setHistoryError(null);
       setLoadingLogs(false);
       return;
     }
 
+    let cancelled = false;
     setLoadingLogs(true);
     setHistoryError(null);
-    apiSyncedRef.current = false;
 
-    fetchSoilHistory<SoilTest[]>(user.id)
+    fetchSoilHistory<any[]>(user.id)
       .then((data) => {
-        console.log('API DATA:', data);
-        const normalized = (Array.isArray(data) ? data : []).map((row, index) =>
-          normalizeSoilTestRow(row, index, user.id)
-        );
-        console.log('NORMALIZED HISTORY DATA:', normalized);
+        if (cancelled) return;
+        const normalized = (Array.isArray(data) ? data : [])
+          .map((row, index) => normalizeSoilLog(row, index, user.id))
+          .filter((row): row is SoilTest => !!row)
+          .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
         setLogs(normalized);
       })
-      .catch((e) => {
-        console.error('History fetch error:', e);
-        setHistoryError(e instanceof Error ? e.message : 'Failed to fetch soil tests');
+      .catch((error) => {
+        if (cancelled) return;
         setLogs([]);
+        setHistoryError(error?.message || 'Failed to fetch soil tests.');
       })
-      .finally(() => setLoadingLogs(false));
-  }, [user?.id]);
+      .finally(() => {
+        if (!cancelled) setLoadingLogs(false);
+      });
 
-  const permanentMarkers = useMemo(() => {
-    return logs
-      .filter((t) => {
-        const lat = Number(t.latitude);
-        const lng = Number(t.longitude);
-        return Number.isFinite(lat) && Number.isFinite(lng);
-      })
-      .map((t): Omit<SoilMarker, 'key'> => ({
-        latitude: Number(t.latitude),
-        longitude: Number(t.longitude),
-        ph: safeNumber(t.ph),
-        n: safeNumber(t.n),
-        p: safeNumber(t.p),
-        k: safeNumber(t.k),
-        moisture: safeNumber(t.moisture),
-        temperature: safeNumber(t.temperature),
-        timestamp: normalizeToIso(t.createdAt),
-        source: 'api',
-      }));
-  }, [logs]);
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user?.id]);
 
-  // ── Convert API logs → SoilMarkers and add to context (permanent) ────────
   useEffect(() => {
-    if (apiSyncedRef.current || permanentMarkers.length === 0) return;
-    apiSyncedRef.current = true;
-    addSoilMarkers(permanentMarkers);
-  }, [permanentMarkers, addSoilMarkers]);
+    let cancelled = false;
+    setLoadingTrend(true);
 
-  // ── Fetch trend data ─────────────────────────────────────────────────────
-  useEffect(() => {
     let days = 30;
     if (timeFilter === 'Last 90 Days') days = 90;
     if (timeFilter === 'Last Year') days = 365;
     if (timeFilter === 'All Time') days = 3650;
-    getParameterTrend(selectedParam, days).then(setTrend).catch(() => setTrend(null));
-  }, [selectedParam, timeFilter]);
 
-  // ── Merged & filtered markers (all sources, deduplicated by context) ──────
-  const allMarkers = useMemo(() => {
-    const merged = new Map<string, SoilMarker>();
+    getParameterTrend(selectedParameter, days)
+      .then((response) => {
+        if (!cancelled) setTrend(response || null);
+      })
+      .catch(() => {
+        if (!cancelled) setTrend(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTrend(false);
+      });
 
-    for (const marker of permanentMarkers) {
-      const key = markerDedupKey(marker);
-      merged.set(key, { ...marker, key });
-    }
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedParameter, timeFilter]);
 
-    for (const marker of soilMarkers) {
-      if (!Number.isFinite(marker.latitude) || !Number.isFinite(marker.longitude)) continue;
-      const key = marker.key ?? markerDedupKey(marker);
-      merged.set(key, { ...marker, key });
-    }
-
-    return Array.from(merged.values());
-  }, [permanentMarkers, soilMarkers]);
-
-  // ── Map initial region ────────────────────────────────────────────────────
+  const markers = useMemo(() => buildMarkers(logs), [logs]);
   const mapInitialRegion = useMemo(() => {
-    if (allMarkers.length > 0) {
+    if (!markers.length) {
       return {
-        latitude: allMarkers[0].latitude,
-        longitude: allMarkers[0].longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
+        latitude: 20.5937,
+        longitude: 78.9629,
+        latitudeDelta: 8,
+        longitudeDelta: 8,
       };
     }
-    return { latitude: 20.5937, longitude: 78.9629, latitudeDelta: 8, longitudeDelta: 8 };
-  }, [allMarkers]);
 
-  // ── Valid logs for history list ────────────────────────────────────────────
-  const dbLogs = useMemo(
-    () => (Array.isArray(logs) ? logs.filter((l) => !!l && !!l.createdAt) : []),
-    [logs]
+    return {
+      latitude: markers[0].latitude,
+      longitude: markers[0].longitude,
+      latitudeDelta: 0.2,
+      longitudeDelta: 0.2,
+    };
+  }, [markers]);
+
+  const chartLogs = useMemo(() => logs.slice(0, 6).reverse(), [logs]);
+  const chartData = useMemo(
+    () => ({
+      labels: chartLogs.length ? chartLogs.map((log) => safeDateLabel(log.createdAt)) : ['No Data'],
+      datasets: [
+        {
+          data: chartLogs.length ? chartLogs.map((log) => getLogMetric(log, selectedParameter)) : [0],
+        },
+      ],
+    }),
+    [chartLogs, selectedParameter]
   );
 
-  // ── Export ─────────────────────────────────────────────────────────────────
   const handleExport = async () => {
-    if (!Array.isArray(dbLogs) || dbLogs.length === 0) {
-      alert('No soil tests available to export.');
+    if (!logs.length || !user) {
+      Alert.alert('No Data', 'No soil tests are available to export yet.');
       return;
     }
+
     setIsExporting(true);
     try {
-      if (user) await exportSoilReport(dbLogs, user as any);
+      await exportSoilReport(logs, user as any);
     } catch {
-      alert('Export failed');
+      Alert.alert('Export Failed', 'Unable to export the soil history PDF right now.');
     } finally {
       setIsExporting(false);
     }
   };
 
-  // ── Chart helpers ──────────────────────────────────────────────────────────
-  const getParamColor = (param: string) => {
-    if (param.includes('pH')) return '#2563EB';
-    if (param.includes('Nitrogen')) return '#EF4444';
-    if (param.includes('Phosphorus')) return '#8B5CF6';
-    if (param.includes('Potassium')) return '#F97316';
-    if (param.includes('Moisture')) return '#86EFAC';
-    return '#16A34A';
-  };
-
-  const getChartData = () => {
-    if (!Array.isArray(dbLogs) || dbLogs.length === 0) {
-      return { labels: ['No Data'], datasets: [{ data: [0] }] };
-    }
-    const recentLogs = [...dbLogs].reverse().slice(-6);
-    return {
-      labels: recentLogs.map((l) => parseDateLabel(l.createdAt)),
-      datasets: [{
-        data: recentLogs.map((l) => {
-          if (selectedParam.includes('pH')) return safeNumber(l.ph);
-          if (selectedParam.includes('Nitrogen')) return safeNumber(l.n);
-          if (selectedParam.includes('Phosphorus')) return safeNumber(l.p);
-          if (selectedParam.includes('Potassium')) return safeNumber(l.k);
-          if (selectedParam.includes('Moisture')) return safeNumber(l.moisture);
-          return 0;
-        })
-      }]
-    };
-  };
-
-  const parameters = ['Nitrogen (N)', 'Phosphorus (P)', 'Potassium (K)', 'pH Level', 'Moisture'];
-
-  // Auto fallback to OSM when Google tiles don't load on device.
-  useEffect(() => {
-    if (isLoadingMarkers || mapLoaded || mapMode === 'osm') return;
-    const timer = setTimeout(() => {
-      if (!mapLoaded) {
-        console.warn('[History Map] Google tiles timeout, switching to OSM fallback');
-        setMapMode('osm');
-      }
-    }, 4500);
-    return () => clearTimeout(timer);
-  }, [isLoadingMarkers, mapLoaded, mapMode, allMarkers.length]);
-
-  if (loadingLogs || isLoadingMarkers) {
+  if (!token || !user?.id) {
     return (
-      <View style={s.root}>
+      <View style={styles.root}>
         <LinearGradient
-          colors={[C.bgLight, C.bgWhite]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
+          colors={[COLORS.backgroundTop, COLORS.backgroundBottom]}
           style={StyleSheet.absoluteFill}
         />
-        <View style={s.centerState}>
-          <ActivityIndicator size="large" color={C.greenBtn} />
-          <Text style={s.centerStateText}>Loading soil history...</Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (historyError) {
-    return (
-      <View style={s.root}>
-        <LinearGradient
-          colors={[C.bgLight, C.bgWhite]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={s.centerState}>
-          <Ionicons name="warning-outline" size={34} color="#DC2626" />
-          <Text style={s.centerStateTitle}>Unable To Load History</Text>
-          <Text style={s.centerStateText}>{historyError}</Text>
+        <View style={styles.centerState}>
+          <Ionicons name="lock-closed-outline" size={34} color={COLORS.accent} />
+          <Text style={styles.centerTitle}>Sign In To View History</Text>
+          <Text style={styles.centerText}>Your soil test history will appear here after login.</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={s.root}>
-        {/* ── ROOT BACKGROUND ── */}
-        <LinearGradient
-          colors={[C.bgLight, C.bgWhite]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+    <View style={styles.root}>
+      <LinearGradient
+        colors={[COLORS.backgroundTop, COLORS.backgroundBottom]}
+        style={StyleSheet.absoluteFill}
+      />
 
-        <ScrollView
-          contentContainerStyle={s.scroll}
-          showsVerticalScrollIndicator={false}
-          onScrollBeginDrag={hideTabBar}
-          onScrollEndDrag={showTabBar}
-          onMomentumScrollBegin={hideTabBar}
-          onMomentumScrollEnd={showTabBar}
-          scrollEventThrottle={16}
-        >
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={hideTabBar}
+        onScrollEndDrag={showTabBar}
+        onMomentumScrollBegin={hideTabBar}
+        onMomentumScrollEnd={showTabBar}
+        scrollEventThrottle={16}
+      >
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>History & Analytics</Text>
+          <TouchableOpacity
+            style={[styles.exportBtn, isExporting && { opacity: 0.7 }]}
+            onPress={handleExport}
+            disabled={isExporting}
+          >
+            <Ionicons name="document-text-outline" size={14} color="#FFF" style={{ marginRight: 4 }} />
+            <Text style={styles.exportBtnText}>{isExporting ? 'Starting...' : 'Export PDF'}</Text>
+          </TouchableOpacity>
+        </View>
 
-          {/* ── HEADER & EXPORT ── */}
-          <View style={s.headerRow}>
-            <Text style={s.title}>History & Analytics</Text>
+        {!!historyError && (
+          <View style={styles.errorBanner}>
+            <Ionicons name="warning-outline" size={16} color={COLORS.warningText} />
+            <Text style={styles.errorBannerText}>{historyError}</Text>
+          </View>
+        )}
+
+        <View style={styles.filterRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {TIME_FILTERS.map((filter) => (
+              <TouchableOpacity
+                key={filter}
+                style={[styles.filterPill, timeFilter === filter && styles.filterPillActive]}
+                onPress={() => setTimeFilter(filter)}
+              >
+                <Text style={[styles.filterText, timeFilter === filter && styles.filterTextActive]}>
+                  {filter}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {PARAMETERS.map((parameter) => (
+              <TouchableOpacity
+                key={parameter}
+                style={[styles.filterPill, selectedParameter === parameter && styles.filterPillActive]}
+                onPress={() => setSelectedParameter(parameter)}
+              >
+                <Text
+                  style={[
+                    styles.filterText,
+                    selectedParameter === parameter && styles.filterTextActive,
+                  ]}
+                >
+                  {parameter}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Field Test Locations</Text>
             <TouchableOpacity
-              style={[s.exportBtn, isExporting && { opacity: 0.7 }]}
-              onPress={handleExport}
-              disabled={isExporting}
+              style={styles.secondaryBtn}
+              onPress={() => setMapMode((current) => (current === 'google' ? 'osm' : 'google'))}
             >
-              <Ionicons name="document-text-outline" size={14} color="#FFF" style={{ marginRight: 4 }} />
-              <Text style={s.exportBtnText}>{isExporting ? 'Starting...' : 'Export PDF'}</Text>
+              <Text style={styles.secondaryBtnText}>Map: {mapMode === 'google' ? 'Google' : 'OSM'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={() => clearMarkers()}>
+              <Text style={styles.secondaryBtnText}>Clear</Text>
             </TouchableOpacity>
           </View>
 
-          {/* ── FILTERS ── */}
-          <View style={{ zIndex: 100 }}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterScroll} contentContainerStyle={{ paddingRight: 16 }}>
-              <TouchableOpacity onPress={() => { setIsTimeFilterOpen(!isTimeFilterOpen); setIsParameterOpen(false); }} activeOpacity={0.8}>
-                <GlassCard style={[s.filterPill, isTimeFilterOpen && { borderColor: C.greenBtn }]}>
-                  <Text style={s.filterText}>📅 {timeFilter} <Ionicons name={isTimeFilterOpen ? 'chevron-up' : 'chevron-down'} size={12} /></Text>
-                </GlassCard>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => { setIsParameterOpen(!isParameterOpen); setIsTimeFilterOpen(false); }} activeOpacity={0.8}>
-                <GlassCard style={[s.filterPill, isParameterOpen && { borderColor: C.greenBtn }]}>
-                  <Text style={s.filterText}>📊 {selectedParam} <Ionicons name={isParameterOpen ? 'chevron-up' : 'chevron-down'} size={12} /></Text>
-                </GlassCard>
-              </TouchableOpacity>
-            </ScrollView>
-
-            {isTimeFilterOpen && (
-              <Animated.View 
-                entering={SlideInDown.duration(200).springify()} 
-                exiting={SlideOutUp.duration(150)}
-                style={[s.dropdownMenu, { left: 8 }]}
+          <View style={styles.mapWrapper}>
+            {loadingLogs ? (
+              <View style={styles.mapFallback}>
+                <ActivityIndicator size="small" color={COLORS.accent} />
+                <Text style={styles.mapFallbackText}>Loading markers...</Text>
+              </View>
+            ) : (
+              <MapView
+                style={styles.map}
+                provider={Platform.OS === 'android' && mapMode === 'google' ? PROVIDER_GOOGLE : undefined}
+                initialRegion={mapInitialRegion}
+                mapType={mapMode === 'google' ? 'standard' : 'none'}
               >
-                {timeFilters.map((tf, index) => (
-                  <TouchableOpacity
-                    key={tf}
-                    style={[s.dropdownItem, index !== timeFilters.length - 1 && s.dropdownItemBorder]}
-                    onPress={() => { setTimeFilter(tf); setIsTimeFilterOpen(false); }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[s.dropdownText, timeFilter === tf && s.dropdownTextActive]}>{tf}</Text>
-                  </TouchableOpacity>
+                {mapMode === 'osm' && (
+                  <UrlTile
+                    urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    maximumZ={19}
+                    flipY={false}
+                  />
+                )}
+                {markers.map((marker) => (
+                  <Marker
+                    key={marker.id}
+                    coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
+                    pinColor={marker.ph < 6.5 ? '#EF4444' : marker.ph > 7.5 ? '#2563EB' : '#22C55E'}
+                    title={safeDateLabel(marker.timestamp)}
+                    description={`pH ${marker.ph.toFixed(1)} | NPK ${marker.n}-${marker.p}-${marker.k}`}
+                  />
                 ))}
-              </Animated.View>
-            )}
-
-            {isParameterOpen && (
-              <Animated.View 
-                entering={SlideInDown.duration(200).springify()} 
-                exiting={SlideOutUp.duration(150)}
-                style={s.dropdownMenu}
-              >
-                {parameters.map((param, index) => (
-                  <TouchableOpacity
-                    key={param}
-                    style={[s.dropdownItem, index !== parameters.length - 1 && s.dropdownItemBorder]}
-                    onPress={() => { setSelectedParam(param); setIsParameterOpen(false); }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[s.dropdownText, selectedParam === param && s.dropdownTextActive]}>{param}</Text>
-                  </TouchableOpacity>
-                ))}
-              </Animated.View>
+              </MapView>
             )}
           </View>
 
-          {/* ── MAP — FIELD TEST LOCATIONS ── */}
-          <GlassCard style={[s.sectionCard, { zIndex: 1 }]}>
-            <View style={s.mapHeader}>
-              <Text style={s.cardTitle}>Field Test Locations</Text>
-              {(isLoadingMarkers || loadingLogs) && (
-                <ActivityIndicator size="small" color={C.greenBtn} />
-              )}
-              <TouchableOpacity
-                style={s.mapModeBtn}
-                onPress={() => {
-                  setMapLoaded(false);
-                  setMapMode((prev) => (prev === 'google' ? 'osm' : 'google'));
-                }}
-              >
-                <Text style={s.mapModeBtnText}>Map: {mapMode === 'google' ? 'Google' : 'OSM'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.clearBtn} onPress={() => clearMarkers()}>
-                <Text style={s.clearBtnText}>Clear</Text>
-              </TouchableOpacity>
-              <View style={s.markerBadge}>
-                <Text style={s.markerBadgeText}>{allMarkers.length} pin{allMarkers.length !== 1 ? 's' : ''}</Text>
-              </View>
+          {!loadingLogs && !markers.length && (
+            <View style={styles.emptyBlock}>
+              <Ionicons name="location-outline" size={28} color={COLORS.subtitle} />
+              <Text style={styles.emptyText}>No saved soil-test coordinates yet.</Text>
             </View>
+          )}
+        </View>
 
-            <View style={s.mapWrapper}>
-              {isLoadingMarkers ? (
-                <View style={s.mapLoadingState}>
-                  <ActivityIndicator size="small" color={C.greenBtn} />
-                  <Text style={s.mapLoadingText}>Loading markers...</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{selectedParameter} Trend Analysis</Text>
+          {loadingTrend ? (
+            <View style={styles.chartLoading}>
+              <ActivityIndicator size="small" color={COLORS.accent} />
+              <Text style={styles.mapFallbackText}>Loading trend data...</Text>
+            </View>
+          ) : (
+            <LineChart
+              data={chartData}
+              width={Math.max(SCREEN_WIDTH - 48, 240)}
+              height={190}
+              withInnerLines={false}
+              withOuterLines={false}
+              withShadow={false}
+              chartConfig={{
+                backgroundGradientFrom: 'transparent',
+                backgroundGradientTo: 'transparent',
+                backgroundColor: 'transparent',
+                decimalPlaces: selectedParameter === 'pH Level' ? 1 : 0,
+                color: () => getParamColor(selectedParameter),
+                labelColor: () => COLORS.subtitle,
+                propsForDots: {
+                  r: '4',
+                  strokeWidth: '2',
+                  stroke: '#FFFFFF',
+                },
+              }}
+              bezier
+              style={{ borderRadius: 16 }}
+            />
+          )}
+
+          <View style={styles.trendStats}>
+            <View style={styles.trendStat}>
+              <Text style={[styles.trendValue, { color: getParamColor(selectedParameter) }]}>
+                {Number.isFinite(Number(trend?.averageValue))
+                  ? Number(trend?.averageValue).toFixed(selectedParameter === 'pH Level' ? 1 : 0)
+                  : '--'}
+              </Text>
+              <Text style={styles.trendLabel}>Average</Text>
+            </View>
+            <View style={styles.trendStat}>
+              <Text style={styles.trendValue}>
+                {Number.isFinite(Number(trend?.totalTests)) ? String(trend?.totalTests) : '--'}
+              </Text>
+              <Text style={styles.trendLabel}>Total Tests</Text>
+            </View>
+            <View style={styles.trendStat}>
+              <Text style={styles.trendValue}>
+                {Number.isFinite(Number(trend?.improvementPercentage))
+                  ? `${Number(trend?.improvementPercentage) > 0 ? '+' : ''}${Number(
+                      trend?.improvementPercentage
+                    ).toFixed(1)}%`
+                  : '--'}
+              </Text>
+              <Text style={styles.trendLabel}>Improvement</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Test History Log</Text>
+          {loadingLogs ? (
+            <View style={styles.chartLoading}>
+              <ActivityIndicator size="small" color={COLORS.accent} />
+              <Text style={styles.mapFallbackText}>Loading soil history...</Text>
+            </View>
+          ) : logs.length === 0 ? (
+            <View style={styles.emptyBlock}>
+              <Ionicons name="flask-outline" size={28} color={COLORS.subtitle} />
+              <Text style={styles.emptyText}>No soil tests recorded yet.</Text>
+            </View>
+          ) : (
+            logs.map((log) => (
+              <View key={log.id} style={styles.logRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.logDate}>{safeDateTimeLabel(log.createdAt)}</Text>
+                  <Text style={styles.logMeta}>
+                    pH {toNumber(log.ph).toFixed(1)} | NPK {toNumber(log.n)}-{toNumber(log.p)}-{toNumber(log.k)}
+                  </Text>
+                  <Text style={styles.logMeta}>
+                    {log.locationDetails || 'Location unavailable'}
+                  </Text>
+                  {'recommendation' in (log as any) && (log as any).recommendation ? (
+                    <Text style={styles.recommendationText} numberOfLines={2}>
+                      {(log as any).recommendation}
+                    </Text>
+                  ) : null}
                 </View>
-              ) : (
-                <MapView
-                  style={s.mapStyle}
-                  provider={Platform.OS === 'android' && mapMode === 'google' ? PROVIDER_GOOGLE : undefined}
-                  initialRegion={mapInitialRegion}
-                  mapType={mapMode === 'google' ? 'standard' : 'none'}
-                  toolbarEnabled={false}
-                  onMapReady={() => console.log('[History Map] Map ready')}
-                  onMapLoaded={() => {
-                    setMapLoaded(true);
-                    console.log('[History Map] Tiles loaded');
-                  }}
-                >
-                  {mapMode === 'osm' && (
-                    <UrlTile
-                      urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      maximumZ={19}
-                      flipY={false}
-                    />
-                  )}
-                  {allMarkers.map((marker) => (
-                    <Marker
-                      key={marker.key}
-                      coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
-                      pinColor={markerPinColor(marker)}
-                      onPress={() => setSelectedMarker(marker)}
-                    />
-                  ))}
-                </MapView>
-              )}
-            </View>
-
-            <View style={s.legendRow}>
-              <View style={s.legendItem}>
-                <View style={[s.legendDot, { backgroundColor: '#F59E0B' }]} />
-                <Text style={s.legendText}>BLE Live</Text>
+                <Ionicons name="chevron-forward" size={20} color={COLORS.subtitle} />
               </View>
-              <View style={s.legendItem}>
-                <View style={[s.legendDot, { backgroundColor: '#EF4444' }]} />
-                <Text style={s.legendText}>Acidic (pH &lt; 6.5)</Text>
-              </View>
-              <View style={s.legendItem}>
-                <View style={[s.legendDot, { backgroundColor: '#22C55E' }]} />
-                <Text style={s.legendText}>Neutral</Text>
-              </View>
-              <View style={s.legendItem}>
-                <View style={[s.legendDot, { backgroundColor: '#3B82F6' }]} />
-                <Text style={s.legendText}>Alkaline</Text>
-              </View>
-            </View>
-
-            {allMarkers.length === 0 && !isLoadingMarkers && !loadingLogs && (
-              <View style={s.emptyMap}>
-                <Ionicons name="location-outline" size={32} color={C.textSub} />
-                <Text style={s.emptyMapText}>No test locations yet.{'\n'}Connect your Agni sensor to add markers.</Text>
-              </View>
-            )}
-          </GlassCard>
-
-          {/* ── TREND ANALYSIS ── */}
-          <GlassCard style={[s.sectionCard, { zIndex: 1, paddingHorizontal: 0 }]}>
-            <Text style={[s.cardTitle, { paddingHorizontal: 20 }]}>
-              {selectedParam.includes('Nitrogen') ? 'Nitrogen Trend Analysis' : `${selectedParam} Trend Analysis`}
-            </Text>
-
-            <View style={s.chartPlaceholder}>
-              {(!dbLogs || dbLogs.length === 0) ? (
-                <>
-                  <View style={s.gridH} /><View style={[s.gridH, { top: '33%' }]} /><View style={[s.gridH, { top: '66%' }]} />
-                  <View style={s.gridV} /><View style={[s.gridV, { left: '33%' }]} /><View style={[s.gridV, { left: '66%' }]} />
-                  <Ionicons name="trending-up" size={80} color={getParamColor(selectedParam)} style={{ position: 'absolute', opacity: 0.2 }} />
-                  <Text style={{ position: 'absolute', fontFamily: 'Sora_600SemiBold', color: C.textSub }}>No Data Available</Text>
-                </>
-              ) : (
-                <LineChart
-                  data={getChartData()}
-                  width={Math.max(W - 32, 220)}
-                  height={180}
-                  withDots={true}
-                  withInnerLines={false}
-                  withOuterLines={false}
-                  yAxisSuffix=""
-                  yAxisLabel=""
-                  chartConfig={{
-                    backgroundColor: 'transparent',
-                    backgroundGradientFrom: 'rgba(255,255,255,0)',
-                    backgroundGradientTo: 'rgba(255,255,255,0)',
-                    decimalPlaces: selectedParam.includes('pH') ? 1 : 0,
-                    color: (opacity = 1) => getParamColor(selectedParam),
-                    labelColor: (opacity = 1) => C.textSub,
-                    style: { borderRadius: 16 },
-                    propsForDots: { r: '5', strokeWidth: '2', stroke: '#FFFFFF' }
-                  }}
-                  bezier
-                  style={{ marginVertical: 8, borderRadius: 16 }}
-                />
-              )}
-            </View>
-
-            <View style={[s.statsRow, { paddingHorizontal: 20 }]}>
-              <View style={s.statBlock}>
-                <Text style={[s.statVal, { color: getParamColor(selectedParam) }]}>{formatMetric(trend?.averageValue, 1)}</Text>
-                <Text style={s.statLbl}>Avg {selectedParam.split(' ')[0]}</Text>
-              </View>
-              <View style={s.statBlock}>
-                <Text style={[s.statVal, { color: C.valBlue }]}>{Number.isFinite(Number(trend?.totalTests)) ? String(trend?.totalTests) : '--'}</Text>
-                <Text style={s.statLbl}>Total Tests</Text>
-              </View>
-              <View style={s.statBlock}>
-                <Text style={[s.statVal, { color: C.valGreen }]}>
-                  {Number.isFinite(Number(trend?.improvementPercentage))
-                    ? `${Number(trend?.improvementPercentage) > 0 ? '+' : ''}${Number(trend?.improvementPercentage)}%`
-                    : '--'}
-                </Text>
-                <Text style={s.statLbl}>Improvement</Text>
-              </View>
-            </View>
-          </GlassCard>
-
-          {/* ── TEST HISTORY LOG ── */}
-          <GlassCard style={[s.sectionCard, { paddingBottom: 16 }]}>
-            <Text style={[s.cardTitle, { marginBottom: 12 }]}>Test History Log ({timeFilter})</Text>
-            <ScrollView 
-              style={s.logsScrollContainer}
-              showsVerticalScrollIndicator={true}
-              persistentScrollbar={true}
-              nestedScrollEnabled={true}
-            >
-              <View style={s.logsContainer}>
-                {dbLogs.map((log) => (
-                  <GlassCard key={log.id} style={s.logRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.logDate}>{formatFullDate(log.createdAt)}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-                        <Text style={[s.phText, safeNumber(log.ph) < 6 ? { color: '#DC2626' } : safeNumber(log.ph) > 7 ? { color: '#2563EB' } : { color: '#16A34A' }, { marginRight: 12 }]}>
-                          pH: {formatMetric(log.ph, 1)} ({safeNumber(log.ph) < 6 ? 'Acidic' : safeNumber(log.ph) > 7 ? 'Alkaline' : 'Neutral'})
-                        </Text>
-                        <Text style={s.npkText}>NPK: {safeNumber(log.n)}-{safeNumber(log.p)}-{safeNumber(log.k)}</Text>
-                      </View>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color={C.textSub} />
-                  </GlassCard>
-                ))}
-                {!loadingLogs && dbLogs.length === 0 && (
-                  <View style={s.emptyLogs}>
-                    <Ionicons name="flask-outline" size={40} color={C.textSub} style={{ opacity: 0.4 }} />
-                    <Text style={s.emptyLogsText}>No soil tests recorded yet.</Text>
-                  </View>
-                )}
-              </View>
-            </ScrollView>
-          </GlassCard>
-
-        </ScrollView>
-
-        {/* ── MARKER DETAIL MODAL ── */}
-        <MarkerDetailModal marker={selectedMarker} onClose={() => setSelectedMarker(null)} />
-      </View>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   root: { flex: 1 },
-  centerState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    gap: 8,
-  },
-  centerStateTitle: {
-    fontFamily: 'Sora_700Bold',
-    fontSize: 18,
-    color: C.textDark,
-    textAlign: 'center',
-  },
-  centerStateText: {
-    fontFamily: 'Sora_500Medium',
-    fontSize: 13,
-    color: C.textSub,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
   scroll: {
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingBottom: 120,
   },
-
+  centerState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  centerTitle: {
+    marginTop: 12,
+    fontFamily: 'Sora_700Bold',
+    fontSize: 18,
+    color: COLORS.title,
+    textAlign: 'center',
+  },
+  centerText: {
+    marginTop: 8,
+    fontFamily: 'Sora_400Regular',
+    fontSize: 13,
+    color: COLORS.subtitle,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
-    paddingHorizontal: 8,
   },
   title: {
     fontFamily: 'Sora_800ExtraBold',
     fontSize: 22,
-    color: C.textDark,
-    letterSpacing: -0.5,
+    color: COLORS.title,
   },
   exportBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.greenBtn,
+    backgroundColor: COLORS.accent,
+    borderRadius: 100,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 100,
   },
-  exportBtnText: { fontFamily: 'Sora_700Bold', fontSize: 12, color: '#FFF' },
-
-  filterScroll: { marginBottom: 24, paddingHorizontal: 8, marginHorizontal: -8 },
-  filterPill: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 100, marginRight: 10 },
-  filterText: { fontFamily: 'Sora_600SemiBold', fontSize: 13, color: C.textDark },
-
-  dropdownMenu: {
-    position: 'absolute',
-    top: 48,
-    left: 140,
-    width: 160,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 10,
-    zIndex: 999,
+  exportBtnText: {
+    fontFamily: 'Sora_700Bold',
+    fontSize: 12,
+    color: '#FFF',
   },
-  dropdownItem: { paddingVertical: 12, paddingHorizontal: 16 },
-  dropdownItemBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
-  dropdownText: { fontFamily: 'Sora_500Medium', fontSize: 13, color: C.textDark },
-  dropdownTextActive: { color: C.greenBtn, fontFamily: 'Sora_700Bold' },
-
-  sectionCard: { padding: 20, marginBottom: 24 },
-  cardTitle: { fontFamily: 'Sora_700Bold', fontSize: 18, color: C.textDark, marginBottom: 16 },
-
-  // Map
-  mapHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 8 },
-  mapModeBtn: {
-    marginLeft: 'auto',
-    backgroundColor: 'rgba(37,99,235,0.10)',
-    borderRadius: 100,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  mapModeBtnText: { fontFamily: 'Sora_600SemiBold', fontSize: 11, color: '#1D4ED8' },
-  clearBtn: {
-    backgroundColor: 'rgba(15,23,42,0.08)',
-    borderRadius: 100,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  clearBtnText: { fontFamily: 'Sora_600SemiBold', fontSize: 11, color: '#0F172A' },
-  markerBadge: {
-    backgroundColor: 'rgba(5,150,105,0.12)',
-    borderRadius: 100,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  markerBadgeText: { fontFamily: 'Sora_600SemiBold', fontSize: 11, color: C.greenBtn },
-  mapWrapper: {
-    height: 250,
-    width: '100%',
-    borderRadius: 16,
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.warningBg,
+    borderColor: COLORS.warningBorder,
     borderWidth: 1,
-    borderColor: C.glassBorder,
-    overflow: 'hidden',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontFamily: 'Sora_500Medium',
+    fontSize: 12,
+    color: COLORS.warningText,
+  },
+  filterRow: {
+    gap: 10,
     marginBottom: 16,
   },
-  mapStyle: { width: '100%', height: '100%' },
-  mapLoadingState: {
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.08)',
+    marginRight: 10,
+  },
+  filterPillActive: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#86EFAC',
+  },
+  filterText: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 12,
+    color: COLORS.subtitle,
+  },
+  filterTextActive: {
+    color: COLORS.accent,
+  },
+  card: {
+    backgroundColor: COLORS.card,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 18,
+    marginBottom: 18,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  cardTitle: {
+    flex: 1,
+    fontFamily: 'Sora_700Bold',
+    fontSize: 18,
+    color: COLORS.title,
+  },
+  secondaryBtn: {
+    backgroundColor: 'rgba(15,23,42,0.06)',
+    borderRadius: 100,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  secondaryBtnText: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 11,
+    color: COLORS.subtitle,
+  },
+  mapWrapper: {
+    height: 240,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.08)',
+  },
+  map: { width: '100%', height: '100%' },
+  mapFallback: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.65)',
   },
-  mapLoadingText: { fontFamily: 'Sora_500Medium', fontSize: 12, color: C.textSub },
-  legendRow: { flexDirection: 'row', justifyContent: 'center', gap: 16, flexWrap: 'wrap' },
-  legendItem: { flexDirection: 'row', alignItems: 'center' },
-  legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  legendText: { fontFamily: 'Sora_500Medium', fontSize: 11, color: C.textSub },
-  emptyMap: { alignItems: 'center', paddingVertical: 20, gap: 8 },
-  emptyMapText: { fontFamily: 'Sora_500Medium', fontSize: 13, color: C.textSub, textAlign: 'center', lineHeight: 20 },
-
-  // Trend Chart
-  chartPlaceholder: {
-    height: 180,
-    backgroundColor: 'transparent',
-    marginBottom: 16,
-    overflow: 'hidden',
+  mapFallbackText: {
+    fontFamily: 'Sora_500Medium',
+    fontSize: 12,
+    color: COLORS.subtitle,
+  },
+  emptyBlock: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 24,
+    gap: 8,
   },
-  gridH: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: 'rgba(0,0,0,0.03)' },
-  gridV: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(0,0,0,0.03)' },
-  statsRow: { flexDirection: 'row', gap: 8 },
-  statBlock: { flex: 1, paddingVertical: 16, alignItems: 'center' },
-  statVal: { fontFamily: 'Sora_800ExtraBold', fontSize: 20, marginBottom: 4 },
-  statLbl: { fontFamily: 'Sora_500Medium', fontSize: 10, color: C.textSub },
-
-  // Logs
-  logsScrollContainer: {
-    maxHeight: 400,
-    borderRadius: 12,
-    paddingRight: 4,
+  emptyText: {
+    fontFamily: 'Sora_500Medium',
+    fontSize: 13,
+    color: COLORS.subtitle,
+    textAlign: 'center',
   },
-  logsContainer: { 
-    gap: 10, 
-    zIndex: 1,
-    paddingBottom: 8,
+  chartLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 190,
+    gap: 8,
+  },
+  trendStats: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 10,
+  },
+  trendStat: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 14,
+  },
+  trendValue: {
+    fontFamily: 'Sora_800ExtraBold',
+    fontSize: 20,
+    color: COLORS.title,
+  },
+  trendLabel: {
+    marginTop: 4,
+    fontFamily: 'Sora_500Medium',
+    fontSize: 11,
+    color: COLORS.subtitle,
   },
   logRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 16,
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(15,23,42,0.06)',
   },
-  logDate: { fontFamily: 'Sora_600SemiBold', fontSize: 13, color: C.textDark, flex: 1 },
-  phText: { fontFamily: 'Sora_700Bold', fontSize: 11 },
-  npkText: { fontFamily: 'Sora_700Bold', fontSize: 13, color: C.textDark },
-  emptyLogs: { alignItems: 'center', paddingVertical: 32, gap: 8 },
-  emptyLogsText: { fontFamily: 'Sora_500Medium', fontSize: 14, color: C.textSub },
+  logDate: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 13,
+    color: COLORS.title,
+  },
+  logMeta: {
+    marginTop: 4,
+    fontFamily: 'Sora_400Regular',
+    fontSize: 12,
+    color: COLORS.subtitle,
+  },
+  recommendationText: {
+    marginTop: 6,
+    fontFamily: 'Sora_500Medium',
+    fontSize: 12,
+    color: COLORS.accent,
+  },
 });

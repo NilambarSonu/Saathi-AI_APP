@@ -24,8 +24,7 @@ module.exports = ({ config }) => {
           "data": [
             {
               "scheme": "saathiai",
-              "host": "auth",
-              "pathPrefix": "/callback"
+              "host": "oauth-callback"
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]

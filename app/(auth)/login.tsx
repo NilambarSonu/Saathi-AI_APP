@@ -15,7 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { loginWithCredentials, loginWithSocialProvider } from '../../src/features/auth/services/auth';
+import { loginWithCredentials, startSocialAuth } from '../../src/features/auth/services/auth';
 import { FontAwesome } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -81,7 +81,10 @@ export default function LoginScreen() {
   async function handleSocialLogin(provider: 'google' | 'facebook' | 'x') {
     setSocialLoading(provider);
     try {
-      await loginWithSocialProvider(provider);
+      const session = await startSocialAuth(provider);
+      login(session.user, session.token);
+      await AsyncStorage.removeItem('saathi_ble_connect_intent');
+      router.replace('/(app)');
       // Browser closed — Linking listener in _layout.tsx handles the callback
     } catch (err: any) {
       Alert.alert('Social Auth Error', err?.message || 'Could not open login browser.');

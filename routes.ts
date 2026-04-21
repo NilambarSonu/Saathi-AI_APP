@@ -17,7 +17,7 @@ import { eq } from "drizzle-orm";
 import passport from "passport";
 import { Strategy as GoogleStrategy, Profile as GoogleProfile } from "passport-google-oauth20";
 import { Strategy as FacebookStrategy, Profile as FacebookProfile } from "passport-facebook";
-import { Strategy as TwitterStrategy } from "@superfaceai/passport-twitter-oauth2";
+import { Strategy as TwitterStrategy } from "passport-twitter";
 import { sendOtpEmail, sendContactNotificationEmail } from "./email-service";
 
 const multerStorage = multer.memoryStorage();
@@ -46,10 +46,13 @@ const FACEBOOK_CLIENT_SECRET = process.env.FACEBOOK_CLIENT_SECRET;
 const X_CLIENT_ID = process.env.X_CLIENT_ID;
 const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET;
 
-// Dynamic callback URLs
-const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || "http://localhost:5000/api/auth/google/callback";
-const FACEBOOK_CALLBACK_URL = process.env.FACEBOOK_CALLBACK_URL || "http://localhost:5000/api/auth/facebook/callback";
-const X_CALLBACK_URL = process.env.X_CALLBACK_URL || "http://localhost:5000/api/auth/x/callback";
+// Dynamic callback URLs based on environment
+const isDev = process.env.NODE_ENV === 'development';
+const BASE_URL = isDev ? "http://localhost:5000" : "https://saathiai.org";
+
+const GOOGLE_CALLBACK_URL = `${BASE_URL}/api/auth/google/callback`;
+const FACEBOOK_CALLBACK_URL = `${BASE_URL}/api/auth/facebook/callback`;
+const X_CALLBACK_URL = `${BASE_URL}/api/auth/x/callback`;
 
 // Dual auth middleware
 async function authenticateToken(req: Request, res: Response, next: NextFunction) {
@@ -191,8 +194,7 @@ function setupPassport(app: Express) {
       clientID: FACEBOOK_CLIENT_ID,
       clientSecret: FACEBOOK_CLIENT_SECRET,
       callbackURL: FACEBOOK_CALLBACK_URL,
-      profileFields: ["id", "displayName"], // Removed "emails" to avoid scope issues
-      scope: ['public_profile'], // Simplified scope to avoid "Invalid Scope" error
+      profileFields: ["id", "displayName", "emails"],
     }, async (
       accessToken: string,
       refreshToken: string,
@@ -200,25 +202,52 @@ function setupPassport(app: Express) {
       done: (error: any, user?: any) => void
     ) => {
       try {
-        // Facebook with simplified scope - may not have email
-        // Check if user exists by provider ID first
+        console.log("Facebook OAuth profile:", JSON.stringify({ id: profile.id, displayName: profile.displayName, emails: profile.emails }));
+        
+        // 1. Check if user exists by provider ID
         let user = await storage.getUserByProviderId("facebook", profile.id);
-
-        if (!user) {
-          // Create new user from Facebook profile (may not have email)
-          user = await storage.createUser({
-            username: profile.displayName || `fb_user_${profile.id}`,
-            email: profile.emails?.[0]?.value || "", // May be empty
-            phone: null,
-            password: "",
-            provider: "facebook",
-            providerId: profile.id,
-          });
+        if (user) {
+          console.log("Facebook user found by providerId:", user.id);
+          return done(null, user);
         }
+
+        // 2. Try to find by email if available
+        const email = profile.emails?.[0]?.value;
+        if (email) {
+          user = await storage.getUserByEmail(email);
+          if (user) {
+            console.log("Facebook user found by email, updating provider:", user.id);
+            // Update existing user with Facebook provider info
+            try {
+              await db.update(users)
+                .set({ provider: "facebook", providerId: profile.id })
+                .where(eq(users.id, user.id));
+              user = await storage.getUser(user.id);
+            } catch (e) {
+              console.error("Failed to update provider info:", e);
+            }
+            return done(null, user);
+          }
+        }
+
+        // 3. Create new user - sanitize username and ensure unique email
+        const sanitizedName = (profile.displayName || "").replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase() || `fb_user`;
+        const uniqueUsername = `${sanitizedName}_${profile.id.slice(-6)}`;
+        const userEmail = email || `fb_${profile.id}@oauth.saathiai.org`;
+
+        user = await storage.createUser({
+          username: uniqueUsername,
+          email: userEmail,
+          phone: null,
+          password: "",
+          provider: "facebook",
+          providerId: profile.id,
+        });
+        console.log("New Facebook user created:", user.id);
 
         done(null, user);
       } catch (error: any) {
-        console.error(`Facebook OAuth error: ${error.message}`);
+        console.error(`Facebook OAuth error:`, error);
         done(error);
       }
     }));
@@ -227,44 +256,67 @@ function setupPassport(app: Express) {
     console.log("Facebook OAuth not configured - missing FACEBOOK_CLIENT_ID or FACEBOOK_CLIENT_SECRET");
   }
 
-  // X (Twitter) Strategy - OAuth 2.0
+  // X (Twitter) Strategy - OAuth 1.0a
   if (X_CLIENT_ID && X_CLIENT_SECRET) {
     passport.use(new TwitterStrategy({
-      clientID: X_CLIENT_ID,
-      clientSecret: X_CLIENT_SECRET,
+      consumerKey: X_CLIENT_ID,        // using existing env var names for convenience
+      consumerSecret: X_CLIENT_SECRET, // using existing env var names for convenience
       callbackURL: X_CALLBACK_URL,
-      clientType: 'confidential', // Required for OAuth 2.0
-      scope: ['tweet.read', 'users.read', 'offline.access'], // Twitter API v2 scopes
+      includeEmail: true, // Attempt to fetch email
     }, async (
-      accessToken: string,
-      refreshToken: string,
+      token: string,
+      tokenSecret: string,
       profile: any,
       done: (error: any, user?: any) => void
     ) => {
       try {
-        console.log("X OAuth 2.0 profile:", profile);
-        // Check if user exists by provider ID first
+        console.log("X OAuth 2.0 profile:", JSON.stringify({ id: profile.id, username: profile.username, displayName: profile.displayName }));
+        
+        // 1. Check if user exists by provider ID first
         let user = await storage.getUserByProviderId("x", profile.id);
-        if (!user) {
-          // Try to find by username if no provider ID match
-          user = await storage.getUserByUsername(profile.username);
+        if (user) {
+          console.log("X user found by providerId:", user.id);
+          return done(null, user);
         }
 
-        if (!user) {
-          // Create new user from X profile
-          user = await storage.createUser({
-            username: profile.username || profile.displayName || `x_user_${profile.id}`,
-            email: profile.emails?.[0]?.value || "", // May be empty in v2.0
-            phone: null,
-            password: "",
-            provider: "x",
-            providerId: profile.id,
-          });
+        // 2. Try to find by email if available
+        const email = profile.emails?.[0]?.value;
+        if (email) {
+            user = await storage.getUserByEmail(email);
+            if (user) {
+               console.log("X user found by email, updating provider:", user.id);
+               // Update existing user with X provider info
+               try {
+                 await db.update(users)
+                   .set({ provider: "x", providerId: profile.id })
+                   .where(eq(users.id, user.id));
+                 user = await storage.getUser(user.id);
+               } catch (e) {
+                 console.error("Failed to update provider info:", e);
+               }
+               return done(null, user);
+            }
         }
+
+        // 3. Create new user - sanitize username and ensure unique email
+        const baseName = profile.username || profile.displayName || "x_user";
+        const sanitizedName = baseName.replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();
+        const uniqueUsername = `${sanitizedName}_${profile.id.slice(-6)}`;
+        const userEmail = email || `x_${profile.id}@oauth.saathiai.org`;
+
+        user = await storage.createUser({
+          username: uniqueUsername,
+          email: userEmail,
+          phone: null,
+          password: "",
+          provider: "x",
+          providerId: profile.id,
+        });
+        console.log("New X user created:", user.id);
 
         done(null, user);
       } catch (error: any) {
-        console.error(`X OAuth 2.0 error: ${error.message}`);
+        console.error(`X OAuth 2.0 error:`, error);
         done(error, undefined);
       }
     }));
@@ -588,121 +640,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Google OAuth
   app.get("/api/auth/google", (req, res, next) => {
-    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      return res.status(500).json({
-        error: "Google OAuth not configured",
-        code: "PROVIDER_NOT_SET",
-        message: "Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env"
-      });
-    }
-    passport.authenticate("google", { scope: ["profile", "email"] })(req, res, next);
-  });
+    const redirectUri = req.query.redirect_uri as string;
+    const prompt = req.query.prompt as string;
 
-  app.get("/api/auth/google/callback", (req, res, next) => {
-    console.log('🔄 Google OAuth callback triggered');
-    passport.authenticate("google", { session: false }, (err: any, user: any) => {
-      if (err || !user) {
-        console.error(`Google callback error: ${err?.message || "No user"}`);
-        return res.redirect("/auth?error=login_failed");
-      }
+    const state = JSON.stringify({ redirectUri });
 
-      const token = generateToken(user);
-      const state = req.query.state as string;
-      const isMobileOAuth = state && state.includes('mobile');
-      
-      if (isMobileOAuth) {
-        const accessToken = generateAccessToken({
-          id: user.id,
-          email: user.email,
-          username: user.username,
-        });
-        const refreshToken = generateRefreshToken(user.id);
-        return res.redirect(
-          `saathiai://auth/callback?token=${accessToken}&refreshToken=${refreshToken}&userId=${user.id}`
-        );
-      }
-
-      console.log('✅ Google OAuth successful, redirecting to:', `/auth?oauth_success=true&token=${token.substring(0, 20)}...`);
-      // Redirect to auth page with success parameters
-      res.redirect(`/auth?oauth_success=true&token=${token}`);
+    passport.authenticate("google", {
+      scope: ["profile", "email"],
+      state,
+      ...(prompt && { prompt })
     })(req, res, next);
   });
+
+  app.get("/api/auth/google/callback",
+    passport.authenticate("google", { session: false }),
+    (req, res) => {
+      try {
+        const user = req.user as any;
+
+        const token = generateAccessToken({ id: user.id, email: user.email, username: user.username });
+        const refreshToken = generateRefreshToken(user.id);
+
+        // 👇 Get redirectUri from state
+        let redirectUri: string | undefined;
+        if (req.query.state) {
+          try {
+            const state = JSON.parse(req.query.state as string);
+            redirectUri = state.redirectUri;
+          } catch (e) {
+            console.error("Error parsing state in Google callback:", e);
+          }
+        }
+
+        // ✅ MOBILE FLOW
+        if (redirectUri && (
+          redirectUri.startsWith("saathiai://") ||
+          redirectUri.startsWith("exp+saathi-ai://") ||
+          redirectUri.includes("://auth/callback")
+        )) {
+          return res.send(`
+            <html>
+              <body>
+                <script>
+                  window.location.href = "${redirectUri}?token=${token}&userId=${user.id}";
+                </script>
+              </body>
+            </html>
+          `);
+        }
+
+        // ✅ WEB FLOW
+        return res.redirect(`${BASE_URL}/?token=${token}&userId=${user.id}&oauth_success=true`);
+
+      } catch (err) {
+        console.error(err);
+        return res.redirect(`${BASE_URL}/login?error=oauth_failed`);
+      }
+    }
+  );
 
   // Facebook OAuth
   app.get("/api/auth/facebook", (req, res, next) => {
-    if (!FACEBOOK_CLIENT_ID || !FACEBOOK_CLIENT_SECRET) {
-      return res.status(500).json({
-        error: "Facebook OAuth not configured",
-        code: "PROVIDER_NOT_SET",
-        message: "Add FACEBOOK_CLIENT_ID and FACEBOOK_CLIENT_SECRET to .env"
-      });
-    }
-    passport.authenticate("facebook", { scope: ['public_profile'] })(req, res, next);
+    const redirectUri = req.query.redirect_uri;
+    const state = JSON.stringify({ redirectUri });
+    passport.authenticate("facebook", { scope: ["public_profile"], state })(req, res, next);
   });
 
-  app.get("/api/auth/facebook/callback", (req, res, next) => {
-    passport.authenticate("facebook", { session: false }, (err: any, user: any) => {
-      if (err || !user) {
-        console.error(`Facebook callback error: ${err?.message || "No user"}`);
-        return res.redirect("/auth?error=login_failed");
-      }
+  app.get("/api/auth/facebook/callback",
+    passport.authenticate("facebook", { session: false }),
+    (req, res) => {
+      try {
+        const user = req.user as any;
 
-      const token = generateToken(user);
-      const state = req.query.state as string;
-      const isMobileOAuth = state && state.includes('mobile');
-      
-      if (isMobileOAuth) {
-        const accessToken = generateAccessToken({
-          id: user.id,
-          email: user.email,
-          username: user.username,
-        });
+        const token = generateAccessToken({ id: user.id, email: user.email, username: user.username });
         const refreshToken = generateRefreshToken(user.id);
-        return res.redirect(
-          `saathiai://auth/callback?token=${accessToken}&refreshToken=${refreshToken}&userId=${user.id}`
-        );
+
+        // 👇 Get redirectUri from state
+        let redirectUri: string | undefined;
+        if (req.query.state) {
+          try {
+            const state = JSON.parse(req.query.state as string);
+            redirectUri = state.redirectUri;
+          } catch (e) {
+            console.error("Error parsing state in Facebook callback:", e);
+          }
+        }
+
+        // ✅ MOBILE FLOW
+        if (redirectUri && (
+          redirectUri.startsWith("saathiai://") ||
+          redirectUri.startsWith("exp+saathi-ai://") ||
+          redirectUri.includes("://auth/callback")
+        )) {
+          return res.send(`
+            <html>
+              <body>
+                <script>
+                  window.location.href = "${redirectUri}?token=${token}&userId=${user.id}";
+                </script>
+              </body>
+            </html>
+          `);
+        }
+
+        // ✅ WEB FLOW
+        return res.redirect(`${BASE_URL}/?token=${token}&userId=${user.id}&oauth_success=true`);
+
+      } catch (err) {
+        console.error(err);
+        return res.redirect(`${BASE_URL}/login?error=oauth_failed`);
       }
-      res.redirect(`/auth?oauth_success=true&token=${token}`);
-    })(req, res, next);
-  });
+    }
+  );
 
   // X (Twitter) OAuth
   app.get("/api/auth/x", (req, res, next) => {
-    if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
-      return res.status(500).json({
-        error: "X OAuth not configured",
-        code: "PROVIDER_NOT_SET",
-        message: "Add X_CLIENT_ID and X_CLIENT_SECRET to .env"
-      });
+    console.log("=== X OAUTH INITIATE ===");
+    console.log("Query:", req.query);
+    console.log("Session ID before redirect:", req.sessionID);
+    console.log("Session data:", req.session);
+    
+    if (req.query.redirect_uri) {
+      (req.session as any).redirectUri = req.query.redirect_uri;
     }
-    passport.authenticate("twitter", { session: false })(req, res, next);
+    
+    // Save session manually before redirect to ensure PKCE state persists
+    req.session.save((err) => {
+      if (err) console.error("Error saving session before X oauth:", err);
+      console.log("Session saved. Redirecting to Twitter...");
+      passport.authenticate("twitter")(req, res, next);
+    });
   });
 
   app.get("/api/auth/x/callback", (req, res, next) => {
-    passport.authenticate("twitter", { session: false }, (err: any, user: any) => {
-      if (err || !user) {
-        console.error(`X callback error: ${err?.message || "No user"}`);
-        return res.redirect("/auth?error=login_failed");
-      }
+    console.log("=== X OAUTH CALLBACK ===");
+    console.log("Query:", req.query);
+    console.log("Session ID at callback:", req.sessionID);
+    console.log("Session data at callback:", req.session);
 
-      const token = generateToken(user);
-      const state = req.query.state as string;
-      const isMobileOAuth = state && state.includes('mobile');
-      
-      if (isMobileOAuth) {
-        const accessToken = generateAccessToken({
-          id: user.id,
-          email: user.email,
-          username: user.username,
-        });
-        const refreshToken = generateRefreshToken(user.id);
-        return res.redirect(
-          `saathiai://auth/callback?token=${accessToken}&refreshToken=${refreshToken}&userId=${user.id}`
-        );
+    passport.authenticate("twitter", { session: false }, (err: any, user: any, info: any) => {
+      console.log("X OAuth callback passport response - User:", !!user, "Error:", err, "Info:", info);
+      if (err) {
+        console.error("X OAuth Error details:", err);
+        return res.redirect(`${BASE_URL}/login?error=x_auth_failed&msg=${encodeURIComponent(err.message)}`);
       }
-      res.redirect(`/auth?oauth_success=true&token=${token}`);
+      if (!user) {
+        console.error("X OAuth No User returned - Info:", info);
+        return res.redirect(`${BASE_URL}/login?error=x_auth_failed&msg=${encodeURIComponent(info?.message || "User not found")}`);
+      }
+      
+      try {
+        const token = generateAccessToken({ id: user.id, email: user.email, username: user.username });
+        const refreshToken = generateRefreshToken(user.id);
+
+        // 👇 Get redirectUri from session or state
+        let redirectUri = (req.session as any).redirectUri;
+        if (req.query.state && !redirectUri) {
+          try {
+            const state = JSON.parse(req.query.state as string);
+            redirectUri = state.redirectUri;
+          } catch (e) {
+            console.error("Error parsing state in X callback:", e);
+          }
+        }
+
+        // ✅ MOBILE FLOW
+        if (redirectUri && (
+          redirectUri.startsWith("saathiai://") ||
+          redirectUri.startsWith("exp+saathi-ai://") ||
+          redirectUri.includes("://auth/callback")
+        )) {
+          return res.send(`
+            <html>
+              <body>
+                <script>
+                  window.location.href = "${redirectUri}?token=${token}&userId=${user.id}";
+                </script>
+              </body>
+            </html>
+          `);
+        }
+
+        // ✅ WEB FLOW
+        return res.redirect(`${BASE_URL}/?token=${token}&userId=${user.id}&oauth_success=true`);
+
+      } catch (err) {
+        console.error(err);
+        return res.redirect(`${BASE_URL}/login?error=oauth_failed`);
+      }
     })(req, res, next);
   });
 
@@ -818,35 +944,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get user profile endpoint
+  // Get current authenticated user profile
   app.get("/api/user", authenticateToken, async (req, res) => {
     try {
-      // 1. VERIFY AUTH MIDDLEWARE (authenticateToken does this)
-      // 2. ATTACH USER TO REQUEST (req.user is populated by authenticateToken)
-      const decodedParam = (req as any).user;
-      
-      // 3. FETCH USER FROM DB
-      // Just in case we need to fetch the absolutely fresh version
-      const user = await storage.getUser(decodedParam.id);
+      console.log("🔥 CORRECT USER ROUTE HIT");
 
-      // 5. ADD DEBUG LOGS
-      console.log("USER FROM DB:", user);
-      
-      // 7. HANDLE EDGE CASE
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated", code: "UNAUTHORIZED" });
       }
 
-      // 4. RETURN CORRECT RESPONSE
-      res.json({
-        id: user.id || (user as any)._id,
-        email: user.email,
-        username: user.username,
-        farms: (user as any).farms || []
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+      }
+
+      return res.json({
+        ok: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          phone: user.phone,
+          location: user.location,
+          phoneVerified: user.phoneVerified,
+          profilePicture: user.profilePicture,
+          preferredLanguage: user.preferredLanguage,
+          provider: user.provider,
+          createdAt: user.createdAt,
+        },
       });
     } catch (error: any) {
       console.error(`Get user error: ${error.message}`);
-      res.status(500).json({ error: "Failed to get user profile" });
+      return res.status(500).json({ error: "Failed to fetch user", code: "GET_USER_FAILED" });
     }
   });
 
@@ -1010,7 +1140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/user", authenticateToken, async (req, res) => {
     try {
       const user = (req as any).user;
-      await storage.deleteUser(user.userId);
+      await storage.deleteUser(user.id);
       res.json({ ok: true, message: "Account deleted successfully" });
     } catch (error: any) {
       console.error(`Delete user error: ${error.message}`);
@@ -1048,9 +1178,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Return JSON
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Content-Disposition', `attachment; filename=saathi-ai-data-${new Date().toISOString().split('T')[0]}.json`);
+        
+        let stats = null;
+        if (userSoilTests && userSoilTests.length > 0) {
+          const sortedTests = [...userSoilTests].sort((a: any, b: any) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime());
+          
+          stats = {
+            totalTests: userSoilTests.length,
+            latestTestDate: sortedTests[0].testDate,
+            averages: {
+              ph: Number((userSoilTests.reduce((acc: number, curr: any) => acc + (Number(curr.ph) || 0), 0) / userSoilTests.length).toFixed(1)),
+              nitrogen: Math.round(userSoilTests.reduce((acc: number, curr: any) => acc + (Number(curr.nitrogen) || 0), 0) / userSoilTests.length),
+              phosphorus: Math.round(userSoilTests.reduce((acc: number, curr: any) => acc + (Number(curr.phosphorus) || 0), 0) / userSoilTests.length),
+              potassium: Math.round(userSoilTests.reduce((acc: number, curr: any) => acc + (Number(curr.potassium) || 0), 0) / userSoilTests.length),
+              moisture: Math.round(userSoilTests.reduce((acc: number, curr: any) => acc + (Number(curr.moisture) || 0), 0) / userSoilTests.length)
+            }
+          };
+        }
+
         res.json({
           userId,
           exportDate: new Date().toISOString(),
+          stats,
           soilTests: userSoilTests
         });
       }

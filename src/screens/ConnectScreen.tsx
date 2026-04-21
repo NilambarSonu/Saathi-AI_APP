@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { hideTabBar, showTabBar } from '../../constants/Animations';
 import {
   View, Text, TouchableOpacity, StyleSheet, Pressable,
@@ -67,12 +67,23 @@ function getStatusVisual(status: string, bluetoothState: BleState | null) {
   const isConnected = status === 'connected' || status === 'transferring' || status === 'complete';
   const isScanning = status === 'scanning' || status === 'connecting';
 
+  if (status === 'permission_denied') {
+    return {
+      label: 'Offline',
+      dotColor: '#EF4444',
+      textColor: '#B91C1C',
+      backgroundColor: '#FEE2E2',
+      pulse: false,
+      emphasized: true,
+    };
+  }
+
   if (bluetoothState === 'PoweredOff') {
     return {
       label: 'Offline',
-      dotColor: '#94A3B8',
-      textColor: '#475569',
-      backgroundColor: '#E2E8F0',
+      dotColor: '#EF4444',
+      textColor: '#B91C1C',
+      backgroundColor: '#FEE2E2',
       pulse: false,
       emphasized: false,
     };
@@ -103,7 +114,7 @@ function getStatusVisual(status: string, bluetoothState: BleState | null) {
   if (bluetoothState === 'PoweredOn') {
     return {
       label: 'Online',
-      dotColor: '#22C55E',
+      dotColor: '#16A34A',
       textColor: '#15803D',
       backgroundColor: '#ECFDF3',
       pulse: false,
@@ -113,9 +124,9 @@ function getStatusVisual(status: string, bluetoothState: BleState | null) {
 
   return {
     label: 'Offline',
-    dotColor: '#94A3B8',
-    textColor: '#475569',
-    backgroundColor: '#E2E8F0',
+    dotColor: '#EF4444',
+    textColor: '#B91C1C',
+    backgroundColor: '#FEE2E2',
     pulse: false,
     emphasized: false,
   };
@@ -357,10 +368,38 @@ export default function ConnectScreen() {
   const [pipelineLoading, setPipelineLoading] = useState(false);
   const [pipelineStage, setPipelineStage] = useState('');
   const [pipelineMessage, setPipelineMessage] = useState<string | null>(null);
+  const [showBluetoothSheet, setShowBluetoothSheet] = useState(false);
+  const [bluetoothSheetDismissed, setBluetoothSheetDismissed] = useState(false);
+  const lastBtStateRef = useRef<BleState | null>(null);
 
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.idle;
   const isBusy = status === 'scanning' || status === 'connecting' || status === 'transferring';
   const isConnected = status === 'connected' || status === 'transferring' || status === 'complete';
+
+  useEffect(() => {
+    const btOff = bluetoothState === 'PoweredOff' || status === 'bluetooth_off';
+
+    if (btOff && !bluetoothSheetDismissed) {
+      setShowBluetoothSheet(true);
+    }
+
+    if (bluetoothState === 'PoweredOn' && lastBtStateRef.current !== 'PoweredOn') {
+      setShowBluetoothSheet(false);
+      setBluetoothSheetDismissed(false);
+    }
+
+    lastBtStateRef.current = bluetoothState;
+  }, [bluetoothState, status, bluetoothSheetDismissed]);
+
+  const openBluetoothSettings = () => {
+    setShowBluetoothSheet(false);
+    Linking.openSettings();
+  };
+
+  const onCancelBluetoothSheet = () => {
+    setBluetoothSheetDismissed(true);
+    setShowBluetoothSheet(false);
+  };
 
   const handlePress = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -484,7 +523,7 @@ export default function ConnectScreen() {
             <Ionicons name="shield-outline" size={22} color="#D97706" />
             <View style={{ flex: 1 }}>
               <Text style={[s.alertTitle, { color: '#92400E' }]}>Permissions Denied</Text>
-              <Text style={s.alertBody}>Go to Settings → Apps → Saathi AI → Permissions and enable Bluetooth.</Text>
+              <Text style={s.alertBody}>Bluetooth permission denied</Text>
             </View>
             <TouchableOpacity onPress={() => Linking.openSettings()}>
               <Text style={s.alertAction}>Open →</Text>
@@ -582,6 +621,26 @@ export default function ConnectScreen() {
         )}
 
         </ScrollView>
+
+        {showBluetoothSheet && (
+          <View style={s.sheetOverlay} pointerEvents="box-none">
+            <Pressable style={s.sheetBackdrop} onPress={onCancelBluetoothSheet} />
+            <View style={s.bluetoothSheet}>
+              <Text style={s.sheetTitle}>Bluetooth is OFF</Text>
+              <Text style={s.sheetBody}>Turn on Bluetooth to scan devices</Text>
+
+              <View style={s.sheetActions}>
+                <TouchableOpacity onPress={onCancelBluetoothSheet} style={s.sheetCancelBtn}>
+                  <Text style={s.sheetCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={openBluetoothSettings} style={s.sheetPrimaryBtn}>
+                  <Text style={s.sheetPrimaryText}>Turn ON</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
       </SafeAreaView>
   );
 }
@@ -714,4 +773,65 @@ const s = StyleSheet.create({
   stepBadge:    { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
   stepBadgeText:{ fontFamily: 'Sora_700Bold', fontSize: 14, color: '#2563EB' },
   stepText:     { fontFamily: 'Sora_400Regular', fontSize: 15, color: '#334155', flex: 1, lineHeight: 22 },
+
+  sheetOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+  },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  bluetoothSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  sheetBody: {
+    marginTop: 8,
+    color: '#666',
+    fontSize: 14,
+  },
+  sheetActions: {
+    flexDirection: 'row',
+    marginTop: 20,
+    gap: 10,
+  },
+  sheetCancelBtn: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  sheetCancelText: {
+    color: '#374151',
+    fontWeight: '600',
+  },
+  sheetPrimaryBtn: {
+    flex: 1,
+    backgroundColor: '#22c55e',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  sheetPrimaryText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
 });

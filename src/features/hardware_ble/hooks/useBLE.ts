@@ -12,6 +12,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { State as BleState } from 'react-native-ble-plx';
 import { bleService, BLEStatus, LogEntry } from '../services/bleService';
@@ -28,15 +29,18 @@ export interface UseBLEReturn {
   soilData:       SoilData | null;
   logs:           LogEntry[];
   permissionDenied: boolean;
+  bluetoothOffModalVisible: boolean;
   connect:        () => Promise<void>;
   disconnect:     () => Promise<void>;
   retryPermission:() => Promise<void>;
+  openBluetoothSettings: () => Promise<void>;
+  cancelBluetoothPrompt: () => Promise<void>;
 }
 
 // ── Friendly error messages ──────────────────────────────────────────────────
 function friendlyError(raw: string): string {
   if (raw.startsWith('PERMISSION_DENIED:'))
-    return 'Bluetooth permissions denied. Go to Settings → Apps → Saathi AI → Permissions and enable Bluetooth.';
+    return 'Bluetooth permission denied';
   if (raw.startsWith('BT_NOT_READY:'))
     return 'Bluetooth is OFF. Please enable Bluetooth in your device settings and try again.';
   if (raw.startsWith('SCAN_TIMEOUT:'))
@@ -55,6 +59,7 @@ export function useBLE(): UseBLEReturn {
   const [soilData,        setSoilData]        = useState<SoilData | null>(null);
   const [logs,            setLogs]            = useState<LogEntry[]>([]);
   const [permissionDenied,setPermissionDenied]= useState(false);
+  const [bluetoothOffModalVisible, setBluetoothOffModalVisible] = useState(false);
 
   // Hook into the SaaS backend processor
   const soilAPI = useSoil();
@@ -109,6 +114,7 @@ export function useBLE(): UseBLEReturn {
       const msg = err?.message ?? '';
 
       if (msg.startsWith('BT_NOT_READY:')) {
+        setBluetoothOffModalVisible(true);
         // Keep intent and wait for the Bluetooth state watcher to fire PoweredOn.
         safeSetStatus('idle');
         return;
@@ -129,6 +135,9 @@ export function useBLE(): UseBLEReturn {
 
   const handleBluetoothState = useCallback((s: BleState) => {
     safeBtState(s);
+    if (s === 'PoweredOn') {
+      setBluetoothOffModalVisible(false);
+    }
     if (s === 'PoweredOn' && connectIntentRef.current) {
       void beginScan();
     }
@@ -180,17 +189,12 @@ export function useBLE(): UseBLEReturn {
       // 1. Permissions
       await bleService.requestAndroidPermissions();
 
-      // 2. If BT is off, trigger system enable prompt (non-error UX path)
-      const isOn = await bleService.isBluetoothPoweredOn();
-      if (!isOn) {
+      // 2. If BT is off, show controlled modal and stop flow
+      const state = await bleService.getBluetoothState();
+      if (state !== 'PoweredOn') {
         safeSetStatus('bluetooth_off');
-        const enabled = await bleService.requestEnableBluetooth();
-        if (!enabled) {
-          connectIntentRef.current = false;
-          await AsyncStorage.removeItem(BLE_CONNECT_INTENT_KEY);
-          safeSetStatus('idle');
-          return;
-        }
+        setBluetoothOffModalVisible(true);
+        return;
       }
 
       // 3. Scan → Connect
@@ -230,14 +234,29 @@ export function useBLE(): UseBLEReturn {
     await connect();
   }, [connect]);
 
+  const openBluetoothSettings = useCallback(async () => {
+    setBluetoothOffModalVisible(false);
+    await Linking.openSettings();
+  }, []);
+
+  const cancelBluetoothPrompt = useCallback(async () => {
+    connectIntentRef.current = false;
+    setBluetoothOffModalVisible(false);
+    await AsyncStorage.removeItem(BLE_CONNECT_INTENT_KEY);
+    safeSetStatus('idle');
+  }, [safeSetStatus]);
+
   return {
     status,
     bluetoothState,
     soilData,
     logs,
     permissionDenied,
+    bluetoothOffModalVisible,
     connect,
     disconnect,
     retryPermission,
+    openBluetoothSettings,
+    cancelBluetoothPrompt,
   };
 }

@@ -48,6 +48,7 @@ export default function AppLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="connect" />
       <Stack.Screen name="ai-chat" />
       <Stack.Screen name="about" />
       <Stack.Screen name="buy-agni" />

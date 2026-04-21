@@ -15,23 +15,25 @@ export interface UserProfile {
 
 /**
  * Fetch the current user's profile.
- * Backend contract: GET /api/user
- * Field mapping: username → name, email → email, profile_picture → avatar
+ * Backend contract: GET /api/dashboard
+ * Field mapping sourced from dashboard.user payload.
  */
 export async function getUserProfile(): Promise<UserProfile> {
-  const raw = await apiCall<any>('/user');
+  const raw = await apiCall<any>('/dashboard');
+  const user = raw?.user ?? raw;
+
   // Normalize field names from backend to our internal model
   return {
-    id: raw?.id ?? raw?._id ?? raw?.userId ?? '',
-    name: raw?.name ?? raw?.username ?? undefined,
-    username: raw?.username ?? raw?.name ?? undefined,
-    email: raw?.email ?? raw?.emailAddress ?? '',
-    phone: raw?.phone ?? raw?.mobile ?? undefined,
-    location: raw?.location ?? raw?.address ?? undefined,
+    id: user?.id ?? user?._id ?? user?.userId ?? '',
+    name: user?.name ?? user?.username ?? undefined,
+    username: user?.username ?? user?.name ?? undefined,
+    email: user?.email ?? user?.emailAddress ?? '',
+    phone: user?.phone ?? user?.mobile ?? undefined,
+    location: user?.location ?? user?.address ?? undefined,
     // profile_picture maps to our avatar field
-    avatar_url: raw?.profile_picture ?? raw?.avatar_url ?? raw?.profile_image ?? raw?.picture ?? undefined,
-    profile_picture: raw?.profile_picture ?? raw?.avatar_url ?? raw?.profile_image ?? undefined,
-    provider: raw?.provider ?? 'local',
-    created_at: raw?.created_at ?? raw?.createdAt ?? new Date().toISOString(),
+    avatar_url: user?.profilePicture ?? user?.profile_picture ?? user?.avatar_url ?? user?.profile_image ?? user?.picture ?? undefined,
+    profile_picture: user?.profilePicture ?? user?.profile_picture ?? user?.avatar_url ?? user?.profile_image ?? undefined,
+    provider: user?.provider ?? 'local',
+    created_at: user?.created_at ?? user?.createdAt ?? new Date().toISOString(),
   };
 }

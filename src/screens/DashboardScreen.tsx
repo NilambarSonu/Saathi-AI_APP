@@ -278,23 +278,34 @@ function HowItWorksTicker() {
 export default function DashboardScreen() {
   const router = useRouter();
   const user = useAuthStore(s => s.user);
-  const [stats, setStats] = useState({ farms: 0, soilTests: 0, aiTips: 0 });
+  const [stats, setStats] = useState<{ farms: number; tests: number; aiTips: number } | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const isStatsLoading = statsLoading === true;
 
+  const handleConnect = () => {
+    router.replace('/(app)/connect');
+  };
+
   useEffect(() => {
-    setStatsLoading(true);
-    setStatsError(null);
-    getDashboardStats()
-      .then(data => setStats(data || { farms: 0, soilTests: 0, aiTips: 0 }))
-      .catch((e: any) => {
-        setStats({ farms: 0, soilTests: 0, aiTips: 0 });
+    async function loadStats() {
+      setStatsLoading(true);
+      setStatsError(null);
+
+      try {
+        const data = await getDashboardStats();
+        setStats(data || { farms: 0, tests: 0, aiTips: 0 });
+      } catch (e: any) {
+        setStats(null);
         setStatsError(e?.message || 'Unable to load dashboard stats.');
-      })
-      .finally(() => setStatsLoading(false));
+      } finally {
+        setStatsLoading(false);
+      }
+    }
+
+    loadStats();
 
     getNotifications().then(data => setNotifications(Array.isArray(data) ? data : [])).catch(() => {
       setNotifications([]);
@@ -388,15 +399,15 @@ export default function DashboardScreen() {
         {statsError && (
           <View style={[s.statsAlert, Shadows.sm]}>
             <Feather name="alert-circle" size={14} color="#B45309" />
-            <Text style={s.statsAlertText}>{statsError}</Text>
+            <Text style={s.statsAlertText}>{statsError || 'Unable to load live stats right now.'}</Text>
           </View>
         )}
 
         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 28 }}>
           {[
-            { label: 'FARMS', value: stats?.farms || 0, icon: 'map', color: '#059669', bg: 'rgba(16, 185, 129, 0.2)', gradient: ['#F0FDF4', '#D1FAE5'] },
-            { label: 'TESTS', value: stats?.soilTests || 0, icon: 'activity', color: '#D97706', bg: 'rgba(245, 158, 11, 0.2)', gradient: ['#FFFBEB', '#FEF3C7'] },
-            { label: 'AI TIPS', value: stats?.aiTips || 0, icon: 'zap', color: '#2563EB', bg: 'rgba(59, 130, 246, 0.2)', gradient: ['#EFF6FF', '#DBEAFE'] },
+            { label: 'FARMS', value: stats?.farms ?? null, icon: 'map', color: '#059669', bg: 'rgba(16, 185, 129, 0.2)', gradient: ['#F0FDF4', '#D1FAE5'] },
+            { label: 'TESTS', value: stats?.tests ?? null, icon: 'activity', color: '#D97706', bg: 'rgba(245, 158, 11, 0.2)', gradient: ['#FFFBEB', '#FEF3C7'] },
+            { label: 'RECOMMENDATIONS', value: stats?.aiTips ?? null, icon: 'zap', color: '#2563EB', bg: 'rgba(59, 130, 246, 0.2)', gradient: ['#EFF6FF', '#DBEAFE'] },
           ].map((st, i) => (
             <View key={i} style={[Shadows.sm, { flex: 1, borderRadius: 20, borderWidth: 1, borderColor: st.bg, overflow: 'hidden' }]}>
               <LinearGradient colors={st.gradient as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
@@ -412,7 +423,9 @@ export default function DashboardScreen() {
                 <Text style={{ fontSize: 11, color: Colors.label2, fontFamily: 'Sora_700Bold', letterSpacing: 0.5, marginBottom: 4 }}>{st.label}</Text>
                 {isStatsLoading
                   ? <ActivityIndicator size="small" color={st.color} style={{ marginTop: 2 }} />
-                  : <AnimatedCounter value={st.value as number} style={{ color: st.color, fontSize: 26, fontFamily: 'Sora_700Bold', letterSpacing: -1 }} />}
+                  : typeof st.value === 'number'
+                    ? <AnimatedCounter value={st.value} style={{ color: st.color, fontSize: 26, fontFamily: 'Sora_700Bold', letterSpacing: -1 }} />
+                    : <Text style={{ color: Colors.label2, fontSize: 20, fontFamily: 'Sora_700Bold' }}>--</Text>}
               </View>
             </View>
           ))}
@@ -428,7 +441,7 @@ export default function DashboardScreen() {
               <Text style={{ fontSize: 14, fontFamily: 'Sora_500Medium', color: '#4A4A4A', lineHeight: 24, marginBottom: 24 }}>
                 Pair your soil sensor instantly for real-time insights.
               </Text>
-              <TouchableOpacity onPress={() => useNavigationStore.getState().setCurrentIndex(1)} style={{ alignSelf: 'flex-start' }}>
+              <TouchableOpacity onPress={handleConnect} style={{ alignSelf: 'flex-start' }}>
                 <LinearGradient colors={['#FF5F6D', '#FFC371']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[s.heroBtn, { borderWidth: 0, paddingHorizontal: 24 }]}>
                   <Text style={{ fontSize: 16, fontFamily: 'Sora_600SemiBold', color: '#FFFFFF', marginRight: 10 }}>Pair Device</Text>
                   <Feather name="arrow-right" size={18} color="#FFFFFF" />
