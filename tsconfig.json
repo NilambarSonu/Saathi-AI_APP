@@ -7,6 +7,5 @@
       "assets/*": ["assets/*"]
     }
   },
-  "extends": "expo/tsconfig.base",
-  "exclude": ["routes.ts", "node_modules", ".expo", "android", "ios"]
+  "extends": "expo/tsconfig.base"
 }
