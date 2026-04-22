@@ -9,3 +9,5 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   currentIndex: 0,
   setCurrentIndex: (index) => set({ currentIndex: index }),
 }));
+
+

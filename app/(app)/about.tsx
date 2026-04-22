@@ -5,9 +5,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LottieView from 'lottie-react-native';
-import { Colors } from '../../constants/Colors';
-import { Spacing } from '../../constants/Spacing';
-import { apiCall } from '../../src/core/services/api';
+import { Colors } from '@/constants/Colors';
+import { Spacing } from '@/constants/Spacing';
+import { apiCall } from '@/services/api';
 
 // ─── Data ────────────────────────────────────────────────────
 const STATS = [
@@ -19,19 +19,19 @@ const STATS = [
 
 const TECH_FEATURES = [
   {
-    animation: require('../../animations/Microscope.json'),
+    animation: require('assets/animations/Microscope.json'),
     color: Colors.primary,
     title: 'Advanced Sensors',
     desc: 'Multi-parameter soil probes measuring NPK, pH, moisture, EC, and temperature with lab-grade accuracy.',
   },
   {
-    animation: require('../../animations/Brain.json'),
+    animation: require('assets/animations/Brain.json'),
     color: Colors.blue,
     title: 'AI Processing',
     desc: 'Gemini-powered recommendations analyzing your soil data to suggest optimal fertilizers and treatments.',
   },
   {
-    animation: require('../../animations/chatbot.json'),
+    animation: require('assets/animations/chatbot.json'),
     color: Colors.amber,
     title: 'Language Support',
     desc: 'Full support for English, Hindi, Odia, and more — making precision farming accessible for every farmer.',
@@ -369,3 +369,5 @@ const styles = StyleSheet.create({
   },
   sendBtnText: { fontFamily: 'Sora_700Bold', fontSize: 15, color: '#fff' },
 });
+
+

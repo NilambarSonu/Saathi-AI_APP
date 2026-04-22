@@ -6,11 +6,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { Colors } from '../../constants/Colors';
-import { Spacing } from '../../constants/Spacing';
-import { useAuthStore } from '../../store/authStore';
-import { apiCall, clearAuthTokens } from '../../src/core/services/api';
-import { logout } from '../../src/features/auth/services/auth';
+import { Colors } from '@/constants/Colors';
+import { Spacing } from '@/constants/Spacing';
+import { useAuthStore } from '@/store/authStore';
+import { apiCall, clearAuthTokens } from '@/services/api';
+import { logout } from '@/features/auth/services/auth';
 import * as Sharing from 'expo-sharing';
 
 const SETTINGS_KEY = 'saathi_settings';
@@ -338,3 +338,5 @@ const styles = StyleSheet.create({
   },
   deleteBtnText: { fontFamily: 'Sora_700Bold', fontSize: 13, color: '#fff' },
 });
+
+

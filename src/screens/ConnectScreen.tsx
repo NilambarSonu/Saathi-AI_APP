@@ -1,11 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { hideTabBar, showTabBar } from '../../constants/Animations';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { hideTabBar, showTabBar } from '@/constants/Animations';
 import {
   View, Text, TouchableOpacity, StyleSheet, Pressable,
-  ScrollView, SafeAreaView, Dimensions,
-  Linking,
+  ScrollView, SafeAreaView, Dimensions, Linking,
 } from 'react-native';
-import type { State as BleState } from 'react-native-ble-plx';
 import { MaterialCommunityIcons, Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import LottieView from 'lottie-react-native';
@@ -24,9 +22,10 @@ import Animated, {
   withTiming,
   cancelAnimation,
 } from 'react-native-reanimated';
-import { useBLE } from '../../src/features/hardware_ble/hooks/useBLE';
-import { sendSoilDataToPipeline } from '../../src/features/soil_analysis/services/soil';
-import { useSoilMarkers } from '../../context/SoilMarkersContext';
+import { useBLE } from '@/features/hardware_ble/hooks/useBLE';
+import { sendSoilDataToPipeline } from '@/features/soil_analysis/services/soil';
+import { useSoilMarkers } from '@/context/SoilMarkersContext';
+import type { State as BleState } from 'react-native-ble-plx';
 
 
 const { width } = Dimensions.get('window');
@@ -276,7 +275,7 @@ function SoilDataView({
       <View style={s.soilContent}>
         <View style={s.imageWrapper}>
           <LottieView
-            source={require('../../animations/soil-analysis-data.json')}
+            source={require('assets/animations/soil-analysis-data.json')}
             autoPlay
             loop
             resizeMode="contain"
@@ -357,9 +356,8 @@ function QuickStartView() {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function ConnectScreen() {
   const {
-    status, bluetoothState, soilData, latestError, logs,
-    permissionDenied, bluetoothOffModalVisible, connect, disconnect, retryPermission,
-    openBluetoothSettings, cancelBluetoothPrompt,
+    status, bluetoothState, soilData, logs,
+    permissionDenied, connect, disconnect, retryPermission, enableBluetooth, openBluetoothSettings,
   } = useBLE();
 
   const { addSoilMarker } = useSoilMarkers();
@@ -389,6 +387,11 @@ export default function ConnectScreen() {
       await disconnect();
     } else if (status === 'permission_denied') {
       await retryPermission();
+    } else if (status === 'bluetooth_off' || bluetoothState === 'PoweredOff') {
+      const enabled = await enableBluetooth();
+      if (!enabled) {
+        await openBluetoothSettings();
+      }
     } else if (!isBusy) {
       await connect();
     }
@@ -505,18 +508,11 @@ export default function ConnectScreen() {
           </Animated.View>
         )}
 
-        {!permissionDenied && latestError && (
-          <Animated.View entering={FadeInDown.duration(300)} style={s.inlineErrorBanner}>
-            <Ionicons name="warning-outline" size={20} color="#B91C1C" />
-            <Text style={s.inlineErrorText}>{latestError}</Text>
-          </Animated.View>
-        )}
-
         {/* ── HERO ── */}
         <View style={s.heroContainer}>
           <View style={[s.radarCircle, isConnected && s.radarCircleActive]}>
             <LottieView
-              source={require('../../animations/Bluetooth.json')}
+              source={require('assets/animations/Bluetooth.json')}
               autoPlay
               loop
               resizeMode="contain"
@@ -603,25 +599,6 @@ export default function ConnectScreen() {
 
         </ScrollView>
 
-        {bluetoothOffModalVisible && (
-          <View style={s.sheetOverlay} pointerEvents="box-none">
-            <Pressable style={s.sheetBackdrop} onPress={cancelBluetoothPrompt} />
-            <View style={s.bluetoothSheet}>
-              <Text style={s.sheetTitle}>Bluetooth is OFF</Text>
-              <Text style={s.sheetBody}>Turn on Bluetooth to scan devices</Text>
-
-              <View style={s.sheetActions}>
-                <TouchableOpacity onPress={cancelBluetoothPrompt} style={s.sheetCancelBtn}>
-                  <Text style={s.sheetCancelText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => void openBluetoothSettings()} style={s.sheetPrimaryBtn}>
-                  <Text style={s.sheetPrimaryText}>Turn ON</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        )}
       </SafeAreaView>
   );
 }
@@ -649,23 +626,6 @@ const s = StyleSheet.create({
   alertTitle: { fontFamily: 'Sora_700Bold', fontSize: 14, color: '#991B1B', marginBottom: 2 },
   alertBody:  { fontFamily: 'Sora_400Regular', fontSize: 13, color: '#7F1D1D', lineHeight: 18 },
   alertAction:{ fontFamily: 'Sora_600SemiBold', fontSize: 13, color: '#D97706', marginTop: 6 },
-  inlineErrorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  inlineErrorText: {
-    flex: 1,
-    fontFamily: 'Sora_500Medium',
-    fontSize: 12,
-    color: '#991B1B',
-    lineHeight: 18,
-  },
 
   heroContainer: { alignItems: 'center', marginVertical: 30 },
   radarCircle:      { width: 260, height: 260, borderRadius: 130, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
@@ -772,64 +732,6 @@ const s = StyleSheet.create({
   stepBadgeText:{ fontFamily: 'Sora_700Bold', fontSize: 14, color: '#2563EB' },
   stepText:     { fontFamily: 'Sora_400Regular', fontSize: 15, color: '#334155', flex: 1, lineHeight: 22 },
 
-  sheetOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-  },
-  sheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  bluetoothSheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-  },
-  sheetTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  sheetBody: {
-    marginTop: 8,
-    color: '#666',
-    fontSize: 14,
-  },
-  sheetActions: {
-    flexDirection: 'row',
-    marginTop: 20,
-    gap: 10,
-  },
-  sheetCancelBtn: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-  },
-  sheetCancelText: {
-    color: '#374151',
-    fontWeight: '600',
-  },
-  sheetPrimaryBtn: {
-    flex: 1,
-    backgroundColor: '#22c55e',
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  sheetPrimaryText: {
-    color: '#fff',
-    fontWeight: '700',
-  },
 });
+
+

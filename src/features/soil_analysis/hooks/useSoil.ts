@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { api } from '../../../core/services/api';
+import { api } from '@/services/api';
 
 export function useSoil() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -50,3 +50,5 @@ export function useSoil() {
 
   return { processSoilData, isProcessing, recommendations, pricing, soilError };
 }
+
+

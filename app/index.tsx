@@ -11,8 +11,8 @@ import Animated, {
   withDelay,
   withRepeat
 } from 'react-native-reanimated';
-import { Colors } from '../constants/Colors';
-import { useAuthStore } from '../store/authStore';
+import { Colors } from '@/constants/Colors';
+import { useAuthStore } from '@/store/authStore';
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -164,3 +164,5 @@ const styles = StyleSheet.create({
     letterSpacing: 0.88, // 0.08em
   }
 });
+
+

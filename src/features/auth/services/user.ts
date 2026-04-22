@@ -1,4 +1,4 @@
-import { apiCall } from '../../../core/services/api';
+import { apiCall } from '@/services/api';
 
 export interface UserProfile {
   id: string;
@@ -37,3 +37,5 @@ export async function getUserProfile(): Promise<UserProfile> {
     created_at: user?.created_at ?? user?.createdAt ?? new Date().toISOString(),
   };
 }
+
+

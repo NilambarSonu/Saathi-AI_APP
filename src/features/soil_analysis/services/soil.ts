@@ -1,4 +1,4 @@
-import { api, apiCall } from '../../../core/services/api';
+import { api, apiCall } from '@/services/api';
 
 export interface SoilTest {
   id: string;
@@ -22,8 +22,8 @@ export interface SoilTest {
 export async function getSoilTests(userId?: string): Promise<SoilTest[]> {
   const normalizedUserId = typeof userId === 'string' ? userId.trim() : '';
   const endpoint = normalizedUserId.length > 0
-    ? `/api/soil-tests/${encodeURIComponent(normalizedUserId)}`
-    : '/api/soil-tests';
+    ? `/soil-tests/${encodeURIComponent(normalizedUserId)}`
+    : '/soil-tests';
   return apiCall<SoilTest[]>(endpoint);
 }
 
@@ -31,14 +31,14 @@ export async function getSoilTests(userId?: string): Promise<SoilTest[]> {
  * Get a specific soil test by ID
  */
 export async function getSoilTest(id: string): Promise<SoilTest> {
-  return apiCall<SoilTest>(`/api/soil-tests/${id}`);
+  return apiCall<SoilTest>(`/soil-tests/${id}`);
 }
 
 /**
  * Save a new soil test record
  */
 export async function saveSoilTest(data: Omit<SoilTest, 'id' | 'userId' | 'createdAt'>): Promise<SoilTest> {
-  return apiCall<SoilTest>('/api/soil-tests', {
+  return apiCall<SoilTest>('/soil-tests', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -85,3 +85,5 @@ export async function sendSoilDataToPipeline(input: SoilPipelinePayload) {
   const payload = normalizeSoilPayload(input);
   return api.soilTests(payload);
 }
+
+

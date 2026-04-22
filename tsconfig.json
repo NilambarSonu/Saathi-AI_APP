@@ -1,5 +1,11 @@
 {
-  "compilerOptions": {},
-  "extends": "expo/tsconfig.base",
-  "exclude": ["app_backup", "components_backup", "hooks_backup"]
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "assets/*": ["assets/*"]
+    }
+  },
+  "extends": "expo/tsconfig.base"
 }

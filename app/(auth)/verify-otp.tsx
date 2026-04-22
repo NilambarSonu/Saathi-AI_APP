@@ -4,9 +4,9 @@ import {
   StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { verifyOTP, resendOTP } from '../../src/features/auth/services/auth';
-import { useAuthStore } from '../../store/authStore';
-import { Colors } from '../../constants/Colors';
+import { verifyOTP, resendOTP } from '@/features/auth/services/auth';
+import { useAuthStore } from '@/store/authStore';
+import { Colors } from '@/constants/Colors';
 
 const OTP_LENGTH = 6;
 
@@ -161,3 +161,5 @@ const styles = StyleSheet.create({
   btnPrimary: { width: '100%', height: 54, backgroundColor: Colors.primary, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   btnText: { fontFamily: 'Sora_700Bold', fontSize: 15, color: '#fff' },
 });
+
+

@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { Stack, Redirect } from 'expo-router';
-import { useAuthStore } from '../../store/authStore';
-import { registerForPushNotifications } from '../../src/core/services/notifications';
-import { registerDevice } from '../../src/features/auth/services/auth';
+import { useAuthStore } from '@/store/authStore';
+import { registerForPushNotifications } from '@/services/notifications';
+import { registerDevice } from '@/features/auth/services/auth';
 
 // expo-navigation-bar setVisibilityAsync is safe with edge-to-edge.
 // The unsupported APIs (setPositionAsync, setBehaviorAsync) have been removed.
@@ -53,7 +53,10 @@ export default function AppLayout() {
       <Stack.Screen name="about" />
       <Stack.Screen name="buy-agni" />
       <Stack.Screen name="chat-history" />
+      <Stack.Screen name="history" />
       <Stack.Screen name="settings" />
     </Stack>
   );
 }
+
+

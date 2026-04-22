@@ -4,6 +4,26 @@ module.exports = function(api) {
     presets: ['babel-preset-expo'],
     plugins: [
       'react-native-reanimated/plugin',
+      [
+        'module-resolver',
+        {
+          root: ['./'],
+          alias: {
+            '@': './src',
+            'assets': './assets',
+          },
+          extensions: [
+            '.ios.js',
+            '.android.js',
+            '.js',
+            '.jsx',
+            '.json',
+            '.tsx',
+            '.ts',
+            '.native.js',
+          ],
+        },
+      ],
     ],
   };
 };

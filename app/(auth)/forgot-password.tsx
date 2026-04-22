@@ -3,11 +3,11 @@ import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, ActivityIndicator,
   KeyboardAvoidingView, Platform, Alert,
+  ImageBackground,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Colors } from '../../constants/Colors';
-import { apiCall } from '../../src/core/services/api';
+import { Colors } from '@/constants/Colors';
+import { apiCall } from '@/services/api';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -100,24 +100,27 @@ export default function ForgotPasswordScreen() {
       style={{ flex: 1 }}
     >
       <ScrollView style={styles.container} bounces={false}>
-        {/* Hero Header */}
-        <LinearGradient
-          colors={['#0D3B1D', '#1A7B3C']}
+        {/* Hero Header Image Background */}
+        <ImageBackground
+          source={require('assets/images/auth_screen_mobile.png')}
           style={styles.hero}
+          resizeMode="cover"
         >
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={{ fontSize: 24, color: '#fff' }}>←</Text>
-          </TouchableOpacity>
-          <View style={styles.heroBadge}><Text style={styles.heroBadgeText}>🔐</Text></View>
-          <Text style={styles.heroTitle}>
-            {step === 'email' ? 'Forgot Password?' : step === 'otp' ? 'Verify OTP' : 'Set New Password'}
-          </Text>
-          <Text style={styles.heroSub}>
-            {step === 'email' ? "No worries! We'll send you reset instructions." : 
-             step === 'otp' ? 'Enter the 6-digit code sent to your email.' : 
-             'Choose a strong password for your account.'}
-          </Text>
-        </LinearGradient>
+          <View style={styles.heroOverlay}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <Text style={{ fontSize: 24, color: '#fff' }}>←</Text>
+            </TouchableOpacity>
+            <View style={styles.heroBadge}><Text style={styles.heroBadgeText}>🔐</Text></View>
+            <Text style={styles.heroTitle}>
+              {step === 'email' ? 'Forgot Password?' : step === 'otp' ? 'Verify OTP' : 'Set New Password'}
+            </Text>
+            <Text style={styles.heroSub}>
+              {step === 'email' ? "No worries! We'll send you reset instructions." : 
+               step === 'otp' ? 'Enter the 6-digit code sent to your email.' : 
+               'Choose a strong password for your account.'}
+            </Text>
+          </View>
+        </ImageBackground>
 
         {/* Auth Card */}
         <View style={styles.card}>
@@ -229,7 +232,14 @@ export default function ForgotPasswordScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  hero: { paddingTop: 64, paddingHorizontal: 24, paddingBottom: 48 },
+  hero: { minHeight: 340, position: 'relative', overflow: 'hidden' },
+  heroOverlay: {
+    paddingTop: 80, 
+    paddingHorizontal: 24, 
+    paddingBottom: 48,
+    backgroundColor: 'rgba(0,0,0,0.4)', // 40% black overlay
+    flex: 1,
+  },
   backBtn: {
     position: 'absolute',
     top: 48,
@@ -246,7 +256,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end', marginBottom: 12,
   },
   heroBadgeText: { fontSize: 20 },
-  heroTitle: { fontSize: 28, fontFamily: 'Sora_800ExtraBold', color: '#fff', lineHeight: 36 },
+  heroTitle: { fontSize: 28, fontFamily: 'Sora_800ExtraBold', color: '#fff', lineHeight: 36, marginTop: 75 },
   heroSub: { fontSize: 13, fontFamily: 'Sora_400Regular', color: 'rgba(255,255,255,0.7)', marginTop: 8 },
   card: {
     backgroundColor: Colors.surface,
@@ -281,3 +291,5 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
 });
+
+

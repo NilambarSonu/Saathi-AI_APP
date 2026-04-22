@@ -3,13 +3,13 @@ import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, ActivityIndicator,
   KeyboardAvoidingView, Platform, Alert,
+  ImageBackground,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { registerAccount, startSocialAuth } from '../../src/features/auth/services/auth';
-import { Colors } from '../../constants/Colors';
-import { useAuthStore } from '../../store/authStore';
+import { registerAccount, startSocialAuth } from '@/features/auth/services/auth';
+import { Colors } from '@/constants/Colors';
+import { useAuthStore } from '@/store/authStore';
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');
@@ -71,14 +71,20 @@ export default function RegisterScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <ScrollView style={styles.container} bounces={false}>
-        <LinearGradient colors={['#0D3B1D', '#1A7B3C']} style={styles.hero}>
-          <View style={styles.heroBadge}><Text style={{ fontSize: 20 }}>🌱</Text></View>
-          <Text style={styles.heroTitle}>
-            Empowering Farmers,{"\n"}
-            <Text style={{ color: '#A8F0C0' }}>Transforming Agriculture.</Text>
-          </Text>
-          <Text style={styles.heroSub}>Join the smart farming revolution today</Text>
-        </LinearGradient>
+        <ImageBackground
+          source={require('assets/images/auth_screen_mobile.png')}
+          style={styles.hero}
+          resizeMode="cover"
+        >
+          <View style={styles.heroOverlay}>
+            <View style={styles.heroBadge}><Text style={{ fontSize: 20 }}>🌱</Text></View>
+            <Text style={styles.heroTitle}>
+              Empowering Farmers,{"\n"}
+              <Text style={{ color: '#A8F0C0' }}>Transforming Agriculture.</Text>
+            </Text>
+            <Text style={styles.heroSub}>Join the smart farming revolution today</Text>
+          </View>
+        </ImageBackground>
 
         <View style={styles.card}>
           <View style={styles.tabRow}>
@@ -164,7 +170,7 @@ export default function RegisterScreen() {
 
           <View style={styles.socialRow}>
             <TouchableOpacity style={styles.socialBtnCircle} onPress={() => handleSocialLogin('google')}>
-              <View style={[styles.socialIconCircle, { backgroundColor: '#FFF', borderColor: '#E5E7EB' }]}> 
+              <View style={[styles.socialIconCircle, { backgroundColor: '#FFF', borderColor: '#E5E7EB' }]}>
                 {socialLoading === 'google'
                   ? <ActivityIndicator size="small" color="#DB4437" />
                   : <FontAwesome name="google" size={20} color="#DB4437" />}
@@ -172,7 +178,7 @@ export default function RegisterScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.socialBtnCircle} onPress={() => handleSocialLogin('facebook')}>
-              <View style={[styles.socialIconCircle, { backgroundColor: '#1877F2' }]}> 
+              <View style={[styles.socialIconCircle, { backgroundColor: '#1877F2' }]}>
                 {socialLoading === 'facebook'
                   ? <ActivityIndicator size="small" color="#FFFFFF" />
                   : <FontAwesome name="facebook-f" size={20} color="#FFFFFF" />}
@@ -180,7 +186,7 @@ export default function RegisterScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.socialBtnCircle} onPress={() => handleSocialLogin('x')}>
-              <View style={[styles.socialIconCircle, { backgroundColor: '#000000' }]}> 
+              <View style={[styles.socialIconCircle, { backgroundColor: '#000000' }]}>
                 {socialLoading === 'x'
                   ? <ActivityIndicator size="small" color="#FFFFFF" />
                   : <FontAwesome name="twitter" size={20} color="#FFFFFF" />}
@@ -195,12 +201,19 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  hero: { paddingTop: 64, paddingHorizontal: 24, paddingBottom: 48 },
+  hero: { minHeight: 340, position: 'relative', overflow: 'hidden' },
+  heroOverlay: {
+    paddingTop: 80,
+    paddingHorizontal: 24,
+    paddingBottom: 48,
+    backgroundColor: 'rgba(0,0,0,0.4)', // 40% black overlay
+    flex: 1,
+  },
   heroBadge: {
     width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-end', marginBottom: 12,
   },
-  heroTitle: { fontSize: 24, fontFamily: 'Sora_800ExtraBold', color: '#fff', lineHeight: 32 },
+  heroTitle: { fontSize: 24, fontFamily: 'Sora_800ExtraBold', color: '#fff', lineHeight: 30, marginTop: 58 },
   heroSub: { fontSize: 13, fontFamily: 'Sora_400Regular', color: 'rgba(255,255,255,0.6)', marginTop: 6 },
   card: { backgroundColor: '#fff', borderRadius: 28, marginTop: -20, padding: 24, paddingBottom: 40 },
   tabRow: { flexDirection: 'row', backgroundColor: Colors.surfaceAlt, borderRadius: 12, padding: 4, marginBottom: 24 },
@@ -242,3 +255,5 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
 });
+
+

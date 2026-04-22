@@ -26,9 +26,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
-import { useChat } from '../../src/features/ai_assistant/hooks/useChat';
-import { api } from '../../src/core/services/api';
-import { useNavigationStore } from '../store/navigationStore';
+import { useChat } from '@/features/ai_assistant/hooks/useChat';
+import { api } from '@/services/api';
+import { useNavigationStore } from '@/store/navigationStore';
 
 export default function AIChatScreen() {
   const params = useLocalSearchParams<{ sessionId?: string; sessionTitle?: string }>();
@@ -192,7 +192,7 @@ export default function AIChatScreen() {
             </TouchableOpacity>
             <View style={styles.headerTitleContainer}>
               <View style={styles.botAvatarOuter}>
-                <Image source={require('../../assets/images/favicon.png')} style={styles.botAvatarInner} />
+                <Image source={require('assets/images/favicon.png')} style={styles.botAvatarInner} />
                 <View style={[styles.onlineDot, error ? { backgroundColor: '#EF4444' } : {}]} />
               </View>
               <View>
@@ -230,7 +230,7 @@ export default function AIChatScreen() {
           ) : messages.length === 0 ? (
             <Animated.View entering={FadeIn.duration(800)} style={styles.welcomeState}>
               <View style={styles.lottieWrapper}>
-                <LottieView source={require('../../animations/chatbot.json')} autoPlay loop style={styles.lottieRobot} />
+                <LottieView source={require('assets/animations/chatbot.json')} autoPlay loop style={styles.lottieRobot} />
               </View>
               <Text style={styles.welcomeTitle}>Namaste, Farmer! 🙏</Text>
               <Text style={styles.welcomeSubtitle}>How can Saathi AI assist your farm today?</Text>
@@ -272,7 +272,7 @@ export default function AIChatScreen() {
                 >
                   {!isUser && (
                     <View style={styles.msgAvatarAI}>
-                      <Image source={require('../../assets/images/favicon.png')} style={{ width: 18, height: 18 }} />
+                      <Image source={require('assets/images/favicon.png')} style={{ width: 18, height: 18 }} />
                     </View>
                   )}
                   <View
@@ -297,7 +297,7 @@ export default function AIChatScreen() {
           {isLoading && (
             <Animated.View entering={FadeInUp} style={[styles.messageRow, styles.messageRowAI]}>
               <View style={styles.msgAvatarAI}>
-                <Image source={require('../../assets/images/favicon.png')} style={{ width: 18, height: 18 }} />
+                <Image source={require('assets/images/favicon.png')} style={{ width: 18, height: 18 }} />
               </View>
               <View style={[styles.msgBubble, styles.messageBubbleTyping]}>
                 <ActivityIndicator size="small" color="#7B2CBF" style={{ marginRight: 8 }} />
@@ -578,3 +578,5 @@ const styles = StyleSheet.create({
   },
   micBtnRecording: { backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FCA5A5' },
 });
+
+

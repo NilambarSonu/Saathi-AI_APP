@@ -16,10 +16,11 @@ import { Pacifico_400Regular } from '@expo-google-fonts/pacifico';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import ErrorBoundary from '../components/ErrorBoundary';
-import { SoilMarkersProvider } from '../context/SoilMarkersContext';
-import { useAuthStore } from '../store/authStore';
-import { checkAuthStatus } from '../src/features/auth/services/auth';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { SoilMarkersProvider } from '@/context/SoilMarkersContext';
+import { useAuthStore } from '@/store/authStore';
+import { checkAuthStatus } from '@/features/auth/services/auth';
+import { getStoredAccessToken } from '@/services/api';
 
 SplashScreen.preventAutoHideAsync();
 WebBrowser.maybeCompleteAuthSession();
@@ -41,7 +42,13 @@ export default function RootLayout() {
       try {
         const user = await checkAuthStatus();
         if (user) {
-          useAuthStore.getState().setUser(user);
+          const token = await getStoredAccessToken();
+          useAuthStore.setState({
+            user,
+            token: token || null,
+            isAuthenticated: true,
+            isLoading: false,
+          });
 
           try {
             if (Constants.appOwnership !== 'expo') {
@@ -111,3 +118,5 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+

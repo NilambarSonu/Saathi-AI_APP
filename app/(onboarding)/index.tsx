@@ -1,18 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, Dimensions, ScrollView, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withSpring, 
-  withTiming,
-  runOnJS,
-  interpolateColor
-} from 'react-native-reanimated';
-import { Colors } from '../../constants/Colors';
-import { Spacing } from '../../constants/Spacing';
+import { Colors } from '@/constants/Colors';
+import { Spacing } from '@/constants/Spacing';
 
 const { width } = Dimensions.get('window');
 
@@ -49,7 +40,7 @@ const SLIDES = [
 export default function OnboardingScreen() {
   const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const translateX = useSharedValue(0);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const completeOnboarding = async () => {
     await AsyncStorage.multiSet([
@@ -59,40 +50,24 @@ export default function OnboardingScreen() {
     router.replace('/(auth)/login');
   };
 
-  const setIndex = (index: number) => {
-    setCurrentIndex(index);
+  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const contentOffsetX = event.nativeEvent.contentOffset.x;
+    const index = Math.round(contentOffsetX / width);
+    if (index !== currentIndex) {
+      setCurrentIndex(index);
+    }
   };
 
-  const panGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      translateX.value = event.translationX;
-    })
-    .onEnd((event) => {
-      if (event.translationX < -50 && currentIndex < SLIDES.length - 1) {
-        // Swipe left (next)
-        translateX.value = withSpring(-width, { damping: 20 }, () => {
-          runOnJS(setIndex)(currentIndex + 1);
-          translateX.value = width;
-          translateX.value = withSpring(0, { damping: 20 });
-        });
-      } else if (event.translationX > 50 && currentIndex > 0) {
-        // Swipe right (prev)
-        translateX.value = withSpring(width, { damping: 20 }, () => {
-          runOnJS(setIndex)(currentIndex - 1);
-          translateX.value = -width;
-          translateX.value = withSpring(0, { damping: 20 });
-        });
-      } else {
-        // Snap back
-        translateX.value = withSpring(0, { damping: 20 });
-      }
-    });
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }]
-  }));
-
-  const slide = SLIDES[currentIndex];
+  const handleContinue = () => {
+    if (currentIndex < SLIDES.length - 1) {
+      scrollViewRef.current?.scrollTo({
+        x: (currentIndex + 1) * width,
+        animated: true,
+      });
+    } else {
+      completeOnboarding();
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -100,26 +75,37 @@ export default function OnboardingScreen() {
         <Text style={styles.skipText}>Skip</Text>
       </Pressable>
 
-      <GestureDetector gesture={panGesture}>
-        <Animated.View style={[styles.slideContainer, animatedStyle]}>
-          <View style={[styles.illustrationPanel, { backgroundColor: slide.bg }]}>
-            <View style={[styles.badge, { backgroundColor: slide.iconColor }]}>
-              <Text style={styles.badgeText}>{slide.badge}</Text>
+      <ScrollView
+        ref={scrollViewRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        bounces={false}
+        style={styles.scrollView}
+      >
+        {SLIDES.map((slide, index) => (
+          <View key={slide.id} style={styles.slide}>
+            <View style={[styles.illustrationPanel, { backgroundColor: slide.bg }]}>
+              <View style={[styles.badge, { backgroundColor: slide.iconColor }]}>
+                <Text style={styles.badgeText}>{slide.badge}</Text>
+              </View>
+              <Text style={{ fontSize: 80, opacity: 0.8 }}>
+                {index === 0 ? '🌡️' : index === 1 ? '🗣️' : '🧠'}
+              </Text>
             </View>
-            <Text style={{ fontSize: 80, opacity: 0.8 }}>
-              {currentIndex === 0 ? '🌡️' : currentIndex === 1 ? '🗣️' : '🧠'}
-            </Text>
-          </View>
 
-          <View style={styles.textContainer}>
-            <Text style={styles.title}>
-              {slide.title}
-              <Text style={{ color: Colors.primary }}>{slide.highlight}</Text>
-            </Text>
-            <Text style={styles.body}>{slide.body}</Text>
+            <View style={styles.textContainer}>
+              <Text style={styles.title}>
+                {slide.title}
+                <Text style={{ color: Colors.primary }}>{slide.highlight}</Text>
+              </Text>
+              <Text style={styles.body}>{slide.body}</Text>
+            </View>
           </View>
-        </Animated.View>
-      </GestureDetector>
+        ))}
+      </ScrollView>
 
       <View style={styles.footer}>
         <View style={styles.indicators}>
@@ -136,17 +122,7 @@ export default function OnboardingScreen() {
 
         <Pressable 
           style={styles.ctaButton} 
-          onPress={() => {
-            if (currentIndex < SLIDES.length - 1) {
-              translateX.value = withTiming(-width, { duration: 250 }, () => {
-                runOnJS(setIndex)(currentIndex + 1);
-                translateX.value = width;
-                translateX.value = withTiming(0, { duration: 250 });
-              });
-            } else {
-              completeOnboarding();
-            }
-          }}
+          onPress={handleContinue}
         >
           <Text style={styles.ctaText}>
             {currentIndex === SLIDES.length - 1 ? 'Get Started' : 'Continue'}
@@ -175,7 +151,11 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     letterSpacing: 0.2,
   },
-  slideContainer: {
+  scrollView: {
+    flex: 1,
+  },
+  slide: {
+    width: width,
     flex: 1,
     alignItems: 'center',
     paddingTop: 120,
@@ -196,7 +176,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    ...Spacing.shadows.sm,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   badgeText: {
     fontFamily: 'Sora_700Bold',
@@ -212,7 +196,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     color: Colors.textPrimary,
     textAlign: 'center',
-    letterSpacing: -0.52, // -0.02em
+    letterSpacing: -0.52,
     marginBottom: Spacing.md,
   },
   body: {
@@ -220,7 +204,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22.4, // 1.6
+    lineHeight: 22.4,
   },
   footer: {
     paddingHorizontal: Spacing.xl,
@@ -250,7 +234,11 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.radius.lg,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Spacing.shadows.md,
+    elevation: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   ctaText: {
     fontFamily: 'Sora_600SemiBold',
@@ -259,3 +247,5 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   }
 });
+
+

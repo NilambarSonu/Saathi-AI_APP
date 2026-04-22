@@ -12,9 +12,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Colors } from '../../constants/Colors';
-import { Spacing } from '../../constants/Spacing';
-import { api, ChatSession } from '../../src/core/services/api';
+import { Colors } from '@/constants/Colors';
+import { Spacing } from '@/constants/Spacing';
+import { api, ChatSession } from '@/services/api';
 
 function safeDateLabel(value?: string | null): string {
   if (!value) return 'Recently';
@@ -421,3 +421,5 @@ const styles = StyleSheet.create({
   },
   startChatBtnText: { fontFamily: 'Sora_700Bold', fontSize: 14, color: '#fff' },
 });
+
+

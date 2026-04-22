@@ -10,18 +10,18 @@ import {
 import { BlurView } from 'expo-blur';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { useNavigationStore } from '../../src/store/navigationStore';
-import { tabBarY } from '../../constants/Animations';
+import { useNavigationStore } from '@/store/navigationStore';
+import { tabBarY } from '@/constants/Animations';
 
-import DashboardScreen from '../../src/screens/DashboardScreen';
-import ConnectScreen from '../../src/screens/ConnectScreen';
-import ChatScreen from '../../src/screens/ChatScreen';
-import HistoryScreen from '../../src/screens/HistoryScreen';
-import ProfileScreen from '../../src/screens/ProfileScreen';
+import DashboardScreen from '@/screens/DashboardScreen';
+import ConnectScreen from '@/screens/ConnectScreen';
+import ChatScreen from '@/screens/ChatScreen';
+import HistoryScreen from '@/screens/HistoryScreen';
+import ProfileScreen from '@/screens/ProfileScreen';
 
 import SwipeContainer, {
   type SwipeContainerHandle,
-} from '../../src/shared/components/navigation/SwipeContainer';
+} from '@/shared/components/navigation/SwipeContainer';
 
 // ── Screens array — stable reference (module-level, never recreated) ──────────
 const SCREENS = [
@@ -213,3 +213,5 @@ const s = StyleSheet.create({
     letterSpacing: 0.4,
   }
 });
+
+

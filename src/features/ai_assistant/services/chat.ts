@@ -1,4 +1,4 @@
-import { apiCall } from '../../../core/services/api';
+import { apiCall } from '@/services/api';
 
 export interface ChatMessage {
   id: string;
@@ -42,3 +42,5 @@ export async function createChatSession(title: string, language: string = 'en'):
   });
   return (data?.session ?? data) as ChatSession;
 }
+
+

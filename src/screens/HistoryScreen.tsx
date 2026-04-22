@@ -14,13 +14,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { LineChart } from 'react-native-chart-kit';
-import { hideTabBar, showTabBar } from '../../constants/Animations';
-import { SoilTest } from '../../src/features/soil_analysis/services/soil';
-import { exportSoilReport } from '../../src/core/services/pdfExport';
-import { getParameterTrend, ParameterTrend } from '../../src/core/services/analytics';
-import { fetchSoilHistory } from '../../src/core/services/api';
-import { useAuthStore } from '../../store/authStore';
-import { useSoilMarkers } from '../../context/SoilMarkersContext';
+import { hideTabBar, showTabBar } from '@/constants/Animations';
+import { SoilTest } from '@/features/soil_analysis/services/soil';
+import { exportSoilReport } from '@/services/pdfExport';
+import { getParameterTrend, ParameterTrend } from '@/services/analytics';
+import { fetchSoilHistory } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
+import { useSoilMarkers } from '@/context/SoilMarkersContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -157,7 +157,7 @@ function buildMarkers(logs: SoilTest[]): HistoryMarker[] {
 }
 
 export default function HistoryScreen() {
-  const { user, token } = useAuthStore();
+  const { user } = useAuthStore();
   const { clearMarkers } = useSoilMarkers();
   const [logs, setLogs] = useState<SoilTest[]>([]);
   const [trend, setTrend] = useState<ParameterTrend | null>(null);
@@ -170,7 +170,7 @@ export default function HistoryScreen() {
   const [mapMode, setMapMode] = useState<'google' | 'osm'>('google');
 
   useEffect(() => {
-    if (!token || !user?.id) {
+    if (!user?.id) {
       setLogs([]);
       setHistoryError(null);
       setLoadingLogs(false);
@@ -202,7 +202,7 @@ export default function HistoryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [token, user?.id]);
+  }, [user?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -254,7 +254,7 @@ export default function HistoryScreen() {
       labels: chartLogs.length ? chartLogs.map((log) => safeDateLabel(log.createdAt)) : ['No Data'],
       datasets: [
         {
-          data: chartLogs.length ? chartLogs.map((log) => getLogMetric(log, selectedParameter)) : [0],
+          data: chartLogs.length >= 2 ? chartLogs.map((log) => getLogMetric(log, selectedParameter)) : [0, 0],
         },
       ],
     }),
@@ -277,7 +277,7 @@ export default function HistoryScreen() {
     }
   };
 
-  if (!token || !user?.id) {
+  if (!user?.id) {
     return (
       <View style={styles.root}>
         <LinearGradient
@@ -499,7 +499,7 @@ export default function HistoryScreen() {
                     pH {toNumber(log.ph).toFixed(1)} | NPK {toNumber(log.n)}-{toNumber(log.p)}-{toNumber(log.k)}
                   </Text>
                   <Text style={styles.logMeta}>
-                    {log.locationDetails || 'Location unavailable'}
+                    {typeof log.locationDetails === 'string' ? log.locationDetails : 'Location unavailable'}
                   </Text>
                   {'recommendation' in (log as any) && (log as any).recommendation ? (
                     <Text style={styles.recommendationText} numberOfLines={2}>
@@ -729,3 +729,5 @@ const styles = StyleSheet.create({
     color: COLORS.accent,
   },
 });
+
+

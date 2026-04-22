@@ -27,6 +27,7 @@ export interface UseBLEReturn {
   disconnect: () => Promise<void>;
   retryPermission: () => Promise<void>;
   openBluetoothSettings: () => Promise<void>;
+  enableBluetooth: () => Promise<boolean>;
   cancelBluetoothPrompt: () => Promise<void>;
 }
 
@@ -98,9 +99,7 @@ export function useBLE(): UseBLEReturn {
       onStatusChange: (nextStatus) => {
         if (!isMounted.current) return;
         setStatus(nextStatus);
-        if (nextStatus === 'bluetooth_off') {
-          setBluetoothOffModalVisible(true);
-        }
+        if (nextStatus === 'bluetooth_off') setBluetoothOffModalVisible(false);
       },
       onLog: addLog,
       onData: handleData,
@@ -164,7 +163,7 @@ export function useBLE(): UseBLEReturn {
         setPermissionDenied(true);
         setStatus('permission_denied');
       } else if (message.startsWith('BT_NOT_READY:')) {
-        setBluetoothOffModalVisible(true);
+        setBluetoothOffModalVisible(false);
         setStatus('bluetooth_off');
       } else {
         setStatus('error');
@@ -197,6 +196,15 @@ export function useBLE(): UseBLEReturn {
     await Linking.openSettings();
   }, []);
 
+  const enableBluetooth = useCallback(async () => {
+    const enabled = await bleService.requestEnableBluetooth();
+    if (enabled) {
+      setBluetoothOffModalVisible(false);
+      setStatus((prev) => (prev === 'bluetooth_off' ? 'idle' : prev));
+    }
+    return enabled;
+  }, []);
+
   const cancelBluetoothPrompt = useCallback(async () => {
     connectIntentRef.current = false;
     setBluetoothOffModalVisible(false);
@@ -219,6 +227,9 @@ export function useBLE(): UseBLEReturn {
     disconnect,
     retryPermission,
     openBluetoothSettings,
+    enableBluetooth,
     cancelBluetoothPrompt,
   };
 }
+
+

@@ -4,8 +4,8 @@ import {
   Image, FlatList, Alert, ActivityIndicator, Platform, Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/Colors';
-import { Spacing } from '../../constants/Spacing';
+import { Colors } from '@/constants/Colors';
+import { Spacing } from '@/constants/Spacing';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const GALLERY_W = SCREEN_W - Spacing.xl * 2;
@@ -475,3 +475,5 @@ const styles = StyleSheet.create({
   buyBtnText: { fontFamily: 'Sora_800ExtraBold', fontSize: 16, color: '#fff' },
   secureNote: { fontFamily: 'Sora_400Regular', fontSize: 11, color: Colors.textMuted, textAlign: 'center', marginTop: 8 },
 });
+
+

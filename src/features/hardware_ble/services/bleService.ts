@@ -8,7 +8,7 @@ import {
   type Subscription,
 } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
-import { saveSoilRecord, type SoilData } from '../../../../database/datastorage';
+import { saveSoilRecord, type SoilData } from '@/services/storage/datastorage';
 
 const DEVICE_NAME_KEYWORD = 'AGNI';
 const SCAN_TIMEOUT_MS = 12_000;
@@ -269,6 +269,25 @@ class BLEService {
 
   async isBluetoothPoweredOn(): Promise<boolean> {
     return (await this.getBluetoothState()) === 'PoweredOn';
+  }
+
+  async requestEnableBluetooth(): Promise<boolean> {
+    if (Platform.OS !== 'android') {
+      return this.isBluetoothPoweredOn();
+    }
+
+    const managerAny = this.manager as unknown as { enable?: () => Promise<BleState> };
+    if (typeof managerAny.enable === 'function') {
+      try {
+        const nextState = await managerAny.enable();
+        this.currentBluetoothState = nextState;
+        this.callbacks?.onBluetoothState?.(nextState);
+      } catch {
+        // User may deny the system enable prompt.
+      }
+    }
+
+    return this.isBluetoothPoweredOn();
   }
 
   async requestAndroidPermissions(): Promise<void> {
@@ -542,3 +561,5 @@ class BLEService {
 }
 
 export const bleService = new BLEService();
+
+

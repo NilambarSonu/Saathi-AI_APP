@@ -5,7 +5,7 @@ import {
   getStoredAccessToken,
   saveAuthTokens,
   saveUserId,
-} from '../../../core/services/api';
+} from '@/services/api';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -120,24 +120,52 @@ async function persistAuthenticatedSession(token: string, userId?: string, refre
   }
 }
 
+function extractUserFromDashboardPayload(payload: any): any {
+  return (
+    payload?.user ||
+    payload?.data?.user ||
+    payload?.dashboard?.user ||
+    payload?.data?.dashboard?.user ||
+    payload?.profile ||
+    payload?.data?.profile ||
+    payload?.data ||
+    payload
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchDashboardUser(token?: string): Promise<User> {
-  const data = await apiCall<any>('/dashboard', {
-    method: 'GET',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  });
+  const endpoints = ['/dashboard', '/auth/me', '/users/me'];
+  const retryDelays = [0, 300, 800];
 
-  if (!data) {
-    throw new Error('Failed to validate session with dashboard.');
+  for (const wait of retryDelays) {
+    if (wait > 0) {
+      await delay(wait);
+    }
+
+    for (const endpoint of endpoints) {
+      try {
+        const data = await apiCall<any>(endpoint, {
+          method: 'GET',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+
+        if (!data) continue;
+
+        const user = normalizeUser(extractUserFromDashboardPayload(data));
+        if (user.id) {
+          return user;
+        }
+      } catch {
+        // Continue trying alternate endpoint/retry to tolerate eventual session propagation.
+      }
+    }
   }
 
-  const userRaw = data?.user ?? data?.data?.user ?? data;
-  const user = normalizeUser(userRaw);
-
-  if (!user.id) {
-    throw new Error('Dashboard response did not include a valid user.');
-  }
-
-  return user;
+  throw new Error('Failed to validate session with dashboard.');
 }
 
 export function parseSocialAuthCallback(url: string): { token: string; userId: string } {
@@ -152,8 +180,27 @@ export function parseSocialAuthCallback(url: string): { token: string; userId: s
     throw new Error('Malformed OAuth redirect.');
   }
 
-  const token = parsedUrl.searchParams.get('token')?.trim();
-  const userId = parsedUrl.searchParams.get('userId')?.trim();
+  const hashParams = new URLSearchParams((parsedUrl.hash || '').replace(/^#/, ''));
+
+  const token = (
+    parsedUrl.searchParams.get('token') ||
+    parsedUrl.searchParams.get('accessToken') ||
+    parsedUrl.searchParams.get('access_token') ||
+    parsedUrl.searchParams.get('authToken') ||
+    hashParams.get('token') ||
+    hashParams.get('accessToken') ||
+    hashParams.get('access_token') ||
+    hashParams.get('authToken')
+  )?.trim();
+
+  const userId = (
+    parsedUrl.searchParams.get('userId') ||
+    parsedUrl.searchParams.get('user_id') ||
+    parsedUrl.searchParams.get('id') ||
+    hashParams.get('userId') ||
+    hashParams.get('user_id') ||
+    hashParams.get('id')
+  )?.trim();
 
   if (!token) {
     throw new Error('No token was returned from the social login callback.');
@@ -312,3 +359,5 @@ export async function registerDevice(params: {
     body: JSON.stringify(params),
   });
 }
+
+

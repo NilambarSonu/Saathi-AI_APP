@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, ActivityIndicator,
   KeyboardAvoidingView, Platform, Alert,
+  ImageBackground,
 } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -13,13 +14,14 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+
+import { loginWithCredentials, startSocialAuth } from '@/features/auth/services/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { loginWithCredentials, startSocialAuth } from '../../src/features/auth/services/auth';
 import { FontAwesome } from '@expo/vector-icons';
-import { Colors } from '../../constants/Colors';
+import { Colors } from '@/constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuthStore } from '../../store/authStore';
+import { useAuthStore } from '@/store/authStore';
 
 export default function LoginScreen() {
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
@@ -104,28 +106,30 @@ export default function LoginScreen() {
       style={{ flex: 1 }}
     >
       <ScrollView style={styles.container} bounces={false} showsVerticalScrollIndicator={false}>
-        {/* Hero Header */}
-        <LinearGradient
-          colors={['#0D3B1D', '#1A7B3C', '#22B455']}
+        {/* Hero Header Image Background */}
+        <ImageBackground
+          source={require('assets/images/auth_screen_mobile.png')}
           style={styles.hero}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          resizeMode="cover"
         >
-          {/* Animated floating elements */}
-          <Animated.View style={[styles.floatingDot, { top: 80, left: 30, width: 60, height: 60, opacity: 0.1 }]} />
-          <Animated.View style={[styles.floatingDot, { top: 140, right: 50, width: 40, height: 40, opacity: 0.15 }]} />
-          
-          <Animated.View style={[styles.heroBadge, badgeStyle]} entering={FadeInDown.delay(200).springify()}>
-            <Text style={styles.heroBadgeText}>🌱</Text>
-          </Animated.View>
-          <Animated.Text style={styles.heroTitle} entering={FadeInDown.delay(300).springify()}>
-            Welcome Back,{'\n'}
-            <Text style={styles.heroAccent}>Farmer Friend!</Text>
-          </Animated.Text>
-          <Animated.Text style={styles.heroSub} entering={FadeInDown.delay(400).springify()}>
-            Login to access your soil insights and AI recommendations
-          </Animated.Text>
-        </LinearGradient>
+          {/* Subtle Dark Overlay to ensure text readability */}
+          <View style={styles.heroOverlay}>
+            {/* Animated floating elements */}
+            <Animated.View style={[styles.floatingDot, { top: 185, left: 15, width: 60, height: 60, opacity: 0.12 }]} />
+            <Animated.View style={[styles.floatingDot, { top: 180, right: 80, width: 40, height: 40, opacity: 0.18 }]} />
+
+            <Animated.View style={[styles.heroBadge, badgeStyle]} entering={FadeInDown.delay(200).springify()}>
+              <Text style={styles.heroBadgeText}>🌱</Text>
+            </Animated.View>
+            <Animated.Text style={styles.heroTitle} entering={FadeInDown.delay(300).springify()}>
+              Welcome Back,{'\n'}
+              <Text style={styles.heroAccent}>Farmer's!</Text>
+            </Animated.Text>
+            <Animated.Text style={styles.heroSub} entering={FadeInDown.delay(400).springify()}>
+              Login to access your soil insights and AI recommendations
+            </Animated.Text>
+          </View>
+        </ImageBackground>
 
         {/* Auth Card */}
         <Animated.View style={styles.card} entering={FadeInUp.delay(500).springify()}>
@@ -217,7 +221,7 @@ export default function LoginScreen() {
           {/* Social buttons */}
           <View style={styles.socialRow}>
             <TouchableOpacity style={styles.socialBtnCircle} onPress={() => handleSocialLogin('google')}>
-              <Animated.View 
+              <Animated.View
                 style={[styles.socialIconCircle, { backgroundColor: '#FFF', borderColor: '#E5E7EB' }]}
                 entering={FadeInDown.delay(600).springify()}
               >
@@ -227,7 +231,7 @@ export default function LoginScreen() {
               </Animated.View>
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialBtnCircle} onPress={() => handleSocialLogin('facebook')}>
-              <Animated.View 
+              <Animated.View
                 style={[styles.socialIconCircle, { backgroundColor: '#1877F2' }]}
                 entering={FadeInDown.delay(700).springify()}
               >
@@ -237,7 +241,7 @@ export default function LoginScreen() {
               </Animated.View>
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialBtnCircle} onPress={() => handleSocialLogin('x')}>
-              <Animated.View 
+              <Animated.View
                 style={[styles.socialIconCircle, { backgroundColor: '#000000' }]}
                 entering={FadeInDown.delay(800).springify()}
               >
@@ -255,12 +259,17 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  hero: { 
-    paddingTop: 64, 
-    paddingHorizontal: 24, 
-    paddingBottom: 48,
+  hero: {
+    minHeight: 340,
     position: 'relative',
     overflow: 'hidden',
+  },
+  heroOverlay: {
+    flex: 1,
+    paddingTop: 110,
+    paddingHorizontal: 20,
+    paddingBottom: 50,
+    backgroundColor: 'rgba(0,0,0,0.4)', // 40% black overlay
   },
   floatingDot: {
     position: 'absolute',
@@ -268,39 +277,40 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
   },
   heroBadge: {
-    width: 56, 
-    height: 56, 
+    width: 56,
+    height: 56,
     borderRadius: 28,
     backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center', 
+    alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'flex-end', 
-    marginBottom: 16,
+    alignSelf: 'flex-end',
+    marginBottom: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
   },
-  heroBadgeText: { fontSize: 28 },
-  heroTitle: { 
-    fontSize: 28, 
-    fontFamily: 'Sora_800ExtraBold', 
-    color: '#fff', 
-    lineHeight: 36,
-    marginBottom: 8,
+  heroBadgeText: { fontSize: 29 },
+  heroTitle: {
+    marginTop: 30,
+    fontSize: 29,
+    fontFamily: 'Sora_800ExtraBold',
+    color: '#fff',
+    lineHeight: 37,
+    marginBottom: 2,
   },
   heroAccent: { color: '#A8F0C0' },
-  heroSub: { 
-    fontSize: 14, 
-    fontFamily: 'Sora_400Regular', 
-    color: 'rgba(255,255,255,0.8)', 
-    marginTop: 6,
+  heroSub: {
+    fontSize: 12,
+    fontFamily: 'Sora_400Regular',
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
     lineHeight: 20,
   },
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 28, 
+    borderRadius: 28,
     margin: 0,
     marginTop: -20,
     padding: 24,
@@ -315,55 +325,55 @@ const styles = StyleSheet.create({
   tabRow: {
     flexDirection: 'row',
     backgroundColor: Colors.surfaceAlt,
-    borderRadius: 12, 
+    borderRadius: 12,
     padding: 4,
-    marginBottom: 24,
+    marginBottom: 15,
   },
   onboardingLinkBtn: {
     alignSelf: 'center',
-    marginBottom: 18,
-    paddingVertical: 4,
+    marginBottom: 10,
+    paddingVertical: 0,
   },
   onboardingLinkText: {
     fontFamily: 'Sora_600SemiBold',
-    fontSize: 12,
+    fontSize: 9,
     color: Colors.primary,
   },
-  tab: { 
-    flex: 1, 
-    height: 40, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
+  tab: {
+    flex: 1,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 9,
   },
-  tabActive: { 
-    backgroundColor: Colors.surface, 
-    shadowColor: '#000', 
-    shadowOpacity: 0.08, 
-    shadowRadius: 4, 
+  tabActive: {
+    backgroundColor: Colors.surface,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
-  tabText: { 
-    fontFamily: 'Sora_600SemiBold', 
-    fontSize: 14, 
+  tabText: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 14,
     color: Colors.textSecondary,
   },
   tabTextActive: { color: Colors.primary },
-  label: { 
-    fontFamily: 'Sora_600SemiBold', 
-    fontSize: 11, 
-    color: Colors.textSecondary, 
-    letterSpacing: 0.6, 
-    marginBottom: 8, 
+  label: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 11,
+    color: Colors.textSecondary,
+    letterSpacing: 0.6,
+    marginBottom: 8,
     marginTop: 4,
     textTransform: 'uppercase',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52, 
+    height: 52,
     backgroundColor: Colors.background,
-    borderWidth: 1.5, 
+    borderWidth: 1.5,
     borderColor: Colors.border,
     borderRadius: 14,
     paddingHorizontal: 16,
@@ -374,12 +384,12 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontFamily: 'Sora_400Regular', 
+    fontFamily: 'Sora_400Regular',
     fontSize: 14,
     color: Colors.textPrimary,
     padding: 0,
   },
-  eyeBtn: { 
+  eyeBtn: {
     padding: 12,
     marginRight: -12,
   },
@@ -410,32 +420,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnDisabled: { opacity: 0.7 },
-  btnPrimaryText: { 
-    fontFamily: 'Sora_700Bold', 
-    fontSize: 15, 
+  btnPrimaryText: {
+    fontFamily: 'Sora_700Bold',
+    fontSize: 15,
     color: '#fff',
   },
-  divider: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 10, 
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     marginVertical: 20,
   },
-  dividerLine: { 
-    flex: 1, 
-    height: 1, 
+  dividerLine: {
+    flex: 1,
+    height: 1,
     backgroundColor: Colors.border,
   },
-  dividerText: { 
-    fontFamily: 'Sora_400Regular', 
-    fontSize: 11, 
-    color: Colors.textSecondary, 
+  dividerText: {
+    fontFamily: 'Sora_400Regular',
+    fontSize: 11,
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
-  socialRow: { 
-    flexDirection: 'row', 
-    gap: 16, 
-    justifyContent: 'center', 
+  socialRow: {
+    flexDirection: 'row',
+    gap: 16,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   socialBtnCircle: {
@@ -459,3 +469,5 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 });
+
+

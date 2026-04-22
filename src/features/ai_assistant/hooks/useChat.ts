@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, ChatSessionMessage } from '../../../core/services/api';
+import { api, ChatSessionMessage } from '@/services/api';
 
 export interface ChatMessage {
   id: string;
@@ -151,3 +151,5 @@ export function useChat(sessionId?: string) {
     clearChat,
   };
 }
+
+

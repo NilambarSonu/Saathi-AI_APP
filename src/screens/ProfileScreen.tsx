@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { hideTabBar, showTabBar } from '../../constants/Animations';
+import { hideTabBar, showTabBar } from '@/constants/Animations';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, Alert, ActivityIndicator, Switch, Platform, Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Colors } from '../../constants/Colors';
-import { Spacing } from '../../constants/Spacing';
-import { useAuthStore } from '../../store/authStore';
-import { apiCall } from '../../src/core/services/api';
-import { logout } from '../../src/features/auth/services/auth';
-import { getUserProfile } from '../../src/features/auth/services/user';
+import { Colors } from '@/constants/Colors';
+import { Spacing } from '@/constants/Spacing';
+import { useAuthStore } from '@/store/authStore';
+import { apiCall } from '@/services/api';
+import { logout } from '@/features/auth/services/auth';
+import { getUserProfile } from '@/features/auth/services/user';
 
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -501,3 +501,5 @@ const styles = StyleSheet.create({
   footer: { alignItems: 'center', paddingVertical: Spacing.md },
   footerText: { fontFamily: 'Sora_400Regular', fontSize: 11, color: Colors.textMuted, textAlign: 'center' },
 });
+
+
