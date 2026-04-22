@@ -282,7 +282,7 @@ class BLEService {
 
   /**
    * Triggers the native Android Bluetooth activation dialog.
-   * Optimized for instant response and accurate UI state transitions.
+    * Uses Android's request-enable intent with a library fallback.
    */
   async requestEnableBluetooth(): Promise<boolean> {
     if (Platform.OS !== 'android') {
@@ -308,21 +308,33 @@ class BLEService {
 
       // 2. Trigger Activation Dialog
       this.setStatus('activating_bluetooth');
-      
-      const managerAny = this.manager as any;
-      if (typeof managerAny.enable === 'function') {
-        // manager.enable() is a native call that resolves when the dialog is closed.
-        // This is the most reliable way to detect Allow/Deny instantly.
-        await managerAny.enable().catch(() => {
-          // Some devices might throw if already enabling or if intent fails
-        });
-      } else {
-        // Fallback to Intent if library method is missing
+
+      // Small delay improves dialog reliability when screen transitions just occurred.
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      let promptTriggered = false;
+      try {
         await Linking.sendIntent('android.bluetooth.adapter.action.REQUEST_ENABLE');
-        // Brief polling fallback only for Intent
-        for (let i = 0; i < 10; i++) {
-          await new Promise(r => setTimeout(r, 500));
-          if (await this.isBluetoothPoweredOn()) break;
+        promptTriggered = true;
+      } catch {
+        // Ignore here and fall back to manager.enable().
+      }
+
+      // Fallback for devices or environments where sendIntent is unavailable.
+      if (!promptTriggered) {
+        const managerAny = this.manager as any;
+        if (typeof managerAny.enable === 'function') {
+          await managerAny.enable().catch(() => {
+            // Keep fallback silent; final state check below decides success.
+          });
+        }
+      }
+
+      // Poll for up to 15 seconds because enabling hardware may not be immediate.
+      for (let i = 0; i < 30; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (await this.isBluetoothPoweredOn()) {
+          break;
         }
       }
 
