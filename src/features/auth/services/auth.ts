@@ -136,6 +136,7 @@ export async function logout() {
     'saathi_token',
     'saathi_refresh_token',
     'saathi_user',
+    'saathi_auth_token',
     'saathi_access_token',  // legacy key compat
   ]);
 }

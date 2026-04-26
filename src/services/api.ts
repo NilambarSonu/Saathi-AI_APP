@@ -1,14 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { tokenCache } from '@/utils/tokenCache';
 
 export const API_BASE = 'https://saathiai.org/api';
 export const API_HOST = 'https://saathiai.org';
 export const API_ROOT = API_BASE;
 
-const TOKEN_KEY = 'saathi_access_token';
+const TOKEN_KEY = 'saathi_auth_token';
 const REFRESH_TOKEN_KEY = 'saathi_refresh_token';
 const USER_ID_KEYS = ['user_id', 'userId'] as const;
-const LEGACY_TOKEN_KEYS = ['auth_token', 'access_token'] as const;
+const LEGACY_TOKEN_KEYS = ['auth_token', 'access_token', 'saathi_access_token', 'saathi_token'] as const;
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
 };
@@ -151,6 +152,7 @@ export async function apiCall<T = any>(endpoint: string, options: RequestInit = 
   if (!response.ok) {
     if (response.status === 401) {
       await clearAuthTokens().catch(() => {});
+      tokenCache.triggerAuthFailure();
       throw new Error('UNAUTHORIZED');
     }
 

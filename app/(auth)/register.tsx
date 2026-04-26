@@ -19,7 +19,7 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<null | 'google' | 'facebook' | 'x'>(null);
-  const { login } = useAuthStore();
+  const { setSession } = useAuthStore();
 
   async function handleSocialLogin(provider: 'google' | 'facebook' | 'x') {
     setSocialLoading(provider);
@@ -28,7 +28,7 @@ export default function RegisterScreen() {
       // saathiai://auth/callback?token=…, the Linking listener in _layout.tsx
       // catches the URL, parses the token, and navigates to /(app).
       const session = await startSocialAuth(provider);
-      await login(session.user, session.token, session.refreshToken ?? null);
+      await setSession(session.user, session.token, session.refreshToken ?? null);
       router.replace('/(app)');
     } catch (err: any) {
       Alert.alert('Social Auth Error', err?.message || 'Could not complete social login.');

@@ -1,122 +1,222 @@
+/**
+ * authStore.ts — Paste this into your APK project at: store/authStore.ts
+ *
+ * KEY FIXES vs old version:
+ *  1. TOKEN_KEY = 'saathi_auth_token' — must match axiosConfig.ts
+ *  2. Guards against saving undefined tokens (checks res.ok first)
+ *  3. Correct error messages shown to the user
+ */
+
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { logout as authLogout, User } from '@/features/auth/services/auth';
 import { tokenCache } from '@/utils/tokenCache';
+import { saveAuthTokens, clearAuthTokens, getStoredAccessToken } from '@/services/api';
 
-// ─────────── Key names used by axiosConfig interceptors ───────────
-export const TOKEN_KEY = 'saathi_token';
-export const REFRESH_TOKEN_KEY = 'saathi_refresh_token';
+const API_BASE_URL = 'https://saathiai.org';
+const TOKEN_KEY   = 'saathi_auth_token';   // ← matches axiosConfig.ts TOKEN_KEY
+const REFRESH_KEY = 'saathi_refresh_token';
 
-interface AuthState {
-  user: User | null;
-  token: string | null;
-  refreshToken: string | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-
-  // Called after login / OTP verify / social auth
-  setAuth: (token: string, refreshToken: string | null, user: User) => Promise<void>;
-
-  // Called from _layout.tsx initialisation path
-  setUser: (user: User) => void;
-
-  // Partial update (e.g. profile edit)
-  updateUser: (fields: Partial<User>) => void;
-
-  setLoading: (loading: boolean) => void;
-
-  // Legacy alias kept for login.tsx / register.tsx
-  login: (user: User, token: string, refreshToken?: string | null) => Promise<void>;
-
-  // Clear local user state only
-  clearUser: () => void;
-
-  logout: () => Promise<void>;
+export interface AuthUser {
+  id: string;
+  username: string;
+  email: string;
+  phone: string | null;
+  location: string | null;
+  provider: string;
+  profilePicture: string | null;
+  preferredLanguage: string;
+  createdAt: string;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      user: null,
-      token: null,
-      refreshToken: null,
-      isAuthenticated: false,
-      isLoading: true,
+interface AuthState {
+  user: AuthUser | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  isInitialized: boolean;
+  error: string | null;
 
-      // ─── Primary setter used after any successful auth ───
-      setAuth: async (token, refreshToken, user) => {
-        // 1. Warm the in-memory cache immediately (axiosConfig reads this on
-        //    the next request without any AsyncStorage round-trip)
-        tokenCache.set(token, refreshToken);
+  initialize: () => Promise<void>;
+  login: (usernameOrEmail: string, password: string) => Promise<void>;
+  loginWithOAuth: (provider: 'google' | 'facebook' | 'x') => Promise<void>;
+  handleOAuthCallback: (url: string) => Promise<void>;
+  logout: () => Promise<void>;
+  clearError: () => void;
+  setSession: (user: any, token: string, refreshToken?: string | null) => Promise<void>;
+}
 
-        // 2. Persist to AsyncStorage so the interceptor can bootstrap on cold
-        //    start before Zustand has rehydrated
-        await AsyncStorage.setItem(TOKEN_KEY, token);
-        if (refreshToken) {
-          await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-        }
-        await AsyncStorage.setItem('saathi_user', JSON.stringify(user));
+export const useAuthStore = create<AuthState>((set, get) => {
+  // Listen for unrecoverable 401s from the API to auto-logout
+  tokenCache.onAuthFailure(() => {
+    console.log('[AuthStore] Auto-logout triggered by API 401');
+    get().logout();
+  });
 
-        set({ token, refreshToken, user, isAuthenticated: true, isLoading: false });
-      },
+  return {
+  user: null,
+  token: null,
+  isAuthenticated: false,
+  isLoading: false,
+  isInitialized: false,
+  error: null,
 
-      // ─── Used by _layout.tsx when restoring session from token ───
-      setUser: (user) => set({ user, isAuthenticated: true, isLoading: false }),
+  // ─── Restore session on app start ───────────────────────────────────────────
+  initialize: async () => {
+    set({ isLoading: true });
+    try {
+      const token = await getStoredAccessToken();
+      if (!token) {
+        set({ isInitialized: true, isLoading: false });
+        console.log('[AuthStore] Rehydrated - no token found');
+        return;
+      }
 
-      // ─── Legacy login alias (login.tsx / register.tsx call login(user, token)) ───
-      login: async (user, token, refreshToken = null) => {
-        return get().setAuth(token, refreshToken, user);
-      },
+      const res = await fetch(`${API_BASE_URL}/api/user`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
+        },
+      });
 
-      updateUser: (fields) =>
-        set((state) => ({
-          user: state.user ? { ...state.user, ...fields } : null,
-        })),
-
-      setLoading: (isLoading) => set({ isLoading }),
-
-      clearUser: () => {
+      if (res.ok) {
+        const data = await res.json();
+        tokenCache.set(token);
+        set({ token, user: mapUser(data.user), isAuthenticated: true, isInitialized: true, isLoading: false });
+        console.log('[AuthStore] Session restored for', data.user?.username);
+      } else {
+        await clearAuthTokens();
         tokenCache.clear();
-        set({ user: null, token: null, refreshToken: null, isAuthenticated: false, isLoading: false });
-      },
-
-      logout: async () => {
-        tokenCache.clear();
-        try {
-          await authLogout(); // clears AsyncStorage keys
-        } catch {
-          // ignore network errors on logout
-        }
-        set({ user: null, token: null, refreshToken: null, isAuthenticated: false, isLoading: false });
-      },
-    }),
-    {
-      name: 'saathi-auth',
-      storage: createJSONStorage(() => AsyncStorage),
-      // Only persist these fields; isLoading is runtime-only
-      partialize: (state) => ({
-        user: state.user,
-        token: state.token,
-        refreshToken: state.refreshToken,
-        isAuthenticated: state.isAuthenticated,
-      }),
-      // ── KEY FIX: warm the tokenCache the moment Zustand rehydrates from
-      // AsyncStorage on cold start.  Without this, the first API request fires
-      // before setAuth() is called and finds an empty cache → 401.
-      onRehydrateStorage: () => (state) => {
-        if (state?.token) {
-          console.log('[AuthStore] Rehydrated - warming tokenCache');
-          tokenCache.set(state.token, state.refreshToken ?? null);
-          // Also ensure the direct AsyncStorage keys are synced
-          AsyncStorage.setItem(TOKEN_KEY, state.token).catch(() => {});
-          if (state.refreshToken) {
-            AsyncStorage.setItem(REFRESH_TOKEN_KEY, state.refreshToken).catch(() => {});
-          }
-        } else {
-          console.log('[AuthStore] Rehydrated - no token found');
-        }
-      },
+        set({ token: null, user: null, isAuthenticated: false, isInitialized: true, isLoading: false });
+        console.log('[AuthStore] Stored token invalid, cleared session');
+      }
+    } catch {
+      set({ isInitialized: true, isLoading: false, isAuthenticated: false });
+      console.log('[AuthStore] Network error during init, proceeding unauthenticated');
     }
-  )
-);
+  },
+
+  // ─── Email / password login ──────────────────────────────────────────────────
+  login: async (usernameOrEmail, password) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
+        },
+        body: JSON.stringify({ usernameOrEmail, password, client: 'mobile' }),
+      });
+
+      const data = await res.json();
+
+      // ✅ Always check res.ok BEFORE reading data.token
+      if (!res.ok) {
+        throw new Error(data.error || data.message || 'Login failed. Please check your credentials.');
+      }
+
+      if (!data.token) {
+        throw new Error('Server did not return an access token. Please try again.');
+      }
+
+      // ✅ Save to SecureStore and AsyncStorage using api.ts
+      await saveAuthTokens(data.token, data.refreshToken);
+      tokenCache.set(data.token, data.refreshToken);
+
+      console.log('[AuthStore] Login successful for', data.user?.username);
+
+      set({
+        token: data.token,
+        user: mapUser(data.user),
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
+    } catch (err: any) {
+      set({ isLoading: false, error: err.message });
+      throw err;
+    }
+  },
+
+  // ─── Social OAuth ─────────────────────────────────────────────────────────────
+  loginWithOAuth: async (provider) => {
+    const { Linking } = await import('react-native');
+    const path = provider === 'x' ? 'x' : provider;
+    const url = `${API_BASE_URL}/api/auth/${path}?redirect_uri=${encodeURIComponent('saathiai://oauth-callback')}`;
+    await Linking.openURL(url);
+  },
+
+  // ─── Handle deep link after OAuth ─────────────────────────────────────────────
+  handleOAuthCallback: async (url: string) => {
+    if (!url.includes('oauth-callback')) return;
+
+    set({ isLoading: true, error: null });
+    try {
+      const queryStart = url.indexOf('?');
+      if (queryStart === -1) throw new Error('Invalid OAuth callback URL');
+      const params = new URLSearchParams(url.slice(queryStart + 1));
+
+      const token = params.get('token');
+      const userId = params.get('userId');
+
+      if (!token || !userId) throw new Error('Missing token or userId in OAuth callback');
+
+      await saveAuthTokens(token);
+      tokenCache.set(token);
+
+      const res = await fetch(`${API_BASE_URL}/api/user`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
+        },
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Server returned ${res.status}`);
+      }
+
+      const data = await res.json();
+      set({ token, user: mapUser(data.user), isAuthenticated: true, isLoading: false, error: null });
+      console.log('[AuthStore] OAuth login successful for', data.user?.username);
+    } catch (err: any) {
+      await clearAuthTokens();
+      tokenCache.clear();
+      set({ isLoading: false, error: `Social login failed: ${err.message}`, user: null, token: null, isAuthenticated: false });
+    }
+  },
+
+  // ─── Logout ──────────────────────────────────────────────────────────────────
+  logout: async () => {
+    await clearAuthTokens();
+    tokenCache.clear();
+    set({ user: null, token: null, isAuthenticated: false, error: null });
+    console.log('[AuthStore] Logged out');
+  },
+
+  clearError: () => set({ error: null }),
+
+  setSession: async (user, token, refreshToken) => {
+    await saveAuthTokens(token, refreshToken || undefined);
+    tokenCache.set(token, refreshToken || null);
+    set({ token, user: mapUser(user), isAuthenticated: true, isInitialized: true, isLoading: false, error: null });
+  },
+};
+});
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function mapUser(raw: any): AuthUser {
+  return {
+    id: raw.id,
+    username: raw.username,
+    email: raw.email,
+    phone: raw.phone ?? null,
+    location: raw.location ?? null,
+    provider: raw.provider ?? 'local',
+    profilePicture: raw.profilePicture ?? raw.profile_picture ?? null,
+    preferredLanguage: raw.preferredLanguage ?? raw.preferred_language ?? 'en',
+    createdAt: raw.createdAt ?? raw.created_at ?? '',
+  };
+}

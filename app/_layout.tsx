@@ -19,8 +19,7 @@ import Constants from 'expo-constants';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { SoilMarkersProvider } from '@/context/SoilMarkersContext';
 import { useAuthStore } from '@/store/authStore';
-import { checkAuthStatus, registerDevice } from '@/features/auth/services/auth';
-import { getStoredAccessToken, getStoredRefreshToken } from '@/services/api';
+import { registerDevice } from '@/features/auth/services/auth';
 
 SplashScreen.preventAutoHideAsync();
 WebBrowser.maybeCompleteAuthSession();
@@ -40,27 +39,10 @@ export default function RootLayout() {
   useEffect(() => {
     async function initializeApp() {
       try {
-        // checkAuthStatus reads saathi_token from AsyncStorage and hits /api/user
-        const user = await checkAuthStatus();
+        await useAuthStore.getState().initialize();
 
-        if (user) {
-          // Restore session into Zustand (token already in AsyncStorage for interceptor)
-          // IMPORTANT: Get token directly from storage, not from Zustand (not yet rehydrated)
-          const token = await getStoredAccessToken();
-          const refreshToken = await getStoredRefreshToken();
-          
-          if (token) {
-            await useAuthStore.getState().setAuth(token, refreshToken, user);
-          } else {
-            // Token should exist if checkAuthStatus returned a user, but safeguard
-            useAuthStore.setState({
-              user: null,
-              token: null,
-              refreshToken: null,
-              isAuthenticated: false,
-            });
-          }
-
+        const state = useAuthStore.getState();
+        if (state.token && state.user) {
           // Register push token in background (non-blocking)
           try {
             if (Constants.appOwnership !== 'expo') {
@@ -74,24 +56,10 @@ export default function RootLayout() {
           } catch (error) {
             console.warn('[Push Register Error]', error);
           }
-        } else {
-          useAuthStore.setState({
-            user: null,
-            token: null,
-            refreshToken: null,
-            isAuthenticated: false,
-          });
         }
       } catch (error) {
-        console.error('[App Init]', error);
-        useAuthStore.setState({
-          user: null,
-          token: null,
-          refreshToken: null,
-          isAuthenticated: false,
-        });
+        console.error('[App Init Error]', error);
       } finally {
-        useAuthStore.setState({ isLoading: false });
         if (fontsLoaded) {
           SplashScreen.hideAsync().catch(() => {});
         }
@@ -106,7 +74,9 @@ export default function RootLayout() {
   // Auto-redirect to login when user logs out from any screen
   useEffect(() => {
     const unsubscribe = useAuthStore.subscribe((state, prevState) => {
-      if (prevState.isAuthenticated && !state.isAuthenticated && !state.isLoading) {
+      const wasAuth = !!prevState.token;
+      const isAuth = !!state.token;
+      if (wasAuth && !isAuth && !state.isLoading) {
         router.replace('/(auth)/login');
       }
     });

@@ -263,6 +263,11 @@ export default function HistoryScreen({ navigation }: any) {
     setIsModalVisible(true);
   };
 
+  const navigateToConnect = useCallback(() => {
+    const { setCurrentIndex } = require('@/store/navigationStore').useNavigationStore.getState();
+    setCurrentIndex(1);
+  }, []);
+
   if (!user) {
     return (
       <View style={styles.emptyContainer}>
@@ -270,6 +275,34 @@ export default function HistoryScreen({ navigation }: any) {
         <Ionicons name="lock-closed" size={64} color="#CBD5E1" />
         <Text style={styles.emptyTitle}>Secure Access</Text>
         <Text style={styles.emptyText}>Please sign in to view your soil test history and analytics.</Text>
+      </View>
+    );
+  }
+
+  // ── Full-screen empty state when user has zero soil tests ────────────────
+  if (!loading && logs.length === 0 && !error) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" />
+        <LinearGradient colors={[COLORS.backgroundTop, COLORS.backgroundBottom]} style={StyleSheet.absoluteFill} />
+
+        {/* Keep the header so the screen isn't disorienting */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>Soil History</Text>
+            <Text style={styles.title}>Analytics Lab</Text>
+          </View>
+        </View>
+
+        <View style={styles.fullEmptyState}>
+          <View style={styles.fullEmptyIllustration}>
+            <Ionicons name="analytics-outline" size={64} color={COLORS.accent} />
+          </View>
+          <Text style={styles.fullEmptyTitle}>No Data Available</Text>
+          <Text style={styles.fullEmptySubtitle}>
+            Your soil analysis history will appear here once tests are recorded.
+          </Text>
+        </View>
       </View>
     );
   }
@@ -446,43 +479,48 @@ export default function HistoryScreen({ navigation }: any) {
 
         {/* History Log */}
         <View style={styles.card}>
+          <Text style={styles.cardTitle}>Test History</Text>
           {loading ? (
             <ActivityIndicator style={{ margin: 20 }} color={COLORS.accent} />
           ) : filteredLogs.length === 0 ? (
             <View style={styles.noDataContainer}>
               <View style={styles.emptyIconCircle}>
-                <Ionicons name="flask-outline" size={32} color={COLORS.accent} />
+                <Ionicons name="analytics-outline" size={32} color={COLORS.accent} />
               </View>
-              <Text style={styles.noDataTitle}>No Records Yet</Text>
-              <Text style={styles.noData}>You haven't conducted any soil tests in this period.</Text>
-              <TouchableOpacity 
-                style={styles.startTestButton}
-                onPress={() => navigation.navigate('Analysis')}
-              >
-                <Text style={styles.startTestText}>Start New Test</Text>
-              </TouchableOpacity>
+              <Text style={styles.noDataTitle}>No Data Available</Text>
+              <Text style={styles.noData}>
+                No soil tests found for the selected filters.
+              </Text>
             </View>
           ) : (
-            filteredLogs.map((log, index) => (
-              <TouchableOpacity 
-                key={log.id} 
-                style={[styles.logItem, index === filteredLogs.length - 1 && { borderBottomWidth: 0 }]}
-                onPress={() => openDetails(log)}
-              >
-                <View style={styles.logIcon}>
-                  <Ionicons name="leaf" size={20} color={COLORS.accent} />
+            <View style={styles.timelineContainer}>
+              {filteredLogs.map((log, index) => (
+                <View key={log.id} style={styles.timelineRow}>
+                  <View style={styles.timelineLineContainer}>
+                    <View style={styles.timelineDot} />
+                    {index !== filteredLogs.length - 1 && <View style={styles.timelineLine} />}
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.timelineContent}
+                    onPress={() => openDetails(log)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.logIcon}>
+                      <Ionicons name="leaf" size={20} color={COLORS.accent} />
+                    </View>
+                    <View style={styles.logInfo}>
+                      <Text style={styles.logDate}>{format(parseISO(log.testDate), 'MMMM d, yyyy')}</Text>
+                      <Text style={styles.logTime}>{format(parseISO(log.testDate), 'hh:mm a')}</Text>
+                    </View>
+                    <View style={styles.logValues}>
+                      <Text style={styles.logMainValue}>pH {Number(log.ph).toFixed(1)}</Text>
+                      <Text style={styles.logSubValue}>N:{Number(log.nitrogen).toFixed(0)} P:{Number(log.phosphorus).toFixed(0)} K:{Number(log.potassium).toFixed(0)} <Text style={styles.logUnit}>ppm</Text></Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#CBD5E1" style={{ marginLeft: 4 }} />
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.logInfo}>
-                  <Text style={styles.logDate}>{format(parseISO(log.testDate), 'MMMM d, yyyy')}</Text>
-                  <Text style={styles.logTime}>{format(parseISO(log.testDate), 'hh:mm a')}</Text>
-                </View>
-                <View style={styles.logValues}>
-                  <Text style={styles.logMainValue}>pH {Number(log.ph).toFixed(1)}</Text>
-                  <Text style={styles.logSubValue}>N:{Number(log.nitrogen).toFixed(0)} P:{Number(log.phosphorus).toFixed(0)} K:{Number(log.potassium).toFixed(0)} <Text style={styles.logUnit}>ppm</Text></Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-              </TouchableOpacity>
-            ))
+              ))}
+            </View>
           )}
         </View>
       </ScrollView>
@@ -496,15 +534,18 @@ export default function HistoryScreen({ navigation }: any) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.modalGrabber} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Test Details</Text>
               <TouchableOpacity onPress={() => setIsModalVisible(false)} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={COLORS.title} />
+                <Ionicons name="close-circle-outline" size={28} color={COLORS.subtitle} />
               </TouchableOpacity>
             </View>
 
             {selectedLog && (
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                {/* 1. Metrics Section */}
+                <Text style={styles.sectionTitle}>Metrics</Text>
                 <View style={styles.modalHero}>
                   <View style={styles.scoreCircle}>
                     <Text style={styles.scoreValue}>{selectedLog.healthScore || 'N/A'}</Text>
@@ -546,10 +587,12 @@ export default function HistoryScreen({ navigation }: any) {
                   </View>
                 </View>
 
+                {/* 2. AI Recommendation Section */}
+                <Text style={styles.sectionTitle}>AI Recommendation</Text>
                 <View style={styles.recommendationCard}>
                   <View style={styles.recommendationHeader}>
-                    <Ionicons name="bulb" size={20} color={COLORS.accent} />
-                    <Text style={styles.recommendationTitle}>AI Recommendations</Text>
+                    <Ionicons name="sparkles" size={20} color={COLORS.accent} />
+                    <Text style={styles.recommendationTitle}>Insights</Text>
                   </View>
                   {selectedLog.recommendation?.recommendations ? (
                     <Text style={styles.recommendationText}>
@@ -562,7 +605,7 @@ export default function HistoryScreen({ navigation }: any) {
                   )}
                   {selectedLog.recommendation?.naturalFertilizers && selectedLog.recommendation.naturalFertilizers.length > 0 && (
                     <View style={{ marginTop: 12 }}>
-                      <Text style={[styles.recommendationTitle, { fontSize: 13, marginBottom: 8 }]}>🌿 Natural Fertilizers</Text>
+                      <Text style={[styles.recommendationTitle, { fontSize: 13, marginBottom: 8, marginLeft: 0 }]}>🌿 Natural Fertilizers</Text>
                       {selectedLog.recommendation.naturalFertilizers.slice(0, 3).map((f, i) => (
                         <Text key={i} style={[styles.recommendationText, { marginBottom: 4 }]}>
                           • <Text style={{ fontFamily: 'Sora_600SemiBold' }}>{f.name}</Text> — {f.amount}
@@ -572,7 +615,7 @@ export default function HistoryScreen({ navigation }: any) {
                   )}
                   {selectedLog.recommendation?.chemicalFertilizers && selectedLog.recommendation.chemicalFertilizers.length > 0 && (
                     <View style={{ marginTop: 12 }}>
-                      <Text style={[styles.recommendationTitle, { fontSize: 13, marginBottom: 8 }]}>🧪 Chemical Fertilizers</Text>
+                      <Text style={[styles.recommendationTitle, { fontSize: 13, marginBottom: 8, marginLeft: 0 }]}>🧪 Chemical Fertilizers</Text>
                       {selectedLog.recommendation.chemicalFertilizers.slice(0, 3).map((f, i) => (
                         <Text key={i} style={[styles.recommendationText, { marginBottom: 4 }]}>
                           • <Text style={{ fontFamily: 'Sora_600SemiBold' }}>{f.name}</Text> — {f.amount}
@@ -582,14 +625,29 @@ export default function HistoryScreen({ navigation }: any) {
                   )}
                 </View>
 
-                {selectedLog.latitude != null && (
-                  <View style={styles.locationDetailRow}>
-                    <Ionicons name="location-outline" size={16} color={COLORS.subtitle} />
-                    <Text style={styles.locationDetailText}>
-                      Coordinates: {Number(selectedLog.latitude).toFixed(4)}, {Number(selectedLog.longitude).toFixed(4)}
-                    </Text>
-                  </View>
-                )}
+                {/* 3. Location Section */}
+                <Text style={styles.sectionTitle}>Location</Text>
+                <View style={styles.locationCard}>
+                  {selectedLog.latitude != null ? (
+                    <>
+                      <Ionicons name="location" size={24} color={COLORS.accent} style={{ marginRight: 12 }} />
+                      <View>
+                        <Text style={styles.locationDetailTitle}>Coordinates</Text>
+                        <Text style={styles.locationDetailText}>
+                          {Number(selectedLog.latitude).toFixed(6)}, {Number(selectedLog.longitude).toFixed(6)}
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="location-outline" size={24} color={COLORS.subtitle} style={{ marginRight: 12 }} />
+                      <View>
+                        <Text style={styles.locationDetailTitle}>Location Unavailable</Text>
+                        <Text style={styles.locationDetailText}>No coordinates recorded</Text>
+                      </View>
+                    </>
+                  )}
+                </View>
                 
                 <TouchableOpacity 
                   style={styles.modalExportButton}
@@ -597,8 +655,10 @@ export default function HistoryScreen({ navigation }: any) {
                     setIsModalVisible(false);
                     exportSoilReport([selectedLog], user as any);
                   }}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.modalExportText}>Export This Report</Text>
+                  <Ionicons name="download-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.modalExportText}>Export Report</Text>
                 </TouchableOpacity>
               </ScrollView>
             )}
@@ -1061,18 +1121,104 @@ const styles = StyleSheet.create({
     fontFamily: 'Sora_400Regular',
     fontSize: 12,
     color: COLORS.subtitle,
-    marginLeft: 6,
+    marginTop: 2,
   },
   modalExportButton: {
     backgroundColor: COLORS.title,
+    flexDirection: 'row',
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: COLORS.title,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   modalExportText: {
     fontFamily: 'Sora_600SemiBold',
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 15,
+  },
+  // ── New styles for timeline & modal sections ───────────────────────
+  timelineContainer: {
+    marginTop: 8,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+  },
+  timelineLineContainer: {
+    width: 24,
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  timelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: COLORS.accent,
+    marginTop: 24,
+    borderWidth: 2,
+    borderColor: '#FFF',
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#E2E8F0',
+    marginTop: 4,
+  },
+  timelineContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  sectionTitle: {
+    fontFamily: 'Sora_700Bold',
+    fontSize: 18,
+    color: COLORS.title,
+    marginBottom: 16,
+    marginTop: 24,
+  },
+  modalGrabber: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#CBD5E1',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  locationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginBottom: 32,
+  },
+  locationDetailTitle: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 14,
+    color: COLORS.title,
   },
   errorCard: {
     flexDirection: 'row',
@@ -1112,6 +1258,40 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
     lineHeight: 22,
+  },
+  // ── Full-screen empty state styles ──────────────────────────────────
+  fullEmptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    marginTop: -40,
+  },
+  fullEmptyIllustration: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(16, 185, 129, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.1)',
+  },
+  fullEmptyTitle: {
+    fontFamily: 'Sora_700Bold',
+    fontSize: 22,
+    color: COLORS.title,
+    marginBottom: 12,
+  },
+  fullEmptySubtitle: {
+    fontFamily: 'Sora_400Regular',
+    fontSize: 15,
+    color: COLORS.subtitle,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+    maxWidth: 280,
   },
 });
 

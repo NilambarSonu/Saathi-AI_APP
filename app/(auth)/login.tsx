@@ -15,7 +15,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { loginWithCredentials, startSocialAuth } from '@/features/auth/services/auth';
+import { startSocialAuth } from '@/features/auth/services/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
@@ -29,7 +29,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<null | 'google' | 'facebook' | 'x'>(null);
-  const { login } = useAuthStore();
+  const { login, setSession } = useAuthStore();
 
   // Floating animation for the hero badge
   const badgeFloat = useSharedValue(0);
@@ -57,8 +57,7 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const response = await loginWithCredentials(usernameOrEmail.trim(), password);
-      await login(response.user, response.token, response.refreshToken ?? null);
+      await login(usernameOrEmail.trim(), password);
       // Clear any pending BLE intent to ensure we land on Home, not Connect
       await AsyncStorage.removeItem('saathi_ble_connect_intent');
       router.replace('/(app)');
@@ -84,7 +83,7 @@ export default function LoginScreen() {
     setSocialLoading(provider);
     try {
       const session = await startSocialAuth(provider);
-      await login(session.user, session.token, session.refreshToken ?? null);
+      await setSession(session.user, session.token, session.refreshToken ?? null);
       await AsyncStorage.removeItem('saathi_ble_connect_intent');
       router.replace('/(app)');
       // Browser closed — Linking listener in _layout.tsx handles the callback

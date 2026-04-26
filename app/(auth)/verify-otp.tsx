@@ -12,7 +12,7 @@ const OTP_LENGTH = 6;
 
 export default function VerifyOTPScreen() {
   const { email } = useLocalSearchParams<{ email: string }>();
-  const { login } = useAuthStore();
+  const { setSession } = useAuthStore();
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState(60);
@@ -61,7 +61,7 @@ export default function VerifyOTPScreen() {
 
       if (response.success && response.token && response.user) {
         // Store session via the auth store (writes to AsyncStorage + Zustand)
-        await login(response.user, response.token, response.refreshToken ?? null);
+        await setSession(response.user, response.token, response.refreshToken ?? null);
         router.replace('/(app)');
       } else {
         Alert.alert('Verification Failed', 'Could not verify email. Please try again.');
