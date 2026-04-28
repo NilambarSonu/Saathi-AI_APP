@@ -33,32 +33,32 @@ export async function exportSoilReport(tests: SoilTest[], user: User) {
 function generateReportHTML(tests: SoilTest[], user: User): string {
   // Sort tests by date descending
   const sortedTests = [...tests].sort((a, b) => 
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    new Date(b.testDate).getTime() - new Date(a.testDate).getTime()
   );
 
   // Calculate statistics
   const avgPh = tests.reduce((sum, t) => sum + Number(t.ph), 0) / tests.length;
-  const avgN = tests.reduce((sum, t) => sum + Number(t.n), 0) / tests.length;
-  const avgP = tests.reduce((sum, t) => sum + Number(t.p), 0) / tests.length;
-  const avgK = tests.reduce((sum, t) => sum + Number(t.k), 0) / tests.length;
+  const avgN = tests.reduce((sum, t) => sum + Number(t.nitrogen), 0) / tests.length;
+  const avgP = tests.reduce((sum, t) => sum + Number(t.phosphorus), 0) / tests.length;
+  const avgK = tests.reduce((sum, t) => sum + Number(t.potassium), 0) / tests.length;
 
   // Generate chart data for last 10 tests
   const chartData = sortedTests.slice(0, 10).reverse();
   const chartLabels = chartData.map((test, i) => 
-    new Date(test.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    new Date(test.testDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   );
-  const nValues = chartData.map(t => Number(t.n));
-  const pValues = chartData.map(t => Number(t.p));
-  const kValues = chartData.map(t => Number(t.k));
+  const nValues = chartData.map(t => Number(t.nitrogen));
+  const pValues = chartData.map(t => Number(t.phosphorus));
+  const kValues = chartData.map(t => Number(t.potassium));
 
   const rows = sortedTests.map(test => `
     <tr>
-      <td>${new Date(test.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-      <td>${new Date(test.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</td>
+      <td>${new Date(test.testDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+      <td>${new Date(test.testDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</td>
       <td class="${Number(test.ph) >= 6 && Number(test.ph) <= 7.5 ? 'good' : 'warn'}">${parseFloat(test.ph.toString()).toFixed(1)}</td>
-      <td>${Number(test.n).toFixed(0)}</td>
-      <td>${Number(test.p).toFixed(0)}</td>
-      <td>${Number(test.k).toFixed(0)}</td>
+      <td>${Number(test.nitrogen).toFixed(0)}</td>
+      <td>${Number(test.phosphorus).toFixed(0)}</td>
+      <td>${Number(test.potassium).toFixed(0)}</td>
       <td>${test.moisture ? Number(test.moisture).toFixed(1) + '%' : 'N/A'}</td>
       <td>${test.temperature ? Number(test.temperature).toFixed(1) + '°C' : 'N/A'}</td>
     </tr>
@@ -72,9 +72,9 @@ function generateReportHTML(tests: SoilTest[], user: User): string {
       <div class="location-grid">
         ${testsWithLocation.slice(0, 8).map(test => `
           <div class="location-card">
-            <strong>${new Date(test.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</strong><br/>
+            <strong>${new Date(test.testDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</strong><br/>
             <small>📍 ${Number(test.latitude).toFixed(5)}, ${Number(test.longitude).toFixed(5)}</small><br/>
-            <small>pH: ${Number(test.ph).toFixed(1)} | N:${Number(test.n).toFixed(0)} P:${Number(test.p).toFixed(0)} K:${Number(test.k).toFixed(0)}</small>
+            <small>pH: ${Number(test.ph).toFixed(1)} | N:${Number(test.nitrogen).toFixed(0)} P:${Number(test.phosphorus).toFixed(0)} K:${Number(test.potassium).toFixed(0)}</small>
           </div>
         `).join('')}
       </div>

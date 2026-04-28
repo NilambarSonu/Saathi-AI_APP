@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   Dimensions,
   Platform,
   ActivityIndicator,
@@ -17,6 +18,8 @@ import {
 } from 'react-native';
 import { Menu, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
+
 // useFocusEffect removed — we now use useEffect with a hasFetchedRef guard
 // to prevent re-fetching on every tab switch, which caused map jitter/reloads
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,8 +31,11 @@ import { hideTabBar, showTabBar } from '@/constants/Animations';
 import { getSoilTests, SoilTest } from '@/features/soil_analysis/services/soil';
 import { exportSoilReport } from '@/services/pdfExport';
 import { useAuthStore } from '@/store/authStore';
+import { useNavigationStore } from '@/store/navigationStore';
 import { useSoilMarkers } from '@/context/SoilMarkersContext';
 import LottieView from 'lottie-react-native';
+import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -86,7 +92,9 @@ const getParamColor = (param: ParameterName): string => {
 
 export default function HistoryScreen({ navigation }: any) {
   const { user } = useAuthStore();
+  const { currentIndex } = useNavigationStore();
   const { addSoilMarkers } = useSoilMarkers();
+  const isFocused = useIsFocused();
   
   const [logs, setLogs] = useState<SoilTest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,15 +108,71 @@ export default function HistoryScreen({ navigation }: any) {
   const [selectedLog, setSelectedLog] = useState<SoilTest | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [isTimeMenuVisible, setIsTimeMenuVisible] = useState(false);
+  const [isParamMenuVisible, setIsParamMenuVisible] = useState(false);
+  const mapRef = useRef<MapView>(null);
 
-  // Reset map ready state whenever the mode changes so the loading overlay shows
-  const handleSetMapMode = useCallback((mode: 'satellite' | 'standard' | 'osm') => {
-    setIsMapReady(false);
-    setMapMode(mode);
+  // Safety fallback to dismiss the perpetual loader if onMapReady never fires
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsMapReady(true);
+    }, 3500);
+    return () => clearTimeout(timer);
   }, []);
 
-  const [timeMenuVisible, setTimeMenuVisible] = useState(false);
-  const [paramMenuVisible, setParamMenuVisible] = useState(false);
+
+  const handleOpenTimeMenu = useCallback(() => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(e => 
+        console.log('[History] Haptics error:', e)
+      );
+    } catch (e) {
+      console.log('[History] Sync haptics error:', e);
+    }
+    setIsTimeMenuVisible(true);
+  }, []);
+
+  const handleOpenParamMenu = useCallback(() => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(e => 
+        console.log('[History] Haptics error:', e)
+      );
+    } catch (e) {
+      console.log('[History] Sync haptics error:', e);
+    }
+    setIsParamMenuVisible(true);
+  }, []);
+
+  const handleSelectTimeFilter = useCallback((filter: TimeFilter) => {
+    try {
+      Haptics.selectionAsync().catch(e => 
+        console.log('[History] Haptics error:', e)
+      );
+    } catch (e) {
+      console.log('[History] Sync haptics error:', e);
+    }
+    setTimeFilter(filter);
+    setIsTimeMenuVisible(false);
+  }, []);
+
+  const handleSelectParam = useCallback((param: ParameterName) => {
+    try {
+      Haptics.selectionAsync().catch(e => 
+        console.log('[History] Haptics error:', e)
+      );
+    } catch (e) {
+      console.log('[History] Sync haptics error:', e);
+    }
+    setSelectedParameter(param);
+    setIsParamMenuVisible(false);
+  }, []);
+
+
+
+  // Change map mode without resetting ready state to prevent blank flashes and reloading loops
+  const handleSetMapMode = useCallback((mode: 'satellite' | 'standard' | 'osm') => {
+    setMapMode(mode);
+  }, []);
 
   // Guard: only fetch once on mount, not on every tab focus
   const hasFetchedRef = React.useRef(false);
@@ -176,6 +240,20 @@ export default function HistoryScreen({ navigation }: any) {
     hasFetchedRef.current = true;
     fetchData();
   }, [user?.id, fetchData]);
+
+  // Fallback to ensure map loader disappears even if onMapReady doesn't fire
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (!isMapReady) {
+      timer = setTimeout(() => {
+        console.log('[History] Map ready fallback triggered');
+        setIsMapReady(true);
+      }, 2500);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isMapReady]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -291,6 +369,13 @@ export default function HistoryScreen({ navigation }: any) {
     };
   }, [logs]);
 
+  // Animate map to region when initial region changes or map becomes ready
+  useEffect(() => {
+    if (isMapReady && mapRef.current && mapInitialRegion) {
+      mapRef.current.animateToRegion(mapInitialRegion, 1000);
+    }
+  }, [isMapReady, mapInitialRegion]);
+
   const mapMarkers = useMemo(() => {
     return logs
       .filter(l => l.latitude !== null && l.longitude !== null)
@@ -375,8 +460,8 @@ export default function HistoryScreen({ navigation }: any) {
       </View>
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />
         }
@@ -388,302 +473,214 @@ export default function HistoryScreen({ navigation }: any) {
           </View>
         )}
 
-            {/* 1. Field Location - Map */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Field Locations</Text>
-                <View style={styles.mapControls}>
-                  <TouchableOpacity 
-                  onPress={() => handleSetMapMode('satellite')}
-                    style={[styles.mapTypeBtn, mapMode === 'satellite' && styles.mapTypeBtnActive]}
-                  >
-                    <Text style={[styles.mapTypeLabel, mapMode === 'satellite' && styles.mapTypeLabelActive]}>Satellite</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                  onPress={() => handleSetMapMode('standard')}
-                    style={[styles.mapTypeBtn, mapMode === 'standard' && styles.mapTypeBtnActive]}
-                  >
-                    <Text style={[styles.mapTypeLabel, mapMode === 'standard' && styles.mapTypeLabelActive]}>Standard</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                  onPress={() => handleSetMapMode('osm')}
-                    style={[styles.mapTypeBtn, mapMode === 'osm' && styles.mapTypeBtnActive]}
-                  >
-                    <Text style={[styles.mapTypeLabel, mapMode === 'osm' && styles.mapTypeLabelActive]}>OSM</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <View style={styles.mapContainer}>
-                <MapView
-                  key={`map-${mapMode}`}
-                  style={styles.map}
-                  provider={PROVIDER_GOOGLE}
-                  initialRegion={mapInitialRegion}
-                  mapType={mapMode === 'satellite' ? 'satellite' : 'standard'}
-                  onMapReady={() => setIsMapReady(true)}
-                  loadingEnabled={true}
-                  showsUserLocation={true}
-                  showsMyLocationButton={true}
-                  scrollEnabled={true}
-                  zoomEnabled={true}
-                  zoomControlEnabled={true}
-                  rotateEnabled={false}
-                  pitchEnabled={false}
-                  moveOnMarkerPress={false}
-                >
-                  {mapMode === 'osm' && (
-                    <UrlTile
-                      // openstreetmap.fr HOT mirror — allows standard app traffic unlike
-                      // direct tile.openstreetmap.org which blocks without a browser UA
-                      urlTemplate="https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png"
-                      maximumZ={19}
-                      tileSize={256}
-                      zIndex={1}
-                    />
-                  )}
-                  {mapMarkers.map((marker) => (
-                    <Marker
-                      key={marker.id}
-                      coordinate={marker.coordinate}
-                      title={`Test on ${format(parseISO(marker.date), 'MMM d, yyyy')}`}
-                      tracksViewChanges={false}
-                    >
-                      <View style={[styles.customMarker, { borderColor: getParamColor(selectedParameter) }]}>
-                        <View style={[styles.markerDot, { backgroundColor: getParamColor(selectedParameter) }]} />
-                      </View>
-                    </Marker>
-                  ))}
-                </MapView>
-              </View>
+        {/* 1. Field Location - Map */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Field Locations</Text>
+            <View style={styles.mapControls}>
+              <Pressable
+                onPress={() => handleSetMapMode('satellite')}
+                style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'satellite' && styles.mapTypeBtnActive, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={[styles.mapTypeLabel, mapMode === 'satellite' && styles.mapTypeLabelActive]}>Satellite</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleSetMapMode('standard')}
+                style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'standard' && styles.mapTypeBtnActive, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={[styles.mapTypeLabel, mapMode === 'standard' && styles.mapTypeLabelActive]}>Standard</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleSetMapMode('osm')}
+                style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'osm' && styles.mapTypeBtnActive, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={[styles.mapTypeLabel, mapMode === 'osm' && styles.mapTypeLabelActive]}>OSM</Text>
+              </Pressable>
             </View>
-
-            {/* 2. Filters Section */}
-            <View style={styles.dropdownSection}>
-              <View style={styles.dropdownGroup}>
-                <Menu
-                  visible={timeMenuVisible}
-                  onDismiss={() => setTimeMenuVisible(false)}
-                  anchor={
-                    <TouchableOpacity 
-                      style={styles.dropdownButton} 
-                      onPress={() => setTimeMenuVisible(true)}
-                      activeOpacity={0.6}
-                    >
-                      <View style={styles.dropdownButtonContent}>
-                        <Text style={styles.dropdownButtonText} numberOfLines={1}>{timeFilter}</Text>
-                      </View>
-                      <Ionicons name="chevron-down" size={12} color="#94A3B8" />
-                    </TouchableOpacity>
-                  }
-                  contentStyle={styles.menuContentSmall}
-                >
-                  {TIME_FILTERS.map((f, idx) => (
-                    <React.Fragment key={f}>
-                      <Menu.Item 
-                        onPress={() => {
-                          setTimeFilter(f);
-                          setTimeMenuVisible(false);
-                        }} 
-                        title={f} 
-                        titleStyle={[styles.menuItemText, timeFilter === f && styles.menuItemTextActive]}
-                      />
-                      {idx < TIME_FILTERS.length - 1 && <Divider style={styles.menuDivider} />}
-                    </React.Fragment>
-                  ))}
-                </Menu>
-              </View>
-
-              <View style={styles.dropdownSpacing} />
-
-              <View style={styles.dropdownGroup}>
-                <Menu
-                  visible={paramMenuVisible}
-                  onDismiss={() => setParamMenuVisible(false)}
-                  anchor={
-                    <TouchableOpacity 
-                      style={styles.dropdownButton} 
-                      onPress={() => setParamMenuVisible(true)}
-                      activeOpacity={0.6}
-                    >
-                      <View style={styles.dropdownButtonContent}>
-                        <View style={[styles.colorDotSmall, { backgroundColor: getParamColor(selectedParameter) }]} />
-                        <Text style={styles.dropdownButtonText} numberOfLines={1}>{selectedParameter}</Text>
-                      </View>
-                      <Ionicons name="chevron-down" size={14} color="#94A3B8" />
-                    </TouchableOpacity>
-                  }
-                  contentStyle={styles.menuContentSmall}
-                >
-                  {PARAMETERS.map((p, idx) => (
-                    <React.Fragment key={p}>
-                      <Menu.Item 
-                        onPress={() => {
-                          setSelectedParameter(p);
-                          setParamMenuVisible(false);
-                        }} 
-                        title={p} 
-                        titleStyle={[styles.menuItemText, selectedParameter === p && { color: getParamColor(p), fontFamily: 'Sora_700Bold' }]}
-                        leadingIcon={() => <View style={[styles.colorDotSmall, { backgroundColor: getParamColor(p), marginTop: 2 }]} />}
-                      />
-                      {idx < PARAMETERS.length - 1 && <Divider style={styles.menuDivider} />}
-                    </React.Fragment>
-                  ))}
-                </Menu>
-              </View>
-            </View>
-
-            {/* 3. Trend Analysis - Chart */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>{selectedParameter} Trend Analysis</Text>
-              {loading ? (
-                <View style={styles.chartLoader}>
-                  <ActivityIndicator color={COLORS.accent} />
-                </View>
-              ) : filteredLogs.length === 0 ? (
-                <View style={styles.chartEmptyContainer}>
-                  <LottieView
-                    source={require('../../assets/animations/history-trend.json')}
-                    autoPlay
-                    loop
-                    style={styles.chartLottie}
-                    resizeMode="contain"
+          </View>
+          <View style={styles.mapContainer}>
+            {currentIndex === 3 ? (
+              <MapView
+                ref={mapRef}
+                style={styles.map}
+                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                initialRegion={mapInitialRegion}
+                mapType={
+                  mapMode === 'satellite' 
+                    ? 'satellite' 
+                    : (mapMode === 'standard' 
+                        ? 'standard' 
+                        : (Platform.OS === 'android' ? 'none' : 'standard'))
+                }
+                onMapReady={() => setIsMapReady(true)}
+                showsUserLocation={true}
+                showsMyLocationButton={true}
+                scrollEnabled={true}
+                zoomEnabled={true}
+                zoomControlEnabled={true}
+                rotateEnabled={false}
+                pitchEnabled={false}
+                moveOnMarkerPress={false}
+              >
+                {mapMode === 'osm' && (
+                  <UrlTile
+                    urlTemplate="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    tileCache={true}
+                    maximumZ={19}
+                    tileSize={256}
+                    zIndex={1}
                   />
-                  <Text style={styles.noDataTitle}>No Trend Data</Text>
-                  <Text style={styles.noData}>Insufficient data to show trend for {timeFilter}.</Text>
-                </View>
-              ) : (
-                <LineChart
-                  data={chartData}
-                  width={SCREEN_WIDTH - 24} 
-                  height={226}
-                  chartConfig={{
-                    backgroundColor: '#FFF',
-                    backgroundGradientFrom: '#FFF',
-                    backgroundGradientTo: '#FFF',
-                    decimalPlaces: selectedParameter === 'pH Level' ? 1 : 0,
-                    color: (opacity = 1) => getParamColor(selectedParameter),
-                    labelColor: (opacity = 1) => '#94A3B8',
-                    style: { borderRadius: 16 },
-                    propsForDots: {
-                      r: '5',
-                      strokeWidth: '2',
-                      stroke: '#FFF'
-                    },
-                    propsForLabels: {
-                      fontFamily: 'Sora_400Regular',
-                      fontSize: 10
-                    }
-                  }}
-                  bezier
-                  style={styles.chart}
-                  withInnerLines={false}
-                  withOuterLines={false}
-                  withVerticalLines={false}
-                />
-              )}
-            </View>
-
-            {/* 4. Stats Summary */}
-            <View style={styles.statsBar}>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Avg {selectedParameter}</Text>
-                <Text style={[styles.statValue, { color: getParamColor(selectedParameter) }]}>
-                  {selectedParameter === 'pH Level' ? stats.avg.toFixed(1) : stats.avg.toFixed(0)}
-                  <Text style={styles.unitText}> {UNITS[selectedParameter]}</Text>
-                </Text>
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Total Tests</Text>
-                <Text style={styles.statValue}>{stats.total}</Text>
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Trend</Text>
-                <View style={styles.trendRow}>
-                  <Ionicons 
-                    name={stats.change >= 0 ? "trending-up" : "trending-down"} 
-                    size={16} 
-                    color={stats.change >= 0 ? "#10B981" : "#EF4444"} 
-                  />
-                  <Text style={[styles.trendText, { color: stats.change >= 0 ? "#10B981" : "#EF4444" }]}>
-                    {Math.abs(stats.change).toFixed(1)}%
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* 5. Soil Test History — fixed-height scrollable card */}
-            <View style={styles.historyCard}>
-              <Text style={styles.cardTitle}>
-                Test History Log ({timeFilter === 'All Time' ? 'All Time' : `Last ${timeFilter}`})
-              </Text>
-
-              {loading ? (
-                <View style={styles.chartLoader}>
-                  <ActivityIndicator color={COLORS.accent} />
-                </View>
-              ) : filteredLogs.length === 0 ? (
-                <View style={styles.noDataContainer}>
-                  <LottieView
-                    source={require('../../assets/animations/soil-analysis-data.json')}
-                    autoPlay
-                    loop
-                    style={styles.historyLottie}
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.noDataTitle}>No Records</Text>
-                  <Text style={styles.noData}>
-                    No soil tests in the selected {timeFilter} range.
-                  </Text>
-                </View>
-              ) : (
-                <FlatList
-                  data={filteredLogs}
-                  keyExtractor={(item) => item.id}
-                  style={styles.historyList}
-                  showsVerticalScrollIndicator={true}
-                  nestedScrollEnabled={true}
-                  scrollEnabled={true}
-                  renderItem={({ item: log, index }) => (
-                    <View style={styles.timelineRow}>
-                      <View style={styles.timelineLineContainer}>
-                        <View style={styles.timelineDot} />
-                        {index !== filteredLogs.length - 1 && <View style={styles.timelineLine} />}
-                      </View>
-                      <TouchableOpacity
-                        style={styles.timelineContent}
-                        onPress={() => openDetails(log)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.logIcon}>
-                          <Ionicons name="leaf" size={18} color={COLORS.accent} />
-                        </View>
-                        <View style={styles.logInfo}>
-                          <Text style={styles.logDate}>{format(parseISO(log.testDate), 'MMM d, yyyy')}</Text>
-                          <Text style={styles.logTime}>{format(parseISO(log.testDate), 'hh:mm a')}</Text>
-                        </View>
-                        <View style={styles.logValues}>
-                          <Text style={[styles.logMainValue, { color: getParamColor(selectedParameter) }]}>
-                            {selectedParameter === 'pH Level' ? 'pH' : (selectedParameter === 'Moisture' ? 'M' : selectedParameter.charAt(0))}{' '}
-                            {Number(log[getParamKey(selectedParameter)]).toFixed(selectedParameter === 'pH Level' ? 1 : 0)}
-                            <Text style={styles.logUnitSmall}> {UNITS[selectedParameter]}</Text>
-                          </Text>
-                          <Text style={styles.logSubValue}>
-                            {selectedParameter !== 'pH Level' && `pH:${Number(log.ph).toFixed(1)} `}
-                            {selectedParameter !== 'Nitrogen' && `N:${Number(log.nitrogen).toFixed(0)} `}
-                            {selectedParameter !== 'Phosphorus' && `P:${Number(log.phosphorus).toFixed(0)} `}
-                            {selectedParameter !== 'Potassium' && `K:${Number(log.potassium).toFixed(0)}`}
-                          </Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-                      </TouchableOpacity>
+                )}
+                {mapMarkers.map((marker) => (
+                  <Marker
+                    key={`${marker.id}-${selectedParameter}`}
+                    coordinate={marker.coordinate}
+                    title={`Test on ${format(parseISO(marker.date), 'MMM d, yyyy')}`}
+                    tracksViewChanges={false}
+                  >
+                    <View style={[styles.customMarker, { borderColor: getParamColor(selectedParameter) }]}>
+                      <View style={[styles.markerDot, { backgroundColor: getParamColor(selectedParameter) }]} />
                     </View>
-                  )}
-                />
-              )}
+                  </Marker>
+                ))}
+              </MapView>
+            ) : (
+              <View style={styles.mapLoaderOverlay}>
+                <ActivityIndicator size="small" color={COLORS.accent} />
+              </View>
+            )}
+            {currentIndex === 3 && !isMapReady && (
+              <View style={styles.mapLoaderOverlay}>
+                <ActivityIndicator size="small" color={COLORS.accent} />
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* 2. Premium Apple Style Dropdown Filters */}
+        <View style={styles.dropdownRow}>
+          <Pressable 
+            style={({ pressed }) => [styles.appleDropdownBtn, pressed && { opacity: 0.7 }]} 
+            onPress={handleOpenTimeMenu}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <Ionicons name="calendar-outline" size={16} color={COLORS.title} style={{ marginRight: 8 }} />
+              <Text style={styles.appleDropdownText} numberOfLines={1}>{timeFilter}</Text>
             </View>
-        </ScrollView>
+            <Ionicons name="chevron-down" size={14} color={COLORS.subtitle} />
+          </Pressable>
+
+          <Pressable 
+            style={({ pressed }) => [styles.appleDropdownBtn, pressed && { opacity: 0.7 }]} 
+            onPress={handleOpenParamMenu}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <View style={[styles.paramColorDot, { backgroundColor: getParamColor(selectedParameter), marginRight: 8 }]} />
+              <Text style={styles.appleDropdownText} numberOfLines={1}>{selectedParameter}</Text>
+            </View>
+            <Ionicons name="chevron-down" size={14} color={COLORS.subtitle} />
+          </Pressable>
+        </View>
+
+        {/* 3. Trend Chart */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{selectedParameter} Trend Analysis</Text>
+          {loading ? (
+            <View style={styles.chartLoader}><ActivityIndicator color={COLORS.accent} /></View>
+          ) : filteredLogs.length === 0 ? (
+            <View style={styles.chartEmptyContainer}>
+              <LottieView source={require('../../assets/animations/history-trend.json')} autoPlay loop style={styles.chartLottie} resizeMode="contain" />
+              <Text style={styles.noDataTitle}>No Trend Data</Text>
+              <Text style={styles.noData}>Insufficient data to show trend for {timeFilter}.</Text>
+            </View>
+          ) : (
+            <LineChart
+              data={chartData} width={SCREEN_WIDTH - 24} height={226}
+              chartConfig={{
+                backgroundColor: '#FFF', backgroundGradientFrom: '#FFF', backgroundGradientTo: '#FFF',
+                decimalPlaces: selectedParameter === 'pH Level' ? 1 : 0,
+                color: (opacity = 1) => getParamColor(selectedParameter),
+                labelColor: (opacity = 1) => '#94A3B8',
+                style: { borderRadius: 16 },
+                propsForDots: { r: '5', strokeWidth: '2', stroke: '#FFF' },
+                propsForLabels: { fontFamily: 'Sora_400Regular', fontSize: 10 }
+              }}
+              bezier style={styles.chart} withInnerLines={false} withOuterLines={false} withVerticalLines={false}
+            />
+          )}
+        </View>
+
+        {/* 4. Stats */}
+        <View style={styles.statsBar}>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Avg {selectedParameter}</Text>
+            <Text style={[styles.statValue, { color: getParamColor(selectedParameter) }]}>
+              {selectedParameter === 'pH Level' ? stats.avg.toFixed(1) : stats.avg.toFixed(0)}
+              <Text style={styles.unitText}> {UNITS[selectedParameter]}</Text>
+            </Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Total Tests</Text>
+            <Text style={styles.statValue}>{stats.total}</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Trend</Text>
+            <View style={styles.trendRow}>
+              <Ionicons name={stats.change >= 0 ? "trending-up" : "trending-down"} size={16} color={stats.change >= 0 ? "#10B981" : "#EF4444"} />
+              <Text style={[styles.trendText, { color: stats.change >= 0 ? "#10B981" : "#EF4444" }]}>{Math.abs(stats.change).toFixed(1)}%</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* 5. History log title */}
+        <View style={[styles.historyCard, { paddingBottom: 16 }]}>
+          <Text style={styles.cardTitle}>
+            Test History Log ({timeFilter === 'All Time' ? 'All Time' : `Last ${timeFilter}`})
+          </Text>
+          {loading && <View style={styles.chartLoader}><ActivityIndicator color={COLORS.accent} /></View>}
+          {!loading && filteredLogs.length === 0 ? (
+            <View style={styles.noDataContainer}>
+              <LottieView source={require('../../assets/animations/soil-analysis-data.json')} autoPlay loop style={styles.historyLottie} resizeMode="contain" />
+              <Text style={styles.noDataTitle}>No Records</Text>
+              <Text style={styles.noData}>No soil tests in the selected {timeFilter} range.</Text>
+            </View>
+          ) : (
+            <View style={{ marginTop: 10 }}>
+                {filteredLogs.map((log, index) => (
+                  <View style={styles.timelineRow} key={log.id || index.toString()}>
+                    <View style={styles.timelineLineContainer}>
+                      <View style={styles.timelineDot} />
+                      {index !== filteredLogs.length - 1 && <View style={styles.timelineLine} />}
+                    </View>
+                    <TouchableOpacity style={styles.timelineContent} onPress={() => openDetails(log)} activeOpacity={0.7}>
+                      <View style={styles.logIcon}><Ionicons name="leaf" size={18} color={COLORS.accent} /></View>
+                      <View style={styles.logInfo}>
+                        <Text style={styles.logDate}>{format(parseISO(log.testDate), 'MMM d, yyyy')}</Text>
+                        <Text style={styles.logTime}>{format(parseISO(log.testDate), 'hh:mm a')}</Text>
+                      </View>
+                      <View style={styles.logValues}>
+                        <Text style={[styles.logMainValue, { color: getParamColor(selectedParameter) }]}>
+                          {selectedParameter === 'pH Level' ? 'pH' : (selectedParameter === 'Moisture' ? 'M' : selectedParameter.charAt(0))}{' '}
+                          {Number(log[getParamKey(selectedParameter)]).toFixed(selectedParameter === 'pH Level' ? 1 : 0)}
+                          <Text style={styles.logUnitSmall}> {UNITS[selectedParameter]}</Text>
+                        </Text>
+                        <Text style={styles.logSubValue}>
+                          {selectedParameter !== 'pH Level' && `pH:${Number(log.ph).toFixed(1)} `}
+                          {selectedParameter !== 'Nitrogen' && `N:${Number(log.nitrogen).toFixed(0)} `}
+                          {selectedParameter !== 'Phosphorus' && `P:${Number(log.phosphorus).toFixed(0)} `}
+                          {selectedParameter !== 'Potassium' && `K:${Number(log.potassium).toFixed(0)}`}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
 
       {/* Details Modal */}
       <Modal
@@ -825,91 +822,170 @@ export default function HistoryScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Time Filter Bottom Sheet */}
+      <Modal
+        visible={isTimeMenuVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsTimeMenuVisible(false)}
+      >
+        <View style={StyleSheet.absoluteFill}>
+          {Platform.OS === 'ios' && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
+          <Pressable 
+            style={styles.actionSheetOverlay} 
+            onPress={() => setIsTimeMenuVisible(false)}
+          >
+            <View style={styles.actionSheetContent} onStartShouldSetResponder={() => true}>
+              <View style={styles.actionSheetGrabber} />
+              <View style={styles.actionSheetHeader}>
+                <Text style={styles.actionSheetTitle}>Time Interval</Text>
+              </View>
+              {TIME_FILTERS.map((filter) => {
+                const isActive = timeFilter === filter;
+                return (
+                  <Pressable
+                    key={filter}
+                    style={({ pressed }) => [
+                      styles.actionSheetItem, 
+                      isActive && styles.actionSheetItemActive,
+                      pressed && { backgroundColor: '#F1F5F9' }
+                    ]}
+                    onPress={() => handleSelectTimeFilter(filter)}
+                  >
+                    <Text style={[styles.actionSheetText, isActive && styles.actionSheetTextActive]}>
+                      {filter}
+                    </Text>
+                    {isActive && <Ionicons name="checkmark-circle" size={20} color={COLORS.title} />}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </View>
+      </Modal>
+
+      {/* Parameter Bottom Sheet */}
+      <Modal
+        visible={isParamMenuVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsParamMenuVisible(false)}
+      >
+        <View style={StyleSheet.absoluteFill}>
+          {Platform.OS === 'ios' && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
+          <Pressable 
+            style={styles.actionSheetOverlay} 
+            onPress={() => setIsParamMenuVisible(false)}
+          >
+            <View style={styles.actionSheetContent} onStartShouldSetResponder={() => true}>
+              <View style={styles.actionSheetGrabber} />
+              <View style={styles.actionSheetHeader}>
+                <Text style={styles.actionSheetTitle}>Soil Parameter</Text>
+              </View>
+              {PARAMETERS.map((param) => {
+                const isActive = selectedParameter === param;
+                const color = getParamColor(param);
+                return (
+                  <Pressable
+                    key={param}
+                    style={({ pressed }) => [
+                      styles.actionSheetItem, 
+                      isActive && styles.actionSheetItemActive,
+                      pressed && { backgroundColor: '#F1F5F9' }
+                    ]}
+                    onPress={() => handleSelectParam(param)}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={[styles.paramColorDot, { backgroundColor: color, marginRight: 12 }]} />
+                      <Text style={[styles.actionSheetText, isActive && { color: color, fontFamily: 'Sora_600SemiBold' }]}>
+                        {param}
+                      </Text>
+                    </View>
+                    {isActive && <Ionicons name="checkmark-circle" size={20} color={color} />}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  dropdownSection: {
-    marginHorizontal: 12,
-    marginBottom: 24,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+  filterContainer: {
+    marginVertical: 16,
+    gap: 12,
   },
-  dropdownGroup: {
-    flex: 1,
-  },
-  dropdownSpacing: {
-    width: 12,
-  },
-  dropdownGroupLabel: {
-    fontFamily: 'Sora_700Bold',
-    fontSize: 10,
-    color: '#94A3B8',
-    letterSpacing: 1,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  dropdownButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
+  filterScroll: {
     paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 14,
+    gap: 8,
+  },
+  paramScroll: {
+    paddingHorizontal: 12,
+    gap: 8,
+    paddingBottom: 4,
+  },
+  applePill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.8)',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: 'rgba(15,23,42,0.05)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.02,
     shadowRadius: 2,
     elevation: 1,
+    marginRight: 8,
   },
-  dropdownButtonContent: {
+  applePillActive: {
+    backgroundColor: COLORS.title,
+    borderColor: COLORS.title,
+  },
+  applePillText: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 13,
+    color: '#64748B',
+  },
+  applePillTextActive: {
+    color: '#FFF',
+  },
+  paramApplePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    paddingRight: 4,
-  },
-  dropdownButtonText: {
-    fontFamily: 'Sora_600SemiBold',
-    fontSize: 14,
-    color: COLORS.title,
-  },
-  menuContentSmall: {
-    backgroundColor: '#FFF',
-    borderRadius: 18,
-    marginTop: 45,
-    paddingVertical: 6,
-    width: (SCREEN_WIDTH - 36) / 2, // Adjusted for 12px margins and 12px gap
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.8)',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: 'rgba(15,23,42,0.05)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 2,
+    elevation: 1,
+    marginRight: 8,
   },
-  colorDotSmall: {
+  paramApplePillText: {
+    fontFamily: 'Sora_500Medium',
+    fontSize: 13,
+    color: '#475569',
+  },
+  paramColorDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     marginRight: 8,
   },
-  menuItemText: {
-    fontFamily: 'Sora_500Medium',
-    fontSize: 13,
-    color: '#475569',
-  },
-  menuItemTextActive: {
-    color: COLORS.accent,
-    fontFamily: 'Sora_700Bold',
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: '#F8FAFC',
-    marginHorizontal: 12,
+  mapLoaderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   historyListContainer: {
     marginTop: 8,
@@ -1014,10 +1090,6 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   filterSection: {
-    marginBottom: 12,
-  },
-  filterScroll: {
-    paddingLeft: 24,
     marginBottom: 12,
   },
   filterPill: {
@@ -1609,6 +1681,96 @@ const styles = StyleSheet.create({
   },
   historyList: {
     maxHeight: 420, // fixed height — scrollable inside the card
+  },
+  dropdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginHorizontal: 12,
+    marginVertical: 12,
+    gap: 12,
+  },
+  appleDropdownBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.06)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  appleDropdownText: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 14,
+    color: COLORS.title,
+    flex: 1,
+  },
+  actionSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  actionSheetContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    paddingHorizontal: 16,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  actionSheetGrabber: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#CBD5E1',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  actionSheetHeader: {
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: 8,
+  },
+  actionSheetTitle: {
+    fontFamily: 'Sora_700Bold',
+    fontSize: 16,
+    color: COLORS.title,
+  },
+  actionSheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  actionSheetItemActive: {
+    backgroundColor: '#F8FAFC',
+  },
+  actionSheetText: {
+    fontFamily: 'Sora_500Medium',
+    fontSize: 15,
+    color: '#475569',
+  },
+  actionSheetTextActive: {
+    fontFamily: 'Sora_600SemiBold',
+    color: COLORS.title,
   },
 });
 

@@ -24,7 +24,7 @@ import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated'
 import { useLocalSearchParams } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import { Audio } from 'expo-audio';
+import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import { useChat } from '@/features/ai_assistant/hooks/useChat';
 import { api } from '@/services/api';
