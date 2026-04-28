@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -101,6 +101,12 @@ export default function HistoryScreen({ navigation }: any) {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
 
+  // Reset map ready state whenever the mode changes so the loading overlay shows
+  const handleSetMapMode = useCallback((mode: 'satellite' | 'standard' | 'osm') => {
+    setIsMapReady(false);
+    setMapMode(mode);
+  }, []);
+
   const [timeMenuVisible, setTimeMenuVisible] = useState(false);
   const [paramMenuVisible, setParamMenuVisible] = useState(false);
 
@@ -161,14 +167,15 @@ export default function HistoryScreen({ navigation }: any) {
     }
   }, [user?.id]);
 
-  // Fetch once on mount. useFocusEffect caused re-fetches every tab visit,
-  // which triggered map re-renders and the laggy / reload experience.
+  // Watch user?.id — on mount auth may not be rehydrated yet (user is null).
+  // This effect runs again when user.id becomes available, triggering the fetch.
+  // hasFetchedRef prevents duplicate fetches if the component re-renders.
   useEffect(() => {
-    if (!hasFetchedRef.current) {
-      hasFetchedRef.current = true;
-      fetchData();
-    }
-  }, [fetchData]);
+    if (!user?.id) return; // wait until auth is ready
+    if (hasFetchedRef.current) return; // already fetched for this session
+    hasFetchedRef.current = true;
+    fetchData();
+  }, [user?.id, fetchData]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -367,43 +374,19 @@ export default function HistoryScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={filteredLogs}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={true} // Explicitly show scrollbar as requested
+      <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        removeClippedSubviews={Platform.OS === 'android'} // Android optimization
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        windowSize={5}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />
         }
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.noDataContainer}>
-              <LottieView
-                source={require('../../assets/animations/soil-analysis-data.json')}
-                autoPlay
-                loop
-                style={styles.historyLottie}
-                resizeMode="contain"
-              />
-              <Text style={styles.noDataTitle}>No Data Available</Text>
-              <Text style={styles.noData}>
-                No soil tests found for the selected {timeFilter} filters.
-              </Text>
-            </View>
-          ) : null
-        }
-        ListHeaderComponent={
-          <>
-            {error && (
-              <View style={styles.errorCard}>
-                <Ionicons name="alert-circle" size={20} color={COLORS.warningText} />
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            )}
+      >
+        {error && (
+          <View style={styles.errorCard}>
+            <Ionicons name="alert-circle" size={20} color={COLORS.warningText} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
 
             {/* 1. Field Location - Map */}
             <View style={styles.card}>
@@ -411,19 +394,19 @@ export default function HistoryScreen({ navigation }: any) {
                 <Text style={styles.cardTitle}>Field Locations</Text>
                 <View style={styles.mapControls}>
                   <TouchableOpacity 
-                    onPress={() => setMapMode('satellite')}
+                  onPress={() => handleSetMapMode('satellite')}
                     style={[styles.mapTypeBtn, mapMode === 'satellite' && styles.mapTypeBtnActive]}
                   >
                     <Text style={[styles.mapTypeLabel, mapMode === 'satellite' && styles.mapTypeLabelActive]}>Satellite</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
-                    onPress={() => setMapMode('standard')}
+                  onPress={() => handleSetMapMode('standard')}
                     style={[styles.mapTypeBtn, mapMode === 'standard' && styles.mapTypeBtnActive]}
                   >
                     <Text style={[styles.mapTypeLabel, mapMode === 'standard' && styles.mapTypeLabelActive]}>Standard</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
-                    onPress={() => setMapMode('osm')}
+                  onPress={() => handleSetMapMode('osm')}
                     style={[styles.mapTypeBtn, mapMode === 'osm' && styles.mapTypeBtnActive]}
                   >
                     <Text style={[styles.mapTypeLabel, mapMode === 'osm' && styles.mapTypeLabelActive]}>OSM</Text>
@@ -434,9 +417,9 @@ export default function HistoryScreen({ navigation }: any) {
                 <MapView
                   key={`map-${mapMode}`}
                   style={styles.map}
-                  provider={mapMode === 'osm' ? undefined : (Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined)}
+                  provider={PROVIDER_GOOGLE}
                   initialRegion={mapInitialRegion}
-                  mapType={mapMode === 'satellite' ? 'satellite' : (mapMode === 'osm' ? 'none' : 'standard')}
+                  mapType={mapMode === 'satellite' ? 'satellite' : 'standard'}
                   onMapReady={() => setIsMapReady(true)}
                   loadingEnabled={true}
                   showsUserLocation={true}
@@ -450,14 +433,12 @@ export default function HistoryScreen({ navigation }: any) {
                 >
                   {mapMode === 'osm' && (
                     <UrlTile
-                      // Using OSM tile-cdn mirror — avoids the privacy/blocked page
-                      // that direct tile.openstreetmap.org shows on first party referrer checks
-                      urlTemplate="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      // openstreetmap.fr HOT mirror — allows standard app traffic unlike
+                      // direct tile.openstreetmap.org which blocks without a browser UA
+                      urlTemplate="https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png"
                       maximumZ={19}
                       tileSize={256}
-                      // Do NOT set shouldReplaceMapContent — it conflicts on Android
-                      // and causes the Google base layer to show through
-                      flipY={false}
+                      zIndex={1}
                     />
                   )}
                   {mapMarkers.map((marker) => (
@@ -632,50 +613,77 @@ export default function HistoryScreen({ navigation }: any) {
               </View>
             </View>
 
-            {/* 5. Soil Test History Title */}
-            <View style={{ marginHorizontal: 12, marginBottom: 12 }}>
-               <Text style={styles.cardTitle}>Test History Log ({timeFilter === 'All Time' ? 'All Time' : `Last ${timeFilter}`})</Text>
-            </View>
-          </>
-        }
-        renderItem={({ item: log, index }) => (
-          <View style={{ paddingHorizontal: 12 }}>
-            <View style={styles.timelineRow}>
-              <View style={styles.timelineLineContainer}>
-                <View style={styles.timelineDot} />
-                {index !== filteredLogs.length - 1 && <View style={styles.timelineLine} />}
-              </View>
-              <TouchableOpacity 
-                style={styles.timelineContent}
-                onPress={() => openDetails(log)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.logIcon}>
-                  <Ionicons name="leaf" size={18} color={COLORS.accent} />
-                </View>
-                <View style={styles.logInfo}>
-                  <Text style={styles.logDate}>{format(parseISO(log.testDate), 'MMM d, yyyy')}</Text>
-                  <Text style={styles.logTime}>{format(parseISO(log.testDate), 'hh:mm a')}</Text>
-                </View>
-                <View style={styles.logValues}>
-                  <Text style={[styles.logMainValue, { color: getParamColor(selectedParameter) }]}>
-                    {selectedParameter === 'pH Level' ? 'pH' : (selectedParameter === 'Moisture' ? 'M' : selectedParameter.charAt(0))} {Number(log[getParamKey(selectedParameter)]).toFixed(selectedParameter === 'pH Level' ? 1 : 0)}
-                    <Text style={styles.logUnitSmall}> {UNITS[selectedParameter]}</Text>
-                  </Text>
-                  <Text style={styles.logSubValue}>
-                    {selectedParameter !== 'pH Level' && `pH:${Number(log.ph).toFixed(1)} `}
-                    {selectedParameter !== 'Nitrogen' && `N:${Number(log.nitrogen).toFixed(0)} `}
-                    {selectedParameter !== 'Phosphorus' && `P:${Number(log.phosphorus).toFixed(0)} `}
-                    {selectedParameter !== 'Potassium' && `K:${Number(log.potassium).toFixed(0)}`}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-      />
+            {/* 5. Soil Test History — fixed-height scrollable card */}
+            <View style={styles.historyCard}>
+              <Text style={styles.cardTitle}>
+                Test History Log ({timeFilter === 'All Time' ? 'All Time' : `Last ${timeFilter}`})
+              </Text>
 
+              {loading ? (
+                <View style={styles.chartLoader}>
+                  <ActivityIndicator color={COLORS.accent} />
+                </View>
+              ) : filteredLogs.length === 0 ? (
+                <View style={styles.noDataContainer}>
+                  <LottieView
+                    source={require('../../assets/animations/soil-analysis-data.json')}
+                    autoPlay
+                    loop
+                    style={styles.historyLottie}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.noDataTitle}>No Records</Text>
+                  <Text style={styles.noData}>
+                    No soil tests in the selected {timeFilter} range.
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={filteredLogs}
+                  keyExtractor={(item) => item.id}
+                  style={styles.historyList}
+                  showsVerticalScrollIndicator={true}
+                  nestedScrollEnabled={true}
+                  scrollEnabled={true}
+                  renderItem={({ item: log, index }) => (
+                    <View style={styles.timelineRow}>
+                      <View style={styles.timelineLineContainer}>
+                        <View style={styles.timelineDot} />
+                        {index !== filteredLogs.length - 1 && <View style={styles.timelineLine} />}
+                      </View>
+                      <TouchableOpacity
+                        style={styles.timelineContent}
+                        onPress={() => openDetails(log)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.logIcon}>
+                          <Ionicons name="leaf" size={18} color={COLORS.accent} />
+                        </View>
+                        <View style={styles.logInfo}>
+                          <Text style={styles.logDate}>{format(parseISO(log.testDate), 'MMM d, yyyy')}</Text>
+                          <Text style={styles.logTime}>{format(parseISO(log.testDate), 'hh:mm a')}</Text>
+                        </View>
+                        <View style={styles.logValues}>
+                          <Text style={[styles.logMainValue, { color: getParamColor(selectedParameter) }]}>
+                            {selectedParameter === 'pH Level' ? 'pH' : (selectedParameter === 'Moisture' ? 'M' : selectedParameter.charAt(0))}{' '}
+                            {Number(log[getParamKey(selectedParameter)]).toFixed(selectedParameter === 'pH Level' ? 1 : 0)}
+                            <Text style={styles.logUnitSmall}> {UNITS[selectedParameter]}</Text>
+                          </Text>
+                          <Text style={styles.logSubValue}>
+                            {selectedParameter !== 'pH Level' && `pH:${Number(log.ph).toFixed(1)} `}
+                            {selectedParameter !== 'Nitrogen' && `N:${Number(log.nitrogen).toFixed(0)} `}
+                            {selectedParameter !== 'Phosphorus' && `P:${Number(log.phosphorus).toFixed(0)} `}
+                            {selectedParameter !== 'Potassium' && `K:${Number(log.potassium).toFixed(0)}`}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                />
+              )}
+            </View>
+        </ScrollView>
 
       {/* Details Modal */}
       <Modal
@@ -1585,7 +1593,22 @@ const styles = StyleSheet.create({
     height: 180,
     marginBottom: 8,
   },
+  historyCard: {
+    backgroundColor: COLORS.card,
+    marginHorizontal: 12,
+    padding: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 100, // extra bottom padding so tab bar doesn't cover last item
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  historyList: {
+    maxHeight: 420, // fixed height — scrollable inside the card
+  },
 });
-
-
 

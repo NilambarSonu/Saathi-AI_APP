@@ -17,6 +17,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { Provider as PaperProvider } from 'react-native-paper';
 import { SoilMarkersProvider } from '@/context/SoilMarkersContext';
 import { useAuthStore } from '@/store/authStore';
 import { registerDevice } from '@/features/auth/services/auth';
@@ -96,16 +97,18 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <SoilMarkersProvider>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
-            <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
-            <Stack.Screen name="(app)" options={{ animation: 'fade' }} />
-          </Stack>
-        </GestureHandlerRootView>
-      </SoilMarkersProvider>
+      <PaperProvider>
+        <SoilMarkersProvider>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" options={{ headerShown: false }} />
+              <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
+              <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
+              <Stack.Screen name="(app)" options={{ animation: 'fade' }} />
+            </Stack>
+          </GestureHandlerRootView>
+        </SoilMarkersProvider>
+      </PaperProvider>
     </ErrorBoundary>
   );
 }
