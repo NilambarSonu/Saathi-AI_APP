@@ -80,7 +80,7 @@ export default function SoilDetailsSheet({ selectedTest, onClose }: SoilDetailsS
               </View>
               <View style={styles.infoBlock}>
                 <Text style={styles.infoLabel}>Date</Text>
-                <Text style={styles.infoValue}>{new Date(selectedTest.createdAt).toLocaleDateString()}</Text>
+                <Text style={styles.infoValue}>{selectedTest.createdAt ? new Date(selectedTest.createdAt).toLocaleDateString() : 'N/A'}</Text>
               </View>
             </View>
 

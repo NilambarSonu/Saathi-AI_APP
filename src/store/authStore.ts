@@ -43,6 +43,10 @@ interface AuthState {
   logout: () => Promise<void>;
   clearError: () => void;
   setSession: (user: any, token: string, refreshToken?: string | null) => Promise<void>;
+  /** Merge/update the in-memory user object without affecting auth tokens */
+  setUser: (user: AuthUser | null) => void;
+  /** Clear user state (alias for a soft client-side logout) */
+  clearUser: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => {
@@ -203,6 +207,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
     tokenCache.set(token, refreshToken || null);
     set({ token, user: mapUser(user), isAuthenticated: true, isInitialized: true, isLoading: false, error: null });
   },
+
+  setUser: (user) => set({ user }),
+
+  clearUser: () => set({ user: null, token: null, isAuthenticated: false }),
 };
 });
 

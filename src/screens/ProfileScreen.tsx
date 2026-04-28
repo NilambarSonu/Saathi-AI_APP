@@ -187,9 +187,9 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, setUser, clearUser } = useAuthStore();
 
-  const [name, setName] = useState(user?.name || user?.username || '');
+  const [name, setName] = useState(user?.username || '');
   const [location, setLocation] = useState(user?.location || '');
-  const [originalName, setOriginalName] = useState(user?.name || user?.username || '');
+  const [originalName, setOriginalName] = useState(user?.username || '');
   const [originalLocation, setOriginalLocation] = useState(user?.location || '');
 
   const [avatarFailed, setAvatarFailed] = useState(false);
@@ -221,7 +221,18 @@ export default function ProfileScreen() {
     getUserProfile().then(data => {
       if (data) {
         const next = mergeUser(user, data);
-        setUser(next);
+        // Build an AuthUser-compatible object before calling setUser
+        setUser({
+          id: next.id ?? user?.id ?? '',
+          username: next.name || next.username || user?.username || '',
+          email: next.email ?? user?.email ?? '',
+          phone: next.phone ?? user?.phone ?? null,
+          location: next.location ?? user?.location ?? null,
+          provider: next.provider ?? user?.provider ?? 'local',
+          profilePicture: next.avatar_url ?? next.profilePicture ?? user?.profilePicture ?? null,
+          preferredLanguage: next.preferredLanguage ?? user?.preferredLanguage ?? 'en',
+          createdAt: next.createdAt ?? user?.createdAt ?? '',
+        });
         setName(next.name || next.username || '');
         setOriginalName(next.name || next.username || '');
         setLocation(next.location || '');
@@ -246,7 +257,18 @@ export default function ProfileScreen() {
     setIsSaving(true);
     try {
       const updated = await updateUserProfile({ name, username: name, location });
-      setUser(mergeUser(user, updated || { name, username: name, location }));
+      const next = mergeUser(user, updated || { name, username: name, location });
+      setUser({
+        id: next.id ?? user?.id ?? '',
+        username: next.name || next.username || user?.username || '',
+        email: next.email ?? user?.email ?? '',
+        phone: next.phone ?? user?.phone ?? null,
+        location: next.location ?? user?.location ?? null,
+        provider: next.provider ?? user?.provider ?? 'local',
+        profilePicture: next.avatar_url ?? next.profilePicture ?? user?.profilePicture ?? null,
+        preferredLanguage: next.preferredLanguage ?? user?.preferredLanguage ?? 'en',
+        createdAt: next.createdAt ?? user?.createdAt ?? '',
+      });
       setOriginalName(name);
       setOriginalLocation(location);
       Alert.alert('✅ Saved', 'Your profile has been updated.');
@@ -356,7 +378,7 @@ export default function ProfileScreen() {
             </View>
 
             {/* Name, email & badges below avatar */}
-            <Text style={styles.heroName} numberOfLines={1}>{user?.name || user?.username || 'Kisan'}</Text>
+            <Text style={styles.heroName} numberOfLines={1}>{user?.username || 'Kisan'}</Text>
             <Text style={styles.heroEmail} numberOfLines={1}>{user?.email || ''}</Text>
             <View style={styles.heroBadgeRow}>
               <View style={styles.heroBadge}>
@@ -365,7 +387,7 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.heroBadge}>
                 <Ionicons name="time-outline" size={10} color="#fff" />
-                <Text style={styles.heroBadgeText}>{getAccountAge(user?.created_at)}</Text>
+                <Text style={styles.heroBadgeText}>{getAccountAge(user?.createdAt)}</Text>
               </View>
               {user?.location && (
                 <View style={styles.heroBadge}>
@@ -496,8 +518,8 @@ export default function ProfileScreen() {
           <Text style={styles.footerText}>Saathi AI·Farmer First Technology</Text>
           <Text style={styles.footerSub}>
             ID: {user?.id ? String(user.id).slice(0, 8) + '...' : 'N/A'}  ·  Joined{' '}
-            {user?.created_at
-              ? new Date(user.created_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+            {user?.createdAt
+              ? new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
               : 'N/A'}
           </Text>
         </View>
