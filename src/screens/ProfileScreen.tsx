@@ -50,7 +50,7 @@ const getProfilePictureUrl = (filename: string | null | undefined): string | nul
   const mappedName = filenameMap[filename] || filename;
   if (filename.startsWith('http')) return filename;
   const encodedName = encodeURI(mappedName);
-  return `https://saathiai.org/Farmer_Icon/${encodedName}`;
+  return `https://www.saathiai.org/Farmer_Icon/${encodedName}`;
 };
 
 const getUserAvatar = (u: any): string | null => {

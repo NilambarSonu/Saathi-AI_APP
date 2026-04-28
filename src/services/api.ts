@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { tokenCache } from '@/utils/tokenCache';
+import { invalidateCache } from '@/api/axiosConfig';
 
-export const API_BASE = 'https://saathiai.org/api';
-export const API_HOST = 'https://saathiai.org';
+export const API_BASE = 'https://www.saathiai.org/api';
+export const API_HOST = 'https://www.saathiai.org';
 export const API_ROOT = API_BASE;
 
 const TOKEN_KEY = 'saathi_auth_token';
@@ -111,6 +112,7 @@ export async function saveAuthTokens(token: string, refreshToken?: string): Prom
     await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
     await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   }
+  invalidateCache();
 }
 
 export async function saveUserId(userId: string): Promise<void> {
@@ -133,6 +135,7 @@ export async function clearAuthTokens(): Promise<void> {
       AsyncStorage.removeItem(key).catch(() => {})
     )
   );
+  invalidateCache();
 }
 
 export async function apiCall<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {

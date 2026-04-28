@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { tokenCache } from '@/utils/tokenCache';
 import { saveAuthTokens, clearAuthTokens, getStoredAccessToken } from '@/services/api';
 
-const API_BASE_URL = 'https://saathiai.org';
+const API_BASE_URL = 'https://www.saathiai.org';
 const TOKEN_KEY   = 'saathi_auth_token';   // ← matches axiosConfig.ts TOKEN_KEY
 const REFRESH_KEY = 'saathi_refresh_token';
 

@@ -92,9 +92,10 @@ export default function HistoryScreen({ navigation }: any) {
   
   const [selectedParameter, setSelectedParameter] = useState<ParameterName>('Nitrogen');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('30 Days');
-  const [mapMode, setMapMode] = useState<'google' | 'osm'>('google');
+  const [mapMode, setMapMode] = useState<'satellite' | 'standard' | 'osm'>(Platform.OS === 'android' ? 'satellite' : 'standard');
   const [selectedLog, setSelectedLog] = useState<SoilTest | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isMapReady, setIsMapReady] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user?.id) {
@@ -118,7 +119,7 @@ export default function HistoryScreen({ navigation }: any) {
       
       // Sync with global SoilMarkersContext
       const contextMarkers = sorted
-        .filter(l => l.latitude && l.longitude)
+        .filter(l => l.latitude !== null && l.longitude !== null)
         .map(l => ({
           latitude: Number(l.latitude),
           longitude: Number(l.longitude),
@@ -139,8 +140,6 @@ export default function HistoryScreen({ navigation }: any) {
       }
     } catch (err: any) {
       console.error('[History] Fetch error:', err);
-      console.error('[History] Error status:', err?.response?.status);
-      console.error('[History] Error data:', err?.response?.data);
       setError(
         err?.response?.status === 401
           ? 'Session expired. Please log in again.'
@@ -241,20 +240,33 @@ export default function HistoryScreen({ navigation }: any) {
   };
 
   const mapInitialRegion = useMemo(() => {
-    const testsWithLoc = logs.filter(l => l.latitude && l.longitude);
-    if (!testsWithLoc.length) {
+    const validLogs = logs.filter(l => 
+      l.latitude !== null && 
+      l.longitude !== null && 
+      !isNaN(Number(l.latitude)) && 
+      !isNaN(Number(l.longitude))
+    );
+
+    if (validLogs.length > 0) {
+      const lats = validLogs.map(l => Number(l.latitude));
+      const longs = validLogs.map(l => Number(l.longitude));
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      const minLong = Math.min(...longs);
+      const maxLong = Math.max(...longs);
+
       return {
-        latitude: 20.5937,
-        longitude: 78.9629,
-        latitudeDelta: 15,
-        longitudeDelta: 15,
+        latitude: (minLat + maxLat) / 2,
+        longitude: (minLong + maxLong) / 2,
+        latitudeDelta: Math.max((maxLat - minLat) * 1.5, 0.05),
+        longitudeDelta: Math.max((maxLong - minLong) * 1.5, 0.05),
       };
     }
     return {
-      latitude: Number(testsWithLoc[0].latitude),
-      longitude: Number(testsWithLoc[0].longitude),
-      latitudeDelta: 0.05,
-      longitudeDelta: 0.05,
+      latitude: 20.5937,
+      longitude: 78.9629,
+      latitudeDelta: 20,
+      longitudeDelta: 20,
     };
   }, [logs]);
   
@@ -448,21 +460,48 @@ export default function HistoryScreen({ navigation }: any) {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Field Locations</Text>
-            <TouchableOpacity onPress={() => setMapMode(m => m === 'google' ? 'osm' : 'google')}>
-              <Text style={styles.mapToggle}>{mapMode === 'google' ? 'Switch to OSM' : 'Switch to Google'}</Text>
-            </TouchableOpacity>
+            <View style={styles.mapControls}>
+              <TouchableOpacity 
+                onPress={() => setMapMode('satellite')}
+                style={[styles.mapTypeBtn, mapMode === 'satellite' && styles.mapTypeBtnActive]}
+              >
+                <Text style={[styles.mapTypeLabel, mapMode === 'satellite' && styles.mapTypeLabelActive]}>Satellite</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => setMapMode('standard')}
+                style={[styles.mapTypeBtn, mapMode === 'standard' && styles.mapTypeBtnActive]}
+              >
+                <Text style={[styles.mapTypeLabel, mapMode === 'standard' && styles.mapTypeLabelActive]}>Standard</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => setMapMode('osm')}
+                style={[styles.mapTypeBtn, mapMode === 'osm' && styles.mapTypeBtnActive]}
+              >
+                <Text style={[styles.mapTypeLabel, mapMode === 'osm' && styles.mapTypeLabelActive]}>OSM</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <View style={styles.mapContainer}>
             <MapView
               style={styles.map}
-              provider={mapMode === 'google' ? PROVIDER_GOOGLE : undefined}
+              // Use Google Provider only for Satellite/Standard to avoid blocking OSM if API key fails
+              provider={mapMode === 'osm' ? undefined : (Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined)}
               initialRegion={mapInitialRegion}
-              mapType={mapMode === 'google' ? 'satellite' : 'none'}
+              mapType={mapMode === 'satellite' ? 'satellite' : (mapMode === 'osm' ? 'none' : 'standard')}
+              onMapReady={() => setIsMapReady(true)}
+              loadingEnabled={false}
+              showsUserLocation={true}
+              showsMyLocationButton={true}
             >
               {mapMode === 'osm' && (
-                <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} />
+                <UrlTile 
+                  urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" 
+                  maximumZ={19} 
+                  tileSize={256}
+                  shouldReplaceMapContent={true}
+                />
               )}
-              {logs.filter(l => l.latitude && l.longitude).map((log, idx) => (
+              {logs.filter(l => l.latitude !== null && l.longitude !== null).map((log) => (
                 <Marker
                   key={log.id}
                   coordinate={{ latitude: Number(log.latitude), longitude: Number(log.longitude) }}
@@ -862,8 +901,13 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   map: {
-    width: '100%',
-    height: '100%',
+    ...StyleSheet.absoluteFillObject,
+  },
+  mapLoader: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
   mapToggle: {
     fontFamily: 'Sora_600SemiBold',
@@ -1292,6 +1336,33 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 32,
     maxWidth: 280,
+  },
+  mapControls: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    padding: 2,
+  },
+  mapTypeBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  mapTypeBtnActive: {
+    backgroundColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  mapTypeLabel: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 10,
+    color: '#64748B',
+  },
+  mapTypeLabelActive: {
+    color: COLORS.accent,
   },
 });
 
