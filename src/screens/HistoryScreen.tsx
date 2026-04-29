@@ -110,6 +110,7 @@ export default function HistoryScreen({ navigation }: any) {
   const [isMapReady, setIsMapReady] = useState(false);
   const [isTimeMenuVisible, setIsTimeMenuVisible] = useState(false);
   const [isParamMenuVisible, setIsParamMenuVisible] = useState(false);
+  const [chartTooltip, setChartTooltip] = useState<{ x: number; y: number; value: number; index: number } | null>(null);
   const mapRef = useRef<MapView>(null);
 
   // Safety fallback to dismiss the perpetual loader if onMapReady never fires
@@ -153,6 +154,7 @@ export default function HistoryScreen({ navigation }: any) {
     }
     setTimeFilter(filter);
     setIsTimeMenuVisible(false);
+    setChartTooltip(null);
   }, []);
 
   const handleSelectParam = useCallback((param: ParameterName) => {
@@ -165,6 +167,7 @@ export default function HistoryScreen({ navigation }: any) {
     }
     setSelectedParameter(param);
     setIsParamMenuVisible(false);
+    setChartTooltip(null);
   }, []);
 
 
@@ -461,7 +464,7 @@ export default function HistoryScreen({ navigation }: any) {
 
       <ScrollView
         showsVerticalScrollIndicator={true}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />
         }
@@ -588,19 +591,59 @@ export default function HistoryScreen({ navigation }: any) {
               <Text style={styles.noData}>Insufficient data to show trend for {timeFilter}.</Text>
             </View>
           ) : (
-            <LineChart
-              data={chartData} width={SCREEN_WIDTH - 24} height={226}
-              chartConfig={{
-                backgroundColor: '#FFF', backgroundGradientFrom: '#FFF', backgroundGradientTo: '#FFF',
-                decimalPlaces: selectedParameter === 'pH Level' ? 1 : 0,
-                color: (opacity = 1) => getParamColor(selectedParameter),
-                labelColor: (opacity = 1) => '#94A3B8',
-                style: { borderRadius: 16 },
-                propsForDots: { r: '5', strokeWidth: '2', stroke: '#FFF' },
-                propsForLabels: { fontFamily: 'Sora_400Regular', fontSize: 10 }
-              }}
-              bezier style={styles.chart} withInnerLines={false} withOuterLines={false} withVerticalLines={false}
-            />
+            <View style={{ position: 'relative' }}>
+              <LineChart
+                data={chartData}
+                width={SCREEN_WIDTH - 6}
+                height={232}
+                chartConfig={{
+                  backgroundColor: '#FFF', backgroundGradientFrom: '#FFF', backgroundGradientTo: '#FFF',
+                  decimalPlaces: selectedParameter === 'pH Level' ? 1 : 0,
+                  color: (opacity = 1) => getParamColor(selectedParameter),
+                  labelColor: (opacity = 1) => '#94A3B8',
+                  style: { borderRadius: 16 },
+                  propsForDots: { r: '6', strokeWidth: '2', stroke: '#FFF' },
+                  propsForLabels: { fontFamily: 'Sora_400Regular', fontSize: 10 },
+                  propsForBackgroundLines: { strokeDasharray: '4,4', stroke: '#F1F5F9', strokeWidth: 1 },
+                }}
+                bezier
+                style={styles.chart}
+                withInnerLines={true}
+                withOuterLines={false}
+                withVerticalLines={false}
+                withHorizontalLines={true}
+                onDataPointClick={({ value, index, x, y }) => {
+                  setChartTooltip(prev =>
+                    prev?.index === index ? null : { x, y, value, index }
+                  );
+                }}
+              />
+              {chartTooltip !== null && (
+                <View
+                  pointerEvents="none"
+                  style={[
+                    styles.chartTooltipBox,
+                    {
+                      left: Math.max(0, Math.min(
+                        chartTooltip.x - 16 - 45,
+                        SCREEN_WIDTH - 6 - 95
+                      )),
+                      top: Math.max(4, chartTooltip.y - 66),
+                    },
+                  ]}
+                >
+                  <Text style={styles.tooltipDateText}>
+                    {chartData.labels[chartTooltip.index]}
+                  </Text>
+                  <Text style={[styles.tooltipValueText, { color: getParamColor(selectedParameter) }]}>
+                    {selectedParameter === 'pH Level'
+                      ? chartTooltip.value.toFixed(1)
+                      : Math.round(chartTooltip.value).toString()}
+                    {UNITS[selectedParameter] ? ` ${UNITS[selectedParameter]}` : ''}
+                  </Text>
+                </View>
+              )}
+            </View>
           )}
         </View>
 
@@ -642,7 +685,7 @@ export default function HistoryScreen({ navigation }: any) {
             </View>
           ) : (
             <ScrollView 
-              style={{ marginTop: 10, maxHeight: 350 }} 
+              style={{ marginTop: 25, maxHeight: 450 }} 
               nestedScrollEnabled={true}
               showsVerticalScrollIndicator={true}
             >
@@ -1140,7 +1183,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginBottom: 20,
+    marginBottom: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.03,
@@ -1172,7 +1215,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   mapContainer: {
-    height: 220,
+    height: 260,
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
@@ -1670,7 +1713,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginBottom: 100, // extra bottom padding so tab bar doesn't cover last item
+    marginBottom: 80,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.03,
@@ -1684,7 +1727,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginHorizontal: 12,
-    marginVertical: 12,
+    marginVertical: 9,
     gap: 12,
   },
   appleDropdownBtn: {
@@ -1769,6 +1812,31 @@ const styles = StyleSheet.create({
   actionSheetTextActive: {
     fontFamily: 'Sora_600SemiBold',
     color: COLORS.title,
+  },
+  chartTooltipBox: {
+    position: 'absolute',
+    backgroundColor: '#1E293B',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 90,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 100,
+  },
+  tooltipDateText: {
+    fontFamily: 'Sora_400Regular',
+    fontSize: 10,
+    color: '#94A3B8',
+    marginBottom: 3,
+  },
+  tooltipValueText: {
+    fontFamily: 'Sora_700Bold',
+    fontSize: 14,
   },
 });
 
