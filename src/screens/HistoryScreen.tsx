@@ -169,7 +169,7 @@ export default function HistoryScreen({ navigation }: any) {
 
 
 
-  // Change map mode without resetting ready state to prevent blank flashes and reloading loops
+  // Change map mode
   const handleSetMapMode = useCallback((mode: 'satellite' | 'standard' | 'osm') => {
     setMapMode(mode);
   }, []);
@@ -524,8 +524,7 @@ export default function HistoryScreen({ navigation }: any) {
               >
                 {mapMode === 'osm' && (
                   <UrlTile
-                    urlTemplate="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    tileCache={true}
+                    urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
                     maximumZ={19}
                     tileSize={256}
                     zIndex={1}
@@ -545,11 +544,6 @@ export default function HistoryScreen({ navigation }: any) {
                 ))}
               </MapView>
             ) : (
-              <View style={styles.mapLoaderOverlay}>
-                <ActivityIndicator size="small" color={COLORS.accent} />
-              </View>
-            )}
-            {currentIndex === 3 && !isMapReady && (
               <View style={styles.mapLoaderOverlay}>
                 <ActivityIndicator size="small" color={COLORS.accent} />
               </View>
@@ -647,7 +641,11 @@ export default function HistoryScreen({ navigation }: any) {
               <Text style={styles.noData}>No soil tests in the selected {timeFilter} range.</Text>
             </View>
           ) : (
-            <View style={{ marginTop: 10 }}>
+            <ScrollView 
+              style={{ marginTop: 10, maxHeight: 350 }} 
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={true}
+            >
                 {filteredLogs.map((log, index) => (
                   <View style={styles.timelineRow} key={log.id || index.toString()}>
                     <View style={styles.timelineLineContainer}>
@@ -677,7 +675,7 @@ export default function HistoryScreen({ navigation }: any) {
                     </TouchableOpacity>
                   </View>
                 ))}
-            </View>
+            </ScrollView>
           )}
         </View>
       </ScrollView>
