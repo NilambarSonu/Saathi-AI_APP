@@ -2,11 +2,11 @@
 
 buildscript {
   ext {
-    buildToolsVersion = "34.0.0"
-    minSdkVersion = 23
-    compileSdkVersion = 34
-    targetSdkVersion = 34
-    ndkVersion = "26.1.10909125"
+    buildToolsVersion = "35.0.0"
+    minSdkVersion = 24
+    compileSdkVersion = 35
+    targetSdkVersion = 35
+    ndkVersion = "27.1.12297006"
     kotlinVersion = "2.0.21"
   }
   repositories {
@@ -22,11 +22,11 @@ buildscript {
 
 // Make ext values available to all subprojects
 ext {
-  buildToolsVersion = "34.0.0"
-  minSdkVersion = 23
-  compileSdkVersion = 34
-  targetSdkVersion = 34
-  ndkVersion = "26.1.10909125"
+  buildToolsVersion = "35.0.0"
+  minSdkVersion = 24
+  compileSdkVersion = 35
+  targetSdkVersion = 35
+  ndkVersion = "27.1.12297006"
   kotlinVersion = "2.0.21"
 }
 

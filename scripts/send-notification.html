@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Saathi AI — Push Notification Sender</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    :root {
+      --bg: #0a0f0d;
+      --surface: #111a14;
+      --surface2: #192218;
+      --border: #1f3127;
+      --primary: #1a7b3c;
+      --primary-light: #22a352;
+      --primary-glow: rgba(26, 123, 60, 0.25);
+      --accent: #3ddc84;
+      --text: #e8f5ee;
+      --text-muted: #7da98a;
+      --error: #ff5252;
+      --success: #00c853;
+      --warning: #ffa726;
+      --radius: 14px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 80px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .logo-icon {
+      width: 52px; height: 52px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 0 24px var(--primary-glow);
+    }
+    .logo-text { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+    .logo-text span { color: var(--accent); }
+    .header p { color: var(--text-muted); font-size: 14px; margin-top: 6px; }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 640px;
+      box-shadow: 0 8px 48px rgba(0,0,0,0.5);
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 18px;
+    }
+
+    .field { margin-bottom: 22px; }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    label span { color: var(--error); margin-left: 2px; }
+
+    input, textarea, select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      padding: 12px 16px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--primary-light);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+    textarea { resize: vertical; min-height: 90px; }
+    select option { background: var(--surface2); }
+
+    .hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 30px 0;
+    }
+
+    /* Target row */
+    .target-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .tab {
+      flex: 1;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .tab.active {
+      background: var(--primary-glow);
+      border-color: var(--primary-light);
+      color: var(--accent);
+    }
+
+    .token-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .token-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .token-row input { flex: 1; }
+    .btn-icon {
+      width: 38px; height: 38px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .btn-icon:hover { border-color: var(--primary-light); color: var(--accent); }
+    .btn-icon.red:hover { border-color: var(--error); color: var(--error); }
+
+    /* Preview card */
+    .preview-wrap {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      margin-bottom: 24px;
+    }
+    .preview-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .preview-content { flex: 1; }
+    .preview-app { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+    .preview-title { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+    .preview-body { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+    .preview-sub { font-size: 11px; color: var(--accent); margin-top: 4px; font-style: italic; }
+    .preview-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+
+    /* Send button */
+    .btn-send {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, var(--primary), #2e9e54);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-send:hover { transform: translateY(-1px); box-shadow: 0 8px 24px var(--primary-glow); }
+    .btn-send:active { transform: translateY(0); }
+    .btn-send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-send .spinner {
+      display: none;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto;
+    }
+    .btn-send.loading .btn-label { display: none; }
+    .btn-send.loading .spinner { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 999;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.success { border-color: var(--success); }
+    .toast.error { border-color: var(--error); }
+    .toast-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .toast.success .toast-dot { background: var(--success); }
+    .toast.error .toast-dot { background: var(--error); }
+
+    /* Response log */
+    .log-area {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      color: var(--text-muted);
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 16px;
+      display: none;
+    }
+    .log-area.visible { display: block; }
+    .log-area.ok { color: #69f0ae; border-color: var(--success); }
+    .log-area.fail { color: #ff8a80; border-color: var(--error); }
+
+    .badge {
+      display: inline-block;
+      background: var(--primary-glow);
+      border: 1px solid var(--primary);
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🌱</div>
+      <div class="logo-text">Saathi <span>AI</span></div>
+    </div>
+    <p>Push Notification Sender &nbsp;·&nbsp; Expo FCM Gateway<span class="badge">Admin</span></p>
+  </div>
+
+  <div class="card">
+
+    <!-- Notification Content -->
+    <div class="section-title">📨 Notification Content</div>
+
+    <div class="field">
+      <label>Title <span>*</span></label>
+      <input id="notif-title" type="text" placeholder="e.g. Soil Alert 🔴 — Low Nitrogen Detected" maxlength="100" />
+    </div>
+
+    <div class="field">
+      <label>Message (Body) <span>*</span></label>
+      <textarea id="notif-body" placeholder="Your soil nitrogen level is critically low. Tap to see recommendations."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Subtitle / Subheading</label>
+      <input id="notif-subtitle" type="text" placeholder="e.g. Field #3 — Rabi Season" maxlength="80" />
+      <div class="hint">Shown below the title on iOS. Android may show it as ticker text.</div>
+    </div>
+
+    <div class="field">
+      <label>Redirect URL / Deep Link</label>
+      <input id="notif-url" type="text" placeholder="saathiai://history  OR  https://saathiai.org/news" />
+      <div class="hint">
+        Use <strong>saathiai://history</strong> to open History screen,
+        <strong>saathiai://ai-chat</strong> for AI Chat,
+        or any <code>https://</code> URL to open in browser.
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Notification Type</label>
+      <select id="notif-type">
+        <option value="system">🔔 System</option>
+        <option value="alert">🔴 Soil Alert</option>
+        <option value="insight">🧠 AI Insight</option>
+        <option value="reminder">⏰ Reminder</option>
+        <option value="sync">✅ Sync Complete</option>
+        <option value="battery">🔋 Battery Alert</option>
+      </select>
+    </div>
+
+    <!-- Live Preview -->
+    <div class="preview-label">📱 Live Preview</div>
+    <div class="preview-wrap">
+      <div class="preview-icon">🌱</div>
+      <div class="preview-content">
+        <div class="preview-app">Saathi AI  ·  now</div>
+        <div class="preview-title" id="prev-title">Your notification title will appear here</div>
+        <div class="preview-body" id="prev-body">Your notification message will appear here...</div>
+        <div class="preview-sub" id="prev-sub"></div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Target -->
+    <div class="section-title">🎯 Send To</div>
+    <div class="target-tabs">
+      <button class="tab active" onclick="setMode('tokens')" id="tab-tokens">Specific Tokens</button>
+      <button class="tab" onclick="setMode('broadcast')" id="tab-broadcast">Broadcast All Users</button>
+    </div>
+
+    <div id="panel-tokens">
+      <div class="hint" style="margin-bottom:14px;">
+        Enter one or more <strong>Expo Push Tokens</strong> (format: <code>ExponentPushToken[xxxx]</code>).
+        You can find each user's token in your database table <code>user_devices</code> or from the app logs.
+      </div>
+      <div class="token-list" id="token-list">
+        <div class="token-row">
+          <input type="text" class="token-input" placeholder="ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" />
+          <button class="btn-icon" onclick="addToken()" title="Add another token">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-broadcast" style="display:none;">
+      <div class="hint">
+        This will send to <strong>all registered user devices</strong> by fetching tokens from your backend API
+        at <code>https://www.saathiai.org/api/notifications/tokens</code>.
+        Make sure that endpoint is implemented and returns <code>{ tokens: ["ExponentPushToken[...]", ...] }</code>.
+      </div>
+      <div class="field" style="margin-top:14px;">
+        <label>Backend API Token (for fetching all tokens)</label>
+        <input id="api-token" type="password" placeholder="Your server API secret / admin JWT" />
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Send -->
+    <div class="preview-label">🚀 Fire It Off</div>
+    <button class="btn-send" id="btn-send" onclick="sendNotification()">
+      <span class="btn-label">Send Notification</span>
+      <div class="spinner"></div>
+    </button>
+
+    <div id="response-log" class="log-area"></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast">
+    <div class="toast-dot"></div>
+    <span id="toast-msg"></span>
+  </div>
+
+<script>
+  // ─── Live Preview ──────────────────────────────────────
+  document.getElementById('notif-title').addEventListener('input', e => {
+    document.getElementById('prev-title').textContent = e.target.value || 'Your notification title will appear here';
+  });
+  document.getElementById('notif-body').addEventListener('input', e => {
+    document.getElementById('prev-body').textContent = e.target.value || 'Your notification message will appear here...';
+  });
+  document.getElementById('notif-subtitle').addEventListener('input', e => {
+    document.getElementById('prev-sub').textContent = e.target.value;
+  });
+
+  // ─── Mode Tabs ──────────────────────────────────────────
+  let currentMode = 'tokens';
+  function setMode(mode) {
+    currentMode = mode;
+    document.getElementById('tab-tokens').classList.toggle('active', mode === 'tokens');
+    document.getElementById('tab-broadcast').classList.toggle('active', mode === 'broadcast');
+    document.getElementById('panel-tokens').style.display = mode === 'tokens' ? 'block' : 'none';
+    document.getElementById('panel-broadcast').style.display = mode === 'broadcast' ? 'block' : 'none';
+  }
+
+  // ─── Token Rows ─────────────────────────────────────────
+  function addToken() {
+    const list = document.getElementById('token-list');
+    const row = document.createElement('div');
+    row.className = 'token-row';
+    row.innerHTML = `
+      <input type="text" class="token-input" placeholder="ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" />
+      <button class="btn-icon red" onclick="this.parentElement.remove()" title="Remove">×</button>
+    `;
+    list.appendChild(row);
+    row.querySelector('input').focus();
+  }
+
+  function getTokens() {
+    return [...document.querySelectorAll('.token-input')]
+      .map(i => i.value.trim())
+      .filter(Boolean);
+  }
+
+  // ─── Toast ──────────────────────────────────────────────
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.className = `toast ${type}`;
+    document.getElementById('toast-msg').textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3800);
+  }
+
+  // ─── Log ────────────────────────────────────────────────
+  function showLog(text, ok) {
+    const el = document.getElementById('response-log');
+    el.textContent = text;
+    el.className = `log-area visible ${ok ? 'ok' : 'fail'}`;
+  }
+
+  // ─── Build Expo Message ─────────────────────────────────
+  function buildMessage(to) {
+    const title   = document.getElementById('notif-title').value.trim();
+    const body    = document.getElementById('notif-body').value.trim();
+    const subtitle= document.getElementById('notif-subtitle').value.trim();
+    const url     = document.getElementById('notif-url').value.trim();
+    const type    = document.getElementById('notif-type').value;
+
+    const msg = {
+      to,
+      title,
+      body,
+      sound: 'default',
+      priority: 'high',
+      data: { type, ...(url ? { url } : {}) },
+      channelId: type === 'alert' ? 'alerts' : 'default',
+    };
+
+    if (subtitle) msg.subtitle = subtitle;
+
+    return msg;
+  }
+
+  // ─── Send ────────────────────────────────────────────────
+  async function sendNotification() {
+    const title = document.getElementById('notif-title').value.trim();
+    const body  = document.getElementById('notif-body').value.trim();
+
+    if (!title) { showToast('Please enter a notification title', 'error'); return; }
+    if (!body)  { showToast('Please enter a notification message', 'error'); return; }
+
+    let tokens = [];
+
+    if (currentMode === 'tokens') {
+      tokens = getTokens();
+      if (!tokens.length) { showToast('Add at least one Expo Push Token', 'error'); return; }
+      const bad = tokens.filter(t => !t.startsWith('ExponentPushToken['));
+      if (bad.length) { showToast('Token format must be ExponentPushToken[...]', 'error'); return; }
+    } else {
+      // Broadcast: fetch tokens from backend
+      const apiToken = document.getElementById('api-token').value.trim();
+      showToast('Fetching all tokens from backend...', 'success');
+      try {
+        const res = await fetch('https://www.saathiai.org/api/notifications/tokens', {
+          headers: { Authorization: `Bearer ${apiToken}` }
+        });
+        const data = await res.json();
+        tokens = data.tokens || [];
+        if (!tokens.length) { showToast('No tokens found on server', 'error'); return; }
+      } catch (e) {
+        showToast('Failed to fetch tokens from backend', 'error');
+        showLog('Error: ' + e.message, false);
+        return;
+      }
+    }
+
+    // Set button loading
+    const btn = document.getElementById('btn-send');
+    btn.classList.add('loading');
+    btn.disabled = true;
+
+    // Chunk tokens into batches of 100 (Expo limit)
+    const CHUNK = 100;
+    const chunks = [];
+    for (let i = 0; i < tokens.length; i += CHUNK) chunks.push(tokens.slice(i, i + CHUNK));
+
+    let allResults = [];
+    let hasError = false;
+
+    try {
+      for (const chunk of chunks) {
+        const messages = chunk.map(t => buildMessage(t));
+
+        const res = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Accept-Encoding': 'gzip, deflate',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(messages),
+        });
+
+        const json = await res.json();
+        allResults.push(...(json.data || []));
+
+        if (!res.ok) hasError = true;
+
+        const failures = (json.data || []).filter(r => r.status === 'error');
+        if (failures.length) hasError = true;
+      }
+
+      const ok = allResults.filter(r => r.status === 'ok').length;
+      const fail = allResults.filter(r => r.status === 'error').length;
+
+      if (fail === 0) {
+        showToast(`✅ Sent to ${ok} device${ok !== 1 ? 's' : ''} successfully!`, 'success');
+      } else {
+        showToast(`⚠️ ${ok} sent, ${fail} failed — check log`, 'error');
+      }
+
+      showLog(JSON.stringify(allResults, null, 2), !hasError);
+    } catch (err) {
+      showToast('Network error — check console', 'error');
+      showLog('Error: ' + err.message, false);
+    } finally {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>
