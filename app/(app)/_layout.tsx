@@ -78,6 +78,7 @@ export default function AppLayout() {
       <Stack.Screen name="chat-history" />
       <Stack.Screen name="history" />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

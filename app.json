@@ -92,6 +92,13 @@
           "modes": ["central"],
           "bluetoothAlwaysPermission": "Allow app to use Bluetooth"
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#1A7B3C"
+        }
       ]
     ],
     "extra": {

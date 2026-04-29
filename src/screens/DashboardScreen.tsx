@@ -12,12 +12,14 @@ import { BlurView } from 'expo-blur';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/authStore';
 import { Colors } from '@/constants/Colors';
+import { router } from 'expo-router';
 import { Shadows } from '@/constants/Shadows';
 import { Type } from '@/constants/Typography';
 import { Image, Modal } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { getDashboardStats, DashboardStats } from '@/services/analytics';
-import { getNotifications, AppNotification } from '@/services/notifications';
+import { getNotifications, AppNotification, markNotificationRead, notifyUser } from '@/services/notifications';
+
 import { useNavigationStore } from '@/store/navigationStore';
 import { tabBarY, hideTabBar, showTabBar } from '@/constants/Animations';
 
@@ -72,8 +74,28 @@ const getFirstName = (user: any): string => {
   return user?.name || user?.username || user?.email?.split('@')[0] || 'Farmer';
 };
 
+const getProfilePictureUrl = (filename: string | null | undefined): string | null => {
+  if (!filename) return null;
+  const filenameMap: Record<string, string> = {
+    'farmer.png': 'farmer.png',
+    'farmer_1.png': 'farmer (1).png',
+    'farmer_2.png': 'farmer (2).png',
+    'farmer_3.png': 'farmer (3).png',
+    'farmer_4.png': 'farmer (4).png',
+    'farmer (1).png': 'farmer (1).png',
+    'farmer (2).png': 'farmer (2).png',
+    'farmer (3).png': 'farmer (3).png',
+    'farmer (4).png': 'farmer (4).png',
+  };
+  const mappedName = filenameMap[filename] || filename;
+  if (filename.startsWith('http')) return filename;
+  const encodedName = encodeURI(mappedName);
+  return `https://www.saathiai.org/Farmer_Icon/${encodedName}`;
+};
+
 const getUserAvatar = (u: any): string | null => {
-  return u?.avatar_url || u?.profile_picture || u?.profile_image || null;
+  const filename = u?.profilePicture || u?.profile_picture || u?.avatar_url || u?.profile_image;
+  return getProfilePictureUrl(filename);
 };
 
 const FEATURES = [
@@ -121,6 +143,18 @@ const FEATURE_DETAILS: Record<string, any> = {
     gradient: ['rgba(196, 56, 228, 0.15)', 'rgba(196, 56, 228, 0.05)']
   }
 };
+
+const getNotifIcon = (type: string) => {
+  switch (type) {
+    case 'alert': return { name: 'alert-circle', color: Colors.error };
+    case 'insight': return { name: 'brain', color: Colors.primary };
+    case 'reminder': return { name: 'calendar', color: Colors.amber };
+    case 'battery': return { name: 'battery-alert', color: Colors.error };
+    case 'sync': return { name: 'sync', color: Colors.success };
+    default: return { name: 'bell', color: Colors.primary };
+  }
+};
+
 
 const HOW_STEPS = [
   {
@@ -319,7 +353,6 @@ export default function DashboardScreen() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const isStatsLoading = statsLoading === true;
 
   // POPUP STATE
@@ -414,7 +447,7 @@ export default function DashboardScreen() {
 
           </View>
           <View style={s.headerRight}>
-            <TouchableOpacity onPress={() => setIsNotifOpen(true)} style={[s.headerBtn, { backgroundColor: Colors.surface, ...Shadows.sm }]}>
+            <TouchableOpacity onPress={() => router.push('/(app)/notifications')} style={[s.headerBtn, { backgroundColor: Colors.surface, ...Shadows.sm }]}>
               <Feather name="bell" size={20} color={Colors.label2} />
               {(Array.isArray(notifications) ? notifications : []).some(n => !n.isRead) && <View style={s.notifDot} />}
             </TouchableOpacity>
@@ -422,44 +455,14 @@ export default function DashboardScreen() {
               {getUserAvatar(user) ? (
                 <Image source={{ uri: getUserAvatar(user) as string }} style={{ width: 44, height: 44, borderRadius: 22 }} />
               ) : (
-                <Image source={{ uri: 'https://ui-avatars.com/api/?background=1A5C35&color=fff&name=' + encodeURIComponent(getFirstName(user)) }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                <LinearGradient colors={['#4ade80', '#16a34a']} style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontFamily: 'Sora_800ExtraBold', fontSize: 16, color: '#fff' }}>{getInitials(user)}</Text>
+                </LinearGradient>
               )}
             </TouchableOpacity>
           </View>
         </View>
 
-        {isNotifOpen && (
-          <View style={s.notifPanel}>
-            <View style={s.notifHeader}>
-              <Text style={s.notifTitle}>Notifications</Text>
-              <TouchableOpacity onPress={() => setIsNotifOpen(false)}>
-                <Ionicons name="close" size={24} color={Colors.label1} />
-              </TouchableOpacity>
-            </View>
-            <View style={{ maxHeight: 300 }}>
-              {!(Array.isArray(notifications) && notifications.length > 0) ? (
-                <Text style={{ padding: 16, textAlign: 'center', color: Colors.label3 }}>No notifications yet.</Text>
-              ) : (
-                notifications.map(n => (
-                  <View key={n.id} style={s.notifItem}>
-                    <View style={[s.notifAvatar, { overflow: 'hidden' }]}>
-                      {getUserAvatar(user) ? (
-                        <Image source={{ uri: getUserAvatar(user) as string }} style={{ width: 40, height: 40 }} />
-                      ) : (
-                        <Image source={{ uri: 'https://ui-avatars.com/api/?background=1A5C35&color=fff&name=' + encodeURIComponent(getFirstName(user)) }} style={{ width: 40, height: 40 }} />
-                      )}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.notifItemUser}>{getFirstName(user)}</Text>
-                      <Text style={s.notifItemMsg}>{n.title}</Text>
-                      <Text style={s.notifTime}>{new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-                    </View>
-                  </View>
-                ))
-              )}
-            </View>
-          </View>
-        )}
 
         {/* ── STATS ROW ── */}
         {statsError && (
@@ -690,11 +693,40 @@ const s = StyleSheet.create({
   notifPanel: { backgroundColor: Colors.surface, borderRadius: 20, padding: 16, marginBottom: 24, ...Shadows.md, borderWidth: 1, borderColor: Colors.sep2 },
   notifHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   notifTitle: { ...Type.title3, color: Colors.label1 },
-  notifItem: { flexDirection: 'row', marginBottom: 16, alignItems: 'center' },
-  notifAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  notifItemUser: { ...Type.headline, color: Colors.label1 },
-  notifItemMsg: { ...Type.subheadline, color: Colors.label2 },
+  notifItem: { 
+    flexDirection: 'row', 
+    paddingVertical: 12, 
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginBottom: 4,
+    alignItems: 'center' 
+  },
+  notifItemUnread: {
+    backgroundColor: Colors.bg0,
+  },
+  notifIconContainer: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    marginRight: 12 
+  },
+  notifItemTitle: { ...Type.headline, color: Colors.label1, fontSize: 14 },
+  notifItemMsg: { ...Type.subheadline, color: Colors.label2, fontSize: 13, marginTop: 2 },
   notifTime: { ...Type.caption2, color: Colors.label3, marginTop: 4 },
+  unreadDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary },
+  testNotifBtn: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: Colors.bg0,
+    borderWidth: 1,
+    borderColor: Colors.sep2,
+    alignItems: 'center',
+  },
+  testNotifText: { ...Type.caption1, color: Colors.primary, fontFamily: 'Sora_600SemiBold' },
+
 
   // POPUP STYLES
   popupOverlay: {

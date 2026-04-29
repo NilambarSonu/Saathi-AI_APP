@@ -7,7 +7,8 @@
     "start": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "jest"
   },
   "dependencies": {
     "@config-plugins/react-native-ble-plx": "^7.0.0",
@@ -23,7 +24,6 @@
     "expo-audio": "^55.0.14",
     "expo-auth-session": "~7.0.10",
     "expo-av": "~16.0.8",
-    "expo-audio": "~15.0.0",
     "expo-blur": "~15.0.8",
     "expo-constants": "~18.0.9",
     "expo-crypto": "~15.0.8",
@@ -73,10 +73,15 @@
   },
   "private": true,
   "devDependencies": {
+    "@testing-library/jest-native": "^5.4.3",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.1.10",
     "babel-plugin-module-resolver": "^5.0.3",
     "baseline-browser-mapping": "^2.10.8",
     "buffer": "^6.0.3",
+    "jest": "^30.3.0",
+    "jest-expo": "^55.0.16",
+    "react-test-renderer": "^19.2.5",
     "typescript": "~5.9.2"
   }
 }

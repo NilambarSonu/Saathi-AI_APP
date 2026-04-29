@@ -22,11 +22,15 @@ import { SoilMarkersProvider } from '@/context/SoilMarkersContext';
 import { useAuthStore } from '@/store/authStore';
 import { registerDevice } from '@/features/auth/services/auth';
 
+import { useNotifications } from '@/hooks/useNotifications';
+
 SplashScreen.preventAutoHideAsync();
 WebBrowser.maybeCompleteAuthSession();
 
 export default function RootLayout() {
   const navigationRouter = useRouter();
+  useNotifications();
+  
   const [fontsLoaded] = useFonts({
     Sora_300Light,
     Sora_400Regular,
@@ -41,23 +45,6 @@ export default function RootLayout() {
     async function initializeApp() {
       try {
         await useAuthStore.getState().initialize();
-
-        const state = useAuthStore.getState();
-        if (state.token && state.user) {
-          // Register push token in background (non-blocking)
-          try {
-            if (Constants.appOwnership !== 'expo') {
-              const expoToken = (await Notifications.getExpoPushTokenAsync()).data;
-              await registerDevice({
-                expo_push_token: expoToken,
-                device_type: Platform.OS === 'ios' ? 'ios' : 'android',
-                device_name: Platform.OS === 'ios' ? 'iPhone' : 'Android Device',
-              });
-            }
-          } catch (error) {
-            console.warn('[Push Register Error]', error);
-          }
-        }
       } catch (error) {
         console.error('[App Init Error]', error);
       } finally {
@@ -83,17 +70,6 @@ export default function RootLayout() {
     });
     return unsubscribe;
   }, []);
-
-  // Handle deep-link push notification taps
-  useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const screen = response.notification.request.content.data?.screen;
-      if (screen) {
-        navigationRouter.push(`/(app)/${screen}`);
-      }
-    });
-    return () => subscription.remove();
-  }, [navigationRouter]);
 
   return (
     <ErrorBoundary>
