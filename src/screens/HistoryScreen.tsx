@@ -714,7 +714,7 @@ export default function HistoryScreen({ navigation }: any) {
                     propsForBackgroundLines: { strokeDasharray: '4,4', stroke: '#F1F5F9', strokeWidth: 1 },
                   }}
                   bezier
-                  style={[styles.chart, { marginLeft: -33, marginVertical: 0 }]}
+                  style={{ ...styles.chart, marginLeft: -33, marginVertical: 0 }}
                   withInnerLines={true}
                   withOuterLines={false}
                   withVerticalLines={false}

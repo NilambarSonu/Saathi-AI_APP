@@ -11,6 +11,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -91,8 +93,12 @@ export async function registerForPushNotifications(): Promise<string | null> {
     }
 
     return token;
-  } catch (error) {
-    console.error('[Notifications] Error registering for push notifications:', error);
+  } catch (error: any) {
+    if (error.message?.includes('FirebaseApp is not initialized')) {
+      console.warn('[Notifications] Push notifications are not configured yet. This requires Firebase (FCM) credentials for Android. Local notifications will still work.');
+    } else {
+      console.error('[Notifications] Error registering for push notifications:', error);
+    }
     return null;
   }
 }
@@ -165,18 +171,27 @@ export async function notifyUser(
 }
 
 // Domain specific helpers
+export async function scheduleSoilAlert(fieldId: string, message: string) {
+  return notifyUser('Soil Parameter Alert 🔴', message, { screen: 'history', fieldId, type: 'alert' });
+}
+
+export async function scheduleSyncComplete(count: number) {
+  return notifyUser('Sync Complete ✅', `${count} soil tests synced from Agni device`, { screen: 'history', type: 'sync' });
+}
+
+export async function scheduleBatteryAlert() {
+  return notifyUser('Agni Battery Low 🔋', 'Battery low (15%). Please charge soon.', { screen: 'connect', type: 'battery' });
+}
+
+export async function scheduleSmartInsight(message: string) {
+  return notifyUser('AI Insight 🧠', message, { screen: 'ai-chat', type: 'insight' });
+}
+
 export const alerts = {
-  soil: (fieldId: string, message: string) => 
-    notifyUser('Soil Parameter Alert 🔴', message, { screen: 'history', fieldId, type: 'alert' }),
-  
-  sync: (count: number) => 
-    notifyUser('Sync Complete ✅', `${count} soil tests synced from Agni device`, { screen: 'history', type: 'sync' }),
-  
-  battery: () => 
-    notifyUser('Agni Battery Low 🔋', 'Battery low (15%). Please charge soon.', { screen: 'connect', type: 'battery' }),
-  
-  insight: (message: string) => 
-    notifyUser('AI Insight 🧠', message, { screen: 'ai-chat', type: 'insight' }),
+  soil: scheduleSoilAlert,
+  sync: scheduleSyncComplete,
+  battery: scheduleBatteryAlert,
+  insight: scheduleSmartInsight,
 };
 
 /**

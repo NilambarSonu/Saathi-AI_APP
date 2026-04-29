@@ -1,7 +1,7 @@
-]import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, Text, StyleSheet, FlatList, TouchableOpacity, 
-  ActivityIndicator, RefreshControl, Platform 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  ActivityIndicator, RefreshControl, Platform
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,7 +50,7 @@ export default function NotificationsScreen() {
       try {
         await markNotificationRead(item.id);
         setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, isRead: true } : n));
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // Handle navigation logic
@@ -72,13 +72,13 @@ export default function NotificationsScreen() {
 
   const renderItem = ({ item, index }: { item: AppNotification; index: number }) => {
     const icon = getNotifIcon(item.type);
-    
+
     return (
-      <Animated.View 
+      <Animated.View
         entering={FadeInRight.delay(index * 100).duration(400)}
         layout={Layout.springify()}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.notifItem, !item.isRead && styles.unreadItem]}
           onPress={() => handlePress(item)}
           activeOpacity={0.7}
@@ -86,7 +86,7 @@ export default function NotificationsScreen() {
           <View style={[styles.iconContainer, { backgroundColor: icon.color + '15' }]}>
             <MaterialCommunityIcons name={icon.name as any} size={22} color={icon.color} />
           </View>
-          
+
           <View style={styles.contentContainer}>
             <View style={styles.row}>
               <Text style={[styles.title, !item.isRead && styles.unreadText]}>{item.title}</Text>
@@ -111,7 +111,7 @@ export default function NotificationsScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient colors={[Colors.bg0, Colors.bg1]} style={StyleSheet.absoluteFill} />
-      
+
       {/* Header */}
       <BlurView intensity={Platform.OS === 'ios' ? 80 : 100} tint="light" style={styles.header}>
         <View style={styles.headerInner}>
@@ -159,7 +159,7 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg0 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg0 },
-  header: { 
+  header: {
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     borderBottomWidth: 1,
@@ -206,13 +206,13 @@ const styles = StyleSheet.create({
   time: { ...Type.caption2, color: Colors.label3, marginTop: 8 },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 100, paddingHorizontal: 40 },
-  emptyIconCircle: { 
-    width: 100, 
-    height: 100, 
-    borderRadius: 50, 
-    backgroundColor: Colors.surface, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
+  emptyIconCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 24,
     borderWidth: 1,
     borderColor: Colors.sep1
