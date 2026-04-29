@@ -111,7 +111,9 @@ export default function HistoryScreen({ navigation }: any) {
   const [isTimeMenuVisible, setIsTimeMenuVisible] = useState(false);
   const [isParamMenuVisible, setIsParamMenuVisible] = useState(false);
   const [chartTooltip, setChartTooltip] = useState<{ x: number; y: number; value: number; index: number } | null>(null);
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const mapRef = useRef<MapView>(null);
+  const fullMapRef = useRef<MapView>(null);
 
   // Safety fallback to dismiss the perpetual loader if onMapReady never fires
   useEffect(() => {
@@ -478,26 +480,39 @@ export default function HistoryScreen({ navigation }: any) {
 
         {/* 1. Field Location - Map */}
         <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Field Locations</Text>
-            <View style={styles.mapControls}>
+          <View style={[styles.cardHeader, { marginBottom: 9 }]}>
+            <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Field Locations</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={styles.mapControls}>
+                <Pressable
+                  onPress={() => handleSetMapMode('satellite')}
+                  style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'satellite' && styles.mapTypeBtnActive, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={[styles.mapTypeLabel, mapMode === 'satellite' && styles.mapTypeLabelActive]}>Satellite</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => handleSetMapMode('standard')}
+                  style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'standard' && styles.mapTypeBtnActive, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={[styles.mapTypeLabel, mapMode === 'standard' && styles.mapTypeLabelActive]}>Standard</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => handleSetMapMode('osm')}
+                  style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'osm' && styles.mapTypeBtnActive, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={[styles.mapTypeLabel, mapMode === 'osm' && styles.mapTypeLabelActive]}>OSM</Text>
+                </Pressable>
+              </View>
+              {/* Expand button */}
               <Pressable
-                onPress={() => handleSetMapMode('satellite')}
-                style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'satellite' && styles.mapTypeBtnActive, pressed && { opacity: 0.7 }]}
+                onPress={() => setIsMapFullscreen(true)}
+                style={({ pressed }) => ({
+                  backgroundColor: pressed ? '#E2E8F0' : '#F1F5F9',
+                  padding: 6,
+                  borderRadius: 8,
+                })}
               >
-                <Text style={[styles.mapTypeLabel, mapMode === 'satellite' && styles.mapTypeLabelActive]}>Satellite</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleSetMapMode('standard')}
-                style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'standard' && styles.mapTypeBtnActive, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={[styles.mapTypeLabel, mapMode === 'standard' && styles.mapTypeLabelActive]}>Standard</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleSetMapMode('osm')}
-                style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'osm' && styles.mapTypeBtnActive, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={[styles.mapTypeLabel, mapMode === 'osm' && styles.mapTypeLabelActive]}>OSM</Text>
+                <Ionicons name="expand-outline" size={16} color={COLORS.title} />
               </Pressable>
             </View>
           </View>
@@ -509,18 +524,18 @@ export default function HistoryScreen({ navigation }: any) {
                 provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
                 initialRegion={mapInitialRegion}
                 mapType={
-                  mapMode === 'satellite' 
-                    ? 'satellite' 
-                    : (mapMode === 'standard' 
-                        ? 'standard' 
+                  mapMode === 'satellite'
+                    ? 'satellite'
+                    : (mapMode === 'standard'
+                        ? 'standard'
                         : (Platform.OS === 'android' ? 'none' : 'standard'))
                 }
                 onMapReady={() => setIsMapReady(true)}
                 showsUserLocation={true}
-                showsMyLocationButton={true}
+                showsMyLocationButton={false}
                 scrollEnabled={true}
                 zoomEnabled={true}
-                zoomControlEnabled={true}
+                zoomControlEnabled={false}
                 rotateEnabled={false}
                 pitchEnabled={false}
                 moveOnMarkerPress={false}
@@ -553,6 +568,96 @@ export default function HistoryScreen({ navigation }: any) {
             )}
           </View>
         </View>
+
+        {/* Fullscreen Map Modal */}
+        <Modal
+          visible={isMapFullscreen}
+          animationType="slide"
+          statusBarTranslucent
+          onRequestClose={() => setIsMapFullscreen(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#000' }}>
+            <MapView
+              ref={fullMapRef}
+              style={StyleSheet.absoluteFillObject}
+              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+              initialRegion={mapInitialRegion}
+              mapType={
+                mapMode === 'satellite'
+                  ? 'satellite'
+                  : (mapMode === 'standard'
+                      ? 'standard'
+                      : (Platform.OS === 'android' ? 'none' : 'standard'))
+              }
+              showsUserLocation={true}
+              showsMyLocationButton={true}
+              scrollEnabled={true}
+              zoomEnabled={true}
+              zoomControlEnabled={true}
+              rotateEnabled={true}
+              pitchEnabled={true}
+            >
+              {mapMode === 'osm' && (
+                <UrlTile
+                  urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+                  maximumZ={19}
+                  tileSize={256}
+                  zIndex={1}
+                />
+              )}
+              {mapMarkers.map((marker) => (
+                <Marker
+                  key={`fs-${marker.id}`}
+                  coordinate={marker.coordinate}
+                  title={`Test on ${format(parseISO(marker.date), 'MMM d, yyyy')}`}
+                  tracksViewChanges={false}
+                >
+                  <View style={[styles.customMarker, { borderColor: getParamColor(selectedParameter) }]}>
+                    <View style={[styles.markerDot, { backgroundColor: getParamColor(selectedParameter) }]} />
+                  </View>
+                </Marker>
+              ))}
+            </MapView>
+            {/* Close button */}
+            <Pressable
+              onPress={() => setIsMapFullscreen(false)}
+              style={({ pressed }) => ({
+                position: 'absolute',
+                top: Platform.OS === 'android' ? 40 : 56,
+                right: 16,
+                backgroundColor: pressed ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.6)',
+                borderRadius: 20,
+                padding: 10,
+                zIndex: 10,
+              })}
+            >
+              <Ionicons name="contract-outline" size={20} color="#FFF" />
+            </Pressable>
+            {/* Map type row */}
+            <View style={[styles.mapControls, {
+              position: 'absolute',
+              top: Platform.OS === 'android' ? 40 : 56,
+              left: 16,
+              zIndex: 10,
+              backgroundColor: '#FFF',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 4,
+              elevation: 4,
+            }]}>
+              <Pressable onPress={() => handleSetMapMode('satellite')} style={[styles.mapTypeBtn, mapMode === 'satellite' && styles.mapTypeBtnActive]}>
+                <Text style={[styles.mapTypeLabel, mapMode === 'satellite' && styles.mapTypeLabelActive]}>Satellite</Text>
+              </Pressable>
+              <Pressable onPress={() => handleSetMapMode('standard')} style={[styles.mapTypeBtn, mapMode === 'standard' && styles.mapTypeBtnActive]}>
+                <Text style={[styles.mapTypeLabel, mapMode === 'standard' && styles.mapTypeLabelActive]}>Standard</Text>
+              </Pressable>
+              <Pressable onPress={() => handleSetMapMode('osm')} style={[styles.mapTypeBtn, mapMode === 'osm' && styles.mapTypeBtnActive]}>
+                <Text style={[styles.mapTypeLabel, mapMode === 'osm' && styles.mapTypeLabelActive]}>OSM</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
 
         {/* 2. Premium Apple Style Dropdown Filters */}
         <View style={styles.dropdownRow}>
@@ -591,58 +696,61 @@ export default function HistoryScreen({ navigation }: any) {
               <Text style={styles.noData}>Insufficient data to show trend for {timeFilter}.</Text>
             </View>
           ) : (
-            <View style={{ position: 'relative' }}>
-              <LineChart
-                data={chartData}
-                width={SCREEN_WIDTH - 6}
-                height={232}
-                chartConfig={{
-                  backgroundColor: '#FFF', backgroundGradientFrom: '#FFF', backgroundGradientTo: '#FFF',
-                  decimalPlaces: selectedParameter === 'pH Level' ? 1 : 0,
-                  color: (opacity = 1) => getParamColor(selectedParameter),
-                  labelColor: (opacity = 1) => '#94A3B8',
-                  style: { borderRadius: 16 },
-                  propsForDots: { r: '6', strokeWidth: '2', stroke: '#FFF' },
-                  propsForLabels: { fontFamily: 'Sora_400Regular', fontSize: 10 },
-                  propsForBackgroundLines: { strokeDasharray: '4,4', stroke: '#F1F5F9', strokeWidth: 1 },
-                }}
-                bezier
-                style={styles.chart}
-                withInnerLines={true}
-                withOuterLines={false}
-                withVerticalLines={false}
-                withHorizontalLines={true}
-                onDataPointClick={({ value, index, x, y }) => {
-                  setChartTooltip(prev =>
-                    prev?.index === index ? null : { x, y, value, index }
-                  );
-                }}
-              />
-              {chartTooltip !== null && (
-                <View
-                  pointerEvents="none"
-                  style={[
-                    styles.chartTooltipBox,
-                    {
-                      left: Math.max(0, Math.min(
-                        chartTooltip.x - 16 - 45,
-                        SCREEN_WIDTH - 6 - 95
-                      )),
-                      top: Math.max(4, chartTooltip.y - 66),
-                    },
-                  ]}
-                >
-                  <Text style={styles.tooltipDateText}>
-                    {chartData.labels[chartTooltip.index]}
-                  </Text>
-                  <Text style={[styles.tooltipValueText, { color: getParamColor(selectedParameter) }]}>
-                    {selectedParameter === 'pH Level'
-                      ? chartTooltip.value.toFixed(1)
-                      : Math.round(chartTooltip.value).toString()}
-                    {UNITS[selectedParameter] ? ` ${UNITS[selectedParameter]}` : ''}
-                  </Text>
-                </View>
-              )}
+            // overflow:hidden clips the wide chart SVG to the card boundary — fixes white bleed on L/R
+            <View style={{ overflow: 'hidden', marginHorizontal: -16, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }}>
+              <View style={{ position: 'relative' }}>
+                <LineChart
+                  data={chartData}
+                  width={SCREEN_WIDTH + 45}
+                  height={232}
+                  chartConfig={{
+                    backgroundColor: '#FFF', backgroundGradientFrom: '#FFF', backgroundGradientTo: '#FFF',
+                    decimalPlaces: selectedParameter === 'pH Level' ? 1 : 0,
+                    color: (opacity = 1) => getParamColor(selectedParameter),
+                    labelColor: (opacity = 1) => '#94A3B8',
+                    style: { borderRadius: 16 },
+                    propsForDots: { r: '6', strokeWidth: '2', stroke: '#FFF' },
+                    propsForLabels: { fontFamily: 'Sora_400Regular', fontSize: 10 },
+                    propsForBackgroundLines: { strokeDasharray: '4,4', stroke: '#F1F5F9', strokeWidth: 1 },
+                  }}
+                  bezier
+                  style={[styles.chart, { marginLeft: -33, marginVertical: 0 }]}
+                  withInnerLines={true}
+                  withOuterLines={false}
+                  withVerticalLines={false}
+                  withHorizontalLines={true}
+                  onDataPointClick={({ value, index, x, y }) => {
+                    setChartTooltip(prev =>
+                      prev?.index === index ? null : { x, y, value, index }
+                    );
+                  }}
+                />
+                {chartTooltip !== null && (
+                  <View
+                    pointerEvents="none"
+                    style={[
+                      styles.chartTooltipBox,
+                      {
+                        left: Math.max(4, Math.min(
+                          chartTooltip.x - 16 - 45,
+                          SCREEN_WIDTH - 95
+                        )),
+                        top: Math.max(4, chartTooltip.y - 66),
+                      },
+                    ]}
+                  >
+                    <Text style={styles.tooltipDateText}>
+                      {chartData.labels[chartTooltip.index]}
+                    </Text>
+                    <Text style={[styles.tooltipValueText, { color: getParamColor(selectedParameter) }]}>
+                      {selectedParameter === 'pH Level'
+                        ? chartTooltip.value.toFixed(1)
+                        : Math.round(chartTooltip.value).toString()}
+                      {UNITS[selectedParameter] ? ` ${UNITS[selectedParameter]}` : ''}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
           )}
         </View>
@@ -1735,23 +1843,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.06)',
-    shadowColor: '#000',
+    borderWidth: 1.5,
+    borderColor: '#E8EDF5',
+    shadowColor: '#94A3B8',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+    minHeight: 46,
   },
   appleDropdownText: {
     fontFamily: 'Sora_600SemiBold',
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.title,
-    flex: 1,
+    flexShrink: 1,
   },
   actionSheetOverlay: {
     flex: 1,
