@@ -15,6 +15,7 @@ import { saveAuthTokens, clearAuthTokens, getStoredAccessToken } from '@/service
 const API_BASE_URL = 'https://www.saathiai.org';
 const TOKEN_KEY   = 'saathi_auth_token';   // ← matches axiosConfig.ts TOKEN_KEY
 const REFRESH_KEY = 'saathi_refresh_token';
+const USER_CACHE_KEY = 'saathi_user_cache'; // ← persists user profile locally
 
 export interface AuthUser {
   id: string;
@@ -75,6 +76,13 @@ export const useAuthStore = create<AuthState>((set, get) => {
         return;
       }
 
+      // Load locally-cached user profile first (instant, no network)
+      let localUser: AuthUser | null = null;
+      try {
+        const cached = await AsyncStorage.getItem(USER_CACHE_KEY);
+        if (cached) localUser = JSON.parse(cached);
+      } catch { /* ignore */ }
+
       const res = await fetch(`${API_BASE_URL}/api/user`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -86,15 +94,37 @@ export const useAuthStore = create<AuthState>((set, get) => {
       if (res.ok) {
         const data = await res.json();
         tokenCache.set(token);
-        set({ token, user: mapUser(data.user), isAuthenticated: true, isInitialized: true, isLoading: false });
-        console.log('[AuthStore] Session restored for', data.user?.username);
+        const serverUser = mapUser(data.user);
+        // Merge: prefer locally-saved name/location over DB if DB returns null/empty
+        // (server may not persist location field correctly)
+        const mergedUser: AuthUser = {
+          ...serverUser,
+          username: serverUser.username || localUser?.username || '',
+          location: serverUser.location || localUser?.location || null,
+          profilePicture: serverUser.profilePicture || localUser?.profilePicture || null,
+        };
+        set({ token, user: mergedUser, isAuthenticated: true, isInitialized: true, isLoading: false });
+        // Keep local cache in sync
+        await AsyncStorage.setItem(USER_CACHE_KEY, JSON.stringify(mergedUser)).catch(() => {});
+        console.log('[AuthStore] Session restored for', mergedUser.username);
       } else {
         await clearAuthTokens();
         tokenCache.clear();
+        await AsyncStorage.removeItem(USER_CACHE_KEY).catch(() => {});
         set({ token: null, user: null, isAuthenticated: false, isInitialized: true, isLoading: false });
         console.log('[AuthStore] Stored token invalid, cleared session');
       }
     } catch {
+      // Network error — restore from local cache if available
+      try {
+        const cached = await AsyncStorage.getItem(USER_CACHE_KEY);
+        if (cached) {
+          const localUser: AuthUser = JSON.parse(cached);
+          set({ isInitialized: true, isLoading: false, isAuthenticated: true, user: localUser });
+          console.log('[AuthStore] Network error — restored user from local cache');
+          return;
+        }
+      } catch { /* ignore */ }
       set({ isInitialized: true, isLoading: false, isAuthenticated: false });
       console.log('[AuthStore] Network error during init, proceeding unauthenticated');
     }
@@ -130,9 +160,11 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
       console.log('[AuthStore] Login successful for', data.user?.username);
 
+      const mappedUser = mapUser(data.user);
+      await AsyncStorage.setItem(USER_CACHE_KEY, JSON.stringify(mappedUser)).catch(() => {});
       set({
         token: data.token,
-        user: mapUser(data.user),
+        user: mappedUser,
         isAuthenticated: true,
         isLoading: false,
         error: null,
@@ -196,6 +228,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
   logout: async () => {
     await clearAuthTokens();
     tokenCache.clear();
+    await AsyncStorage.removeItem(USER_CACHE_KEY).catch(() => {});
     set({ user: null, token: null, isAuthenticated: false, error: null });
     console.log('[AuthStore] Logged out');
   },
@@ -205,12 +238,23 @@ export const useAuthStore = create<AuthState>((set, get) => {
   setSession: async (user, token, refreshToken) => {
     await saveAuthTokens(token, refreshToken || undefined);
     tokenCache.set(token, refreshToken || null);
-    set({ token, user: mapUser(user), isAuthenticated: true, isInitialized: true, isLoading: false, error: null });
+    const mappedUser = mapUser(user);
+    await AsyncStorage.setItem(USER_CACHE_KEY, JSON.stringify(mappedUser)).catch(() => {});
+    set({ token, user: mappedUser, isAuthenticated: true, isInitialized: true, isLoading: false, error: null });
   },
 
-  setUser: (user) => set({ user }),
+  setUser: (user) => {
+    set({ user });
+    // Persist locally so name/location survive app restart
+    if (user) {
+      AsyncStorage.setItem(USER_CACHE_KEY, JSON.stringify(user)).catch(() => {});
+    }
+  },
 
-  clearUser: () => set({ user: null, token: null, isAuthenticated: false }),
+  clearUser: () => {
+    AsyncStorage.removeItem(USER_CACHE_KEY).catch(() => {});
+    set({ user: null, token: null, isAuthenticated: false });
+  },
 };
 });
 

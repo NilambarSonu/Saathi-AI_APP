@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
 import { useAuthStore } from '@/store/authStore';
-import { logout, sendPasswordChangeOtp } from '@/features/auth/services/auth';
+import { logout, sendPasswordChangeOtp, changePassword } from '@/features/auth/services/auth';
 import {
   getUserProfile,
   updateUserProfile,
@@ -195,6 +195,7 @@ export default function ProfileScreen() {
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [aiPricingEnabled, setAiPricingEnabled] = useState(false);
   const [aiPricingLoading, setAiPricingLoading] = useState(false);
 
@@ -207,6 +208,67 @@ export default function ProfileScreen() {
   });
   const [isPrivacyLoading, setIsPrivacyLoading] = useState(false);
   const [isPrivacyModalVisible, setPrivacyModalVisible] = useState(false);
+
+  // ── Change Password Modal state ─────────────────────────────────
+  type PwdStep = 'idle' | 'sending' | 'otp' | 'newpwd' | 'done';
+  const [pwdModalVisible, setPwdModalVisible] = useState(false);
+  const [pwdStep, setPwdStep] = useState<PwdStep>('idle');
+  const [pwdOtpId, setPwdOtpId] = useState('');
+  const [pwdOtp, setPwdOtp] = useState('');
+  const [pwdNew, setPwdNew] = useState('');
+  const [pwdConfirm, setPwdConfirm] = useState('');
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdError, setPwdError] = useState('');
+  const [pwdShowNew, setPwdShowNew] = useState(false);
+  const [pwdShowConfirm, setPwdShowConfirm] = useState(false);
+
+  const openChangePwdModal = () => {
+    setPwdStep('idle');
+    setPwdOtp('');
+    setPwdNew('');
+    setPwdConfirm('');
+    setPwdError('');
+    setPwdModalVisible(true);
+  };
+
+  const handleSendPwdOtp = async () => {
+    setPwdLoading(true);
+    setPwdError('');
+    try {
+      const res = await sendPasswordChangeOtp();
+      setPwdOtpId(res.otpId || '');
+      setPwdStep('otp');
+    } catch (e: any) {
+      setPwdError(e?.message || 'Failed to send OTP. Try again.');
+    } finally {
+      setPwdLoading(false);
+    }
+  };
+
+  const handleVerifyAndChange = async () => {
+    if (pwdOtp.trim().length !== 6) {
+      setPwdError('Please enter the 6-digit OTP from your email.');
+      return;
+    }
+    if (!pwdNew.trim() || pwdNew.length < 8) {
+      setPwdError('Password must be at least 8 characters.');
+      return;
+    }
+    if (pwdNew !== pwdConfirm) {
+      setPwdError('Passwords do not match.');
+      return;
+    }
+    setPwdLoading(true);
+    setPwdError('');
+    try {
+      await changePassword(pwdOtpId, pwdOtp.trim(), pwdNew.trim());
+      setPwdStep('done');
+    } catch (e: any) {
+      setPwdError(e?.message || 'Incorrect OTP or request expired. Try again.');
+    } finally {
+      setPwdLoading(false);
+    }
+  };
 
   const headerAnim = useRef(new Animated.Value(0)).current;
 
@@ -221,9 +283,11 @@ export default function ProfileScreen() {
     getUserProfile().then(data => {
       if (data) {
         const next = mergeUser(user, data);
-        // Build an AuthUser-compatible object before calling setUser
+        // Never overwrite a valid id already in the store with an empty string
+        // The dashboard endpoint may return the id in a different field name
+        const resolvedId = next.id || user?.id || '';
         setUser({
-          id: next.id ?? user?.id ?? '',
+          id: resolvedId,
           username: next.name || next.username || user?.username || '',
           email: next.email ?? user?.email ?? '',
           phone: next.phone ?? user?.phone ?? null,
@@ -292,17 +356,14 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log Out', style: 'destructive', onPress: async () => {
-          setIsLoggingOut(true);
-          try { await logout(); } catch { }
-          clearUser();
-          router.replace('/(auth)/login');
-        }
-      },
-    ]);
+    setLogoutModalVisible(true);
+  };
+
+  const doLogout = async () => {
+    setIsLoggingOut(true);
+    try { await logout(); } catch { }
+    clearUser();
+    router.replace('/(auth)/login');
   };
 
   const handleChangePassword = () => {
@@ -310,19 +371,7 @@ export default function ProfileScreen() {
       Alert.alert('Not Available', `Password change is not available for ${provider.label} accounts.`);
       return;
     }
-    Alert.alert('Change Password', 'An OTP will be sent to your email to start the reset process.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Send OTP', onPress: async () => {
-          try {
-            await sendPasswordChangeOtp();
-            Alert.alert('📧 OTP Sent', 'Check your inbox. Use the Forgot Password screen to complete the change.');
-          } catch (e: any) {
-            Alert.alert('Error', e.message || 'Failed to send OTP.');
-          }
-        }
-      },
-    ]);
+    openChangePwdModal();
   };
 
   const handlePrivacyToggle = async (key: string, val: boolean) => {
@@ -515,19 +564,246 @@ export default function ProfileScreen() {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Saathi AI·Farmer First Technology</Text>
+          <Text style={styles.footerText}>Saathi AI · Farmer First Technology</Text>
           <Text style={styles.footerSub}>
-            ID: {user?.id ? String(user.id).slice(0, 8) + '...' : 'N/A'}  ·  Joined{' '}
+            {'Farmer ID: '}
+            {user?.id
+              ? String(user.id).length > 12
+                ? String(user.id).slice(0, 6) + '···' + String(user.id).slice(-4)
+                : String(user.id)
+              : 'Loading...'}
+            {'  ·  Joined '}
             {user?.createdAt
               ? new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
-              : 'N/A'}
+              : '—'}
           </Text>
         </View>
 
         <View style={{ height: 85 }} />
       </ScrollView>
 
-      {/* Privacy Settings Modal */}
+      {/* ── Logout Confirmation Modal ─────────────────────────── */}
+      <Modal
+        visible={logoutModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { if (!isLoggingOut) setLogoutModalVisible(false); }}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => { if (!isLoggingOut) setLogoutModalVisible(false); }}
+          />
+          <View style={[styles.modalContent, { paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}>
+            {/* Icon */}
+            <View style={{ alignItems:'center', marginBottom:18 }}>
+              <LinearGradient colors={['#fee2e2','#fecaca']} style={{ width:72, height:72, borderRadius:36, alignItems:'center', justifyContent:'center', marginBottom:14 }}>
+                <Ionicons name="log-out-outline" size={32} color="#dc2626" />
+              </LinearGradient>
+              <Text style={{ fontFamily:'Sora_800ExtraBold', fontSize:20, color:'#0F2419', textAlign:'center', marginBottom:8 }}>Logging out?</Text>
+              <Text style={{ fontFamily:'Sora_400Regular', fontSize:13, color:'#3D6650', textAlign:'center', lineHeight:20, paddingHorizontal:12 }}>
+                {`Hey ${user?.username?.split(' ')[0] || 'Farmer'}, your soil data and crop history are safe.\nCome back anytime! 🌾`}
+              </Text>
+            </View>
+
+            {/* User info strip */}
+            <View style={{ flexDirection:'row', alignItems:'center', gap:10, backgroundColor:'#F4FCF7', borderRadius:14, padding:13, marginBottom:22, borderWidth:1, borderColor:'#E8F8EE' }}>
+              <View style={{ width:40, height:40, borderRadius:20, backgroundColor:'#1A7A40', alignItems:'center', justifyContent:'center' }}>
+                <Text style={{ fontFamily:'Sora_700Bold', fontSize:16, color:'#fff' }}>{getInitials(user)}</Text>
+              </View>
+              <View style={{ flex:1 }}>
+                <Text style={{ fontFamily:'Sora_700Bold', fontSize:13, color:'#0F2419' }}>{user?.username || 'Kisan'}</Text>
+                <Text style={{ fontFamily:'Sora_400Regular', fontSize:11, color:'#7B9E8B' }}>{user?.email || ''}</Text>
+              </View>
+              <Ionicons name="checkmark-circle" size={20} color="#22A05A" />
+            </View>
+
+            {/* Buttons */}
+            <Pressable onPress={doLogout} disabled={isLoggingOut}
+              style={{ borderRadius:14, overflow:'hidden', marginBottom:10, opacity: isLoggingOut ? 0.7 : 1 }}>
+              <LinearGradient colors={['#dc2626','#ef4444']} start={{x:0,y:0}} end={{x:1,y:0}}
+                style={{ flexDirection:'row', alignItems:'center', justifyContent:'center', gap:8, paddingVertical:15, borderRadius:14 }}>
+                {isLoggingOut
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <><Ionicons name="log-out-outline" size={18} color="#fff" /><Text style={{ fontFamily:'Sora_700Bold', fontSize:15, color:'#fff' }}>Yes, Log Out</Text></>}
+              </LinearGradient>
+            </Pressable>
+
+            <Pressable onPress={() => setLogoutModalVisible(false)} disabled={isLoggingOut}
+              style={{ paddingVertical:14, borderRadius:14, alignItems:'center', borderWidth:1.5, borderColor:'#E2EDE7', backgroundColor:'#fff' }}>
+              <Text style={{ fontFamily:'Sora_700Bold', fontSize:15, color:'#1A7A40' }}>Stay Logged In</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Change Password Modal ─────────────────────────────── */}
+      <Modal
+        visible={pwdModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { if (!pwdLoading) setPwdModalVisible(false); }}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => { if (!pwdLoading) setPwdModalVisible(false); }}
+          />
+          <View style={[styles.modalContent, { paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}>
+
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: '#3b82f618', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="lock-closed-outline" size={17} color="#3b82f6" />
+                </View>
+                <Text style={styles.modalTitle}>Change Password</Text>
+              </View>
+              <Pressable onPress={() => { if (!pwdLoading) setPwdModalVisible(false); }} style={styles.closeBtn}>
+                <Ionicons name="close" size={20} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
+
+              {/* ── IDLE: Intro step ── */}
+              {pwdStep === 'idle' && (
+                <View style={{ alignItems: 'center', paddingVertical: 24, gap: 16 }}>
+                  <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#3b82f618', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="mail-outline" size={30} color="#3b82f6" />
+                  </View>
+                  <Text style={{ fontFamily: 'Sora_700Bold', fontSize: 17, color: Colors.textPrimary, textAlign: 'center' }}>Verify Your Identity</Text>
+                  <Text style={{ fontFamily: 'Sora_400Regular', fontSize: 13, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 }}>
+                    We'll send a 6-digit OTP to{' '}
+                    <Text style={{ fontFamily: 'Sora_700Bold', color: Colors.textPrimary }}>{user?.email}</Text>
+                    {' '}to confirm it's you.
+                  </Text>
+                  {pwdError ? <Text style={styles.pwdError}>{pwdError}</Text> : null}
+                  <Pressable
+                    style={[styles.pwdBtn, pwdLoading && { opacity: 0.6 }]}
+                    onPress={handleSendPwdOtp}
+                    disabled={pwdLoading}
+                  >
+                    {pwdLoading
+                      ? <ActivityIndicator color="#fff" />
+                      : <Text style={styles.pwdBtnText}>Send OTP to Email →</Text>}
+                  </Pressable>
+                </View>
+              )}
+
+              {/* ── OTP + NEW PASSWORD step ── */}
+              {pwdStep === 'otp' && (
+                <View style={{ paddingVertical: 8, gap: 4 }}>
+                  <View style={{ backgroundColor: '#f0fdf4', borderRadius: 12, padding: 12, marginBottom: 8, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
+                    <Text style={{ fontFamily: 'Sora_400Regular', fontSize: 12, color: Colors.primary, flex: 1 }}>
+                      OTP sent to <Text style={{ fontFamily: 'Sora_700Bold' }}>{user?.email}</Text>
+                    </Text>
+                  </View>
+                  <View style={{ backgroundColor: '#fffbeb', borderRadius: 10, padding: 10, marginBottom: 16, flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+                    <Ionicons name="warning-outline" size={14} color="#f59e0b" style={{ marginTop: 1 }} />
+                    <Text style={{ fontFamily: 'Sora_400Regular', fontSize: 11, color: '#92400e', flex: 1, lineHeight: 16 }}>
+                      {'Didn\'t receive it? Check your '}
+                      <Text style={{ fontFamily: 'Sora_700Bold' }}>Spam / Junk folder</Text>
+                      {'. OTP expires in 10 minutes.'}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.pwdLabel}>6-DIGIT OTP FROM EMAIL</Text>
+                  <TextInput
+                    style={styles.pwdInput}
+                    value={pwdOtp}
+                    onChangeText={t => { setPwdOtp(t.replace(/[^0-9]/g, '')); setPwdError(''); }}
+                    placeholder="Enter 6-digit code"
+                    placeholderTextColor={Colors.textMuted}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                  />
+
+                  <Text style={[styles.pwdLabel, { marginTop: 8 }]}>NEW PASSWORD</Text>
+                  <View style={styles.pwdInputRow}>
+                    <TextInput
+                      style={[styles.pwdInput, { flex: 1, marginBottom: 0 }]}
+                      value={pwdNew}
+                      onChangeText={t => { setPwdNew(t); setPwdError(''); }}
+                      placeholder="Min 8 characters"
+                      placeholderTextColor={Colors.textMuted}
+                      secureTextEntry={!pwdShowNew}
+                    />
+                    <Pressable onPress={() => setPwdShowNew(v => !v)} style={styles.eyeBtn}>
+                      <Ionicons name={pwdShowNew ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
+                    </Pressable>
+                  </View>
+
+                  <Text style={[styles.pwdLabel, { marginTop: 8 }]}>CONFIRM PASSWORD</Text>
+                  <View style={styles.pwdInputRow}>
+                    <TextInput
+                      style={[styles.pwdInput, { flex: 1, marginBottom: 0 }]}
+                      value={pwdConfirm}
+                      onChangeText={t => { setPwdConfirm(t); setPwdError(''); }}
+                      placeholder="Repeat new password"
+                      placeholderTextColor={Colors.textMuted}
+                      secureTextEntry={!pwdShowConfirm}
+                    />
+                    <Pressable onPress={() => setPwdShowConfirm(v => !v)} style={styles.eyeBtn}>
+                      <Ionicons name={pwdShowConfirm ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
+                    </Pressable>
+                  </View>
+
+                  {/* strength hint */}
+                  {pwdNew.length > 0 && (
+                    <View style={{ flexDirection: 'row', gap: 4, marginTop: 4, marginBottom: 4 }}>
+                      {[1,2,3,4].map(i => (
+                        <View key={i} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor:
+                          pwdNew.length >= i * 3 ? (pwdNew.length >= 10 ? Colors.primary : '#f59e0b') : Colors.borderLight
+                        }} />
+                      ))}
+                    </View>
+                  )}
+
+                  {pwdError ? <Text style={styles.pwdError}>{pwdError}</Text> : null}
+
+                  <Pressable
+                    style={[styles.pwdBtn, { marginTop: 12 }, pwdLoading && { opacity: 0.6 }]}
+                    onPress={handleVerifyAndChange}
+                    disabled={pwdLoading}
+                  >
+                    {pwdLoading
+                      ? <ActivityIndicator color="#fff" />
+                      : <Text style={styles.pwdBtnText}>Change Password ✓</Text>}
+                  </Pressable>
+
+                  <Pressable onPress={handleSendPwdOtp} style={{ alignSelf: 'center', marginTop: 12 }} disabled={pwdLoading}>
+                    <Text style={{ fontFamily: 'Sora_600SemiBold', fontSize: 12, color: Colors.primary }}>Resend OTP</Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {/* ── SUCCESS ── */}
+              {pwdStep === 'done' && (
+                <View style={{ alignItems: 'center', paddingVertical: 32, gap: 16 }}>
+                  <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="checkmark-circle" size={44} color={Colors.primary} />
+                  </View>
+                  <Text style={{ fontFamily: 'Sora_800ExtraBold', fontSize: 20, color: Colors.textPrimary }}>Password Changed!</Text>
+                  <Text style={{ fontFamily: 'Sora_400Regular', fontSize: 13, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 }}>
+                    Your password has been updated successfully. Use your new password next time you log in.
+                  </Text>
+                  <Pressable
+                    style={[styles.pwdBtn, { backgroundColor: Colors.primary }]}
+                    onPress={() => setPwdModalVisible(false)}
+                  >
+                    <Text style={styles.pwdBtnText}>Done ✓</Text>
+                  </Pressable>
+                </View>
+              )}
+
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Privacy Settings Modal ─────────────────────────────── */}
       <Modal
         visible={isPrivacyModalVisible}
         animationType="slide"
@@ -543,7 +819,6 @@ export default function ProfileScreen() {
                 <Ionicons name="close" size={20} color={Colors.textSecondary} />
               </Pressable>
             </View>
-
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
               <ToggleRow
                 label="Profile Visibility"
@@ -797,5 +1072,60 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
     gap: 12,
+  },
+
+  // Change Password modal
+  pwdLabel: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 11,
+    color: Colors.textSecondary,
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  pwdInput: {
+    height: 50,
+    backgroundColor: Colors.background,
+    borderWidth: 1.5,
+    borderColor: Colors.borderLight,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    fontFamily: 'Sora_400Regular',
+    fontSize: 14,
+    color: Colors.textPrimary,
+    marginBottom: 4,
+  },
+  pwdInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    borderWidth: 1.5,
+    borderColor: Colors.borderLight,
+    borderRadius: 12,
+    marginBottom: 4,
+    paddingRight: 4,
+  },
+  eyeBtn: {
+    padding: 10,
+  },
+  pwdBtn: {
+    height: 52,
+    backgroundColor: '#3b82f6',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  pwdBtnText: {
+    fontFamily: 'Sora_700Bold',
+    fontSize: 15,
+    color: '#fff',
+  },
+  pwdError: {
+    fontFamily: 'Sora_400Regular',
+    fontSize: 12,
+    color: Colors.error,
+    textAlign: 'center',
+    marginTop: 4,
   },
 });

@@ -94,6 +94,7 @@ export default function HistoryScreen({ navigation }: any) {
   const { user } = useAuthStore();
   const { currentIndex } = useNavigationStore();
   const { addSoilMarkers } = useSoilMarkers();
+  // isFocused kept for potential future use but map no longer depends on it
   const isFocused = useIsFocused();
   
   const [logs, setLogs] = useState<SoilTest[]>([]);
@@ -107,6 +108,8 @@ export default function HistoryScreen({ navigation }: any) {
   const [mapMode, setMapMode] = useState<'satellite' | 'standard' | 'osm'>(Platform.OS === 'android' ? 'satellite' : 'standard');
   const [selectedLog, setSelectedLog] = useState<SoilTest | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  // Use a ref so isMapReady persists across focus changes without triggering re-renders
+  const mapReadyRef = useRef(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const [isTimeMenuVisible, setIsTimeMenuVisible] = useState(false);
   const [isParamMenuVisible, setIsParamMenuVisible] = useState(false);
@@ -115,9 +118,11 @@ export default function HistoryScreen({ navigation }: any) {
   const mapRef = useRef<MapView>(null);
   const fullMapRef = useRef<MapView>(null);
 
-  // Safety fallback to dismiss the perpetual loader if onMapReady never fires
+  // Safety fallback — only run once (mapReadyRef guards it from re-running on focus)
   useEffect(() => {
+    if (mapReadyRef.current) return;
     const timer = setTimeout(() => {
+      mapReadyRef.current = true;
       setIsMapReady(true);
     }, 3500);
     return () => clearTimeout(timer);
@@ -246,19 +251,18 @@ export default function HistoryScreen({ navigation }: any) {
     fetchData();
   }, [user?.id, fetchData]);
 
-  // Fallback to ensure map loader disappears even if onMapReady doesn't fire
+  // Fallback: runs only once (guarded by mapReadyRef)
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (!isMapReady) {
-      timer = setTimeout(() => {
+    if (mapReadyRef.current) return;
+    const timer = setTimeout(() => {
+      if (!mapReadyRef.current) {
         console.log('[History] Map ready fallback triggered');
+        mapReadyRef.current = true;
         setIsMapReady(true);
-      }, 2500);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [isMapReady]);
+      }
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -374,9 +378,11 @@ export default function HistoryScreen({ navigation }: any) {
     };
   }, [logs]);
 
-  // Animate map to region when initial region changes or map becomes ready
+  // Animate map to initial region only once after it first becomes ready
+  const hasAnimatedRef = useRef(false);
   useEffect(() => {
-    if (isMapReady && mapRef.current && mapInitialRegion) {
+    if (isMapReady && mapRef.current && mapInitialRegion && !hasAnimatedRef.current) {
+      hasAnimatedRef.current = true;
       mapRef.current.animateToRegion(mapInitialRegion, 1000);
     }
   }, [isMapReady, mapInitialRegion]);
@@ -517,52 +523,58 @@ export default function HistoryScreen({ navigation }: any) {
             </View>
           </View>
           <View style={styles.mapContainer}>
-            {currentIndex === 3 ? (
-              <MapView
-                ref={mapRef}
-                style={styles.map}
-                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-                initialRegion={mapInitialRegion}
-                mapType={
-                  mapMode === 'satellite'
-                    ? 'satellite'
-                    : (mapMode === 'standard'
-                        ? 'standard'
-                        : (Platform.OS === 'android' ? 'none' : 'standard'))
+            {/* MapView is always mounted — never conditionally removed — to prevent reload on navigation */}
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+              initialRegion={mapInitialRegion}
+              mapType={
+                mapMode === 'satellite'
+                  ? 'satellite'
+                  : (mapMode === 'standard'
+                      ? 'standard'
+                      : (Platform.OS === 'android' ? 'none' : 'standard'))
+              }
+              onMapReady={() => {
+                if (!mapReadyRef.current) {
+                  mapReadyRef.current = true;
+                  setIsMapReady(true);
                 }
-                onMapReady={() => setIsMapReady(true)}
-                showsUserLocation={true}
-                showsMyLocationButton={false}
-                scrollEnabled={true}
-                zoomEnabled={true}
-                zoomControlEnabled={false}
-                rotateEnabled={false}
-                pitchEnabled={false}
-                moveOnMarkerPress={false}
-              >
-                {mapMode === 'osm' && (
-                  <UrlTile
-                    urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-                    maximumZ={19}
-                    tileSize={256}
-                    zIndex={1}
-                  />
-                )}
-                {mapMarkers.map((marker) => (
-                  <Marker
-                    key={`${marker.id}-${selectedParameter}`}
-                    coordinate={marker.coordinate}
-                    title={`Test on ${format(parseISO(marker.date), 'MMM d, yyyy')}`}
-                    tracksViewChanges={false}
-                  >
-                    <View style={[styles.customMarker, { borderColor: getParamColor(selectedParameter) }]}>
-                      <View style={[styles.markerDot, { backgroundColor: getParamColor(selectedParameter) }]} />
-                    </View>
-                  </Marker>
-                ))}
-              </MapView>
-            ) : (
-              <View style={styles.mapLoaderOverlay}>
+              }}
+              showsUserLocation={true}
+              showsMyLocationButton={false}
+              scrollEnabled={true}
+              zoomEnabled={true}
+              zoomControlEnabled={false}
+              rotateEnabled={false}
+              pitchEnabled={false}
+              moveOnMarkerPress={false}
+            >
+              {mapMode === 'osm' && (
+                <UrlTile
+                  urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+                  maximumZ={19}
+                  tileSize={256}
+                  zIndex={1}
+                />
+              )}
+              {mapMarkers.map((marker) => (
+                <Marker
+                  key={`${marker.id}-${selectedParameter}`}
+                  coordinate={marker.coordinate}
+                  title={`Test on ${format(parseISO(marker.date), 'MMM d, yyyy')}`}
+                  tracksViewChanges={false}
+                >
+                  <View style={[styles.customMarker, { borderColor: getParamColor(selectedParameter) }]}>
+                    <View style={[styles.markerDot, { backgroundColor: getParamColor(selectedParameter) }]} />
+                  </View>
+                </Marker>
+              ))}
+            </MapView>
+            {/* Overlay spinner shown only while map tiles load for the first time */}
+            {!isMapReady && (
+              <View style={[styles.mapLoaderOverlay, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }]}>
                 <ActivityIndicator size="small" color={COLORS.accent} />
               </View>
             )}

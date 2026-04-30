@@ -1,589 +1,475 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Saathi AI — Push Notification Sender</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Saathi AI — Notification Sender</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+:root{--bg:#0a0f0d;--s:#111a14;--s2:#192218;--b:#1f3127;--p:#1a7b3c;--pl:#22a352;--pg:rgba(26,123,60,.22);--ac:#3ddc84;--t:#e8f5ee;--tm:#7da98a;--err:#ff5252;--ok:#00c853;--r:13px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--t);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:36px 16px 80px}
+.hdr{text-align:center;margin-bottom:32px}
+.logo{display:inline-flex;align-items:center;gap:10px;margin-bottom:10px}
+.logo-ic{width:48px;height:48px;background:linear-gradient(135deg,var(--p),var(--ac));border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 0 20px var(--pg)}
+.logo-tx{font-size:24px;font-weight:700;letter-spacing:-.5px}.logo-tx span{color:var(--ac)}
+.hdr p{color:var(--tm);font-size:13px}
+.card{background:var(--s);border:1px solid var(--b);border-radius:18px;padding:32px 36px;width:100%;max-width:660px;box-shadow:0 8px 48px rgba(0,0,0,.5)}
+.sec{font-size:10.5px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--ac);margin-bottom:16px}
+.field{margin-bottom:20px}
+label{display:block;font-size:13px;font-weight:500;color:var(--tm);margin-bottom:7px}
+label span{color:var(--err)}
+input,textarea,select{width:100%;background:var(--s2);border:1.5px solid var(--b);border-radius:9px;color:var(--t);font-family:'Inter',sans-serif;font-size:13.5px;padding:11px 14px;transition:.2s;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--pl);box-shadow:0 0 0 3px var(--pg)}
+textarea{resize:vertical;min-height:80px}
+.hint{font-size:11px;color:var(--tm);margin-top:5px;line-height:1.5}
+hr{border:none;border-top:1px solid var(--b);margin:26px 0}
 
-    :root {
-      --bg: #0a0f0d;
-      --surface: #111a14;
-      --surface2: #192218;
-      --border: #1f3127;
-      --primary: #1a7b3c;
-      --primary-light: #22a352;
-      --primary-glow: rgba(26, 123, 60, 0.25);
-      --accent: #3ddc84;
-      --text: #e8f5ee;
-      --text-muted: #7da98a;
-      --error: #ff5252;
-      --success: #00c853;
-      --warning: #ffa726;
-      --radius: 14px;
-    }
+/* Icon upload */
+.icon-row{display:flex;gap:12px;align-items:flex-start}
+.icon-drop{width:80px;height:80px;border-radius:12px;border:1.5px dashed var(--b);background:var(--s2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:.2s;flex-shrink:0;overflow:hidden;position:relative}
+.icon-drop:hover{border-color:var(--pl)}
+.icon-drop img{width:100%;height:100%;object-fit:cover;display:none}
+.icon-drop .ph{font-size:22px;pointer-events:none}
+.icon-drop .ph-lbl{font-size:9px;color:var(--tm);margin-top:3px;pointer-events:none}
+#icon-file{display:none}
+.icon-right{flex:1}
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+/* Tabs */
+.tabs{display:flex;gap:8px;margin-bottom:18px}
+.tab{flex:1;padding:10px;border-radius:9px;border:1.5px solid var(--b);background:transparent;color:var(--tm);font-size:13px;font-weight:500;cursor:pointer;transition:.2s;text-align:center}
+.tab.on{background:var(--pg);border-color:var(--pl);color:var(--ac)}
 
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 40px 20px 80px;
-    }
+/* Token list */
+.t-list{display:flex;flex-direction:column;gap:8px}
+.t-row{display:flex;gap:8px;align-items:center}
+.t-row input{flex:1}
+.ic-btn{width:36px;height:36px;border-radius:8px;border:1.5px solid var(--b);background:var(--s2);color:var(--tm);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.2s;flex-shrink:0}
+.ic-btn:hover{border-color:var(--pl);color:var(--ac)}
+.ic-btn.rm:hover{border-color:var(--err);color:var(--err)}
 
-    /* Header */
-    .header {
-      text-align: center;
-      margin-bottom: 40px;
-    }
-    .logo {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .logo-icon {
-      width: 52px; height: 52px;
-      background: linear-gradient(135deg, var(--primary), var(--accent));
-      border-radius: 14px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 24px;
-      box-shadow: 0 0 24px var(--primary-glow);
-    }
-    .logo-text { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
-    .logo-text span { color: var(--accent); }
-    .header p { color: var(--text-muted); font-size: 14px; margin-top: 6px; }
+/* Broadcast textarea */
+#bc-area{min-height:120px;font-family:'Courier New',monospace;font-size:12px}
 
-    /* Card */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 36px 40px;
-      width: 100%;
-      max-width: 640px;
-      box-shadow: 0 8px 48px rgba(0,0,0,0.5);
-    }
+/* Preview */
+.prev-wrap{background:var(--s2);border:1px solid var(--b);border-radius:13px;overflow:hidden;margin-bottom:22px}
+.prev-top{display:flex;gap:12px;align-items:flex-start;padding:14px 16px}
+.prev-ic{width:40px;height:40px;border-radius:9px;background:linear-gradient(135deg,var(--p),var(--ac));display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;overflow:hidden}
+.prev-ic img{width:100%;height:100%;object-fit:cover;display:none}
+.prev-c{flex:1}
+.prev-app{font-size:10px;color:var(--tm)}
+.prev-title{font-size:14px;font-weight:600}
+.prev-body{font-size:12px;color:var(--tm);line-height:1.4}
+.prev-sub{font-size:11px;color:var(--ac);margin-top:3px;font-style:italic}
+#prev-img-wrap{display:none;border-top:1px solid var(--b)}
+#prev-img-wrap img{width:100%;max-height:160px;object-fit:cover;display:block}
 
-    .section-title {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 18px;
-    }
+/* Send */
+.btn-send{width:100%;padding:15px;background:linear-gradient(135deg,var(--p),#2e9e54);border:none;border-radius:11px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:.2s;position:relative}
+.btn-send:hover{transform:translateY(-1px);box-shadow:0 8px 24px var(--pg)}
+.btn-send:active{transform:none}
+.btn-send:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.spin{display:none;width:18px;height:18px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;margin:0 auto}
+.btn-send.ld .lbl{display:none}.btn-send.ld .spin{display:block}
+@keyframes sp{to{transform:rotate(360deg)}}
 
-    .field { margin-bottom: 22px; }
-    label {
-      display: block;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-muted);
-      margin-bottom: 8px;
-    }
-    label span { color: var(--error); margin-left: 2px; }
+/* Log */
+.log{background:var(--s2);border:1px solid var(--b);border-radius:9px;padding:12px 14px;font-size:11.5px;font-family:'Courier New',monospace;color:var(--tm);max-height:180px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin-top:14px;display:none}
+.log.vis{display:block}.log.ok{color:#69f0ae;border-color:var(--ok)}.log.fail{color:#ff8a80;border-color:var(--err)}
 
-    input, textarea, select {
-      width: 100%;
-      background: var(--surface2);
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      padding: 12px 16px;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      outline: none;
-    }
-    input:focus, textarea:focus, select:focus {
-      border-color: var(--primary-light);
-      box-shadow: 0 0 0 3px var(--primary-glow);
-    }
-    textarea { resize: vertical; min-height: 90px; }
-    select option { background: var(--surface2); }
+/* Toast */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(70px);background:var(--s);border:1px solid var(--b);border-radius:11px;padding:12px 22px;font-size:13.5px;font-weight:500;box-shadow:0 8px 32px rgba(0,0,0,.5);transition:transform .35s cubic-bezier(.34,1.56,.64,1);display:flex;align-items:center;gap:9px;z-index:999}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.ok{border-color:var(--ok)}.toast.fail{border-color:var(--err)}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.toast.ok .dot{background:var(--ok)}.toast.fail .dot{background:var(--err)}
 
-    .hint {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 6px;
-      line-height: 1.5;
-    }
-
-    .divider {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 30px 0;
-    }
-
-    /* Target row */
-    .target-tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 20px;
-    }
-    .tab {
-      flex: 1;
-      padding: 10px;
-      border-radius: 10px;
-      border: 1.5px solid var(--border);
-      background: transparent;
-      color: var(--text-muted);
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-align: center;
-    }
-    .tab.active {
-      background: var(--primary-glow);
-      border-color: var(--primary-light);
-      color: var(--accent);
-    }
-
-    .token-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .token-row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    .token-row input { flex: 1; }
-    .btn-icon {
-      width: 38px; height: 38px;
-      border-radius: 8px;
-      border: 1.5px solid var(--border);
-      background: var(--surface2);
-      color: var(--text-muted);
-      font-size: 18px;
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.2s;
-      flex-shrink: 0;
-    }
-    .btn-icon:hover { border-color: var(--primary-light); color: var(--accent); }
-    .btn-icon.red:hover { border-color: var(--error); color: var(--error); }
-
-    /* Preview card */
-    .preview-wrap {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 18px 20px;
-      display: flex;
-      gap: 14px;
-      align-items: flex-start;
-      margin-bottom: 24px;
-    }
-    .preview-icon {
-      width: 42px; height: 42px;
-      background: linear-gradient(135deg, var(--primary), var(--accent));
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px;
-      flex-shrink: 0;
-    }
-    .preview-content { flex: 1; }
-    .preview-app { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
-    .preview-title { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
-    .preview-body { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
-    .preview-sub { font-size: 11px; color: var(--accent); margin-top: 4px; font-style: italic; }
-    .preview-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-bottom: 10px;
-      font-weight: 500;
-    }
-
-    /* Send button */
-    .btn-send {
-      width: 100%;
-      padding: 16px;
-      background: linear-gradient(135deg, var(--primary), #2e9e54);
-      border: none;
-      border-radius: 12px;
-      color: white;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      letter-spacing: 0.3px;
-      transition: all 0.2s;
-      position: relative;
-      overflow: hidden;
-    }
-    .btn-send:hover { transform: translateY(-1px); box-shadow: 0 8px 24px var(--primary-glow); }
-    .btn-send:active { transform: translateY(0); }
-    .btn-send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-    .btn-send .spinner {
-      display: none;
-      width: 18px; height: 18px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      margin: 0 auto;
-    }
-    .btn-send.loading .btn-label { display: none; }
-    .btn-send.loading .spinner { display: block; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Toast */
-    .toast {
-      position: fixed;
-      bottom: 32px;
-      left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px 24px;
-      font-size: 14px;
-      font-weight: 500;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      z-index: 999;
-      white-space: nowrap;
-    }
-    .toast.show { transform: translateX(-50%) translateY(0); }
-    .toast.success { border-color: var(--success); }
-    .toast.error { border-color: var(--error); }
-    .toast-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .toast.success .toast-dot { background: var(--success); }
-    .toast.error .toast-dot { background: var(--error); }
-
-    /* Response log */
-    .log-area {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 16px;
-      font-size: 12px;
-      font-family: 'Courier New', monospace;
-      color: var(--text-muted);
-      max-height: 200px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-break: break-all;
-      margin-top: 16px;
-      display: none;
-    }
-    .log-area.visible { display: block; }
-    .log-area.ok { color: #69f0ae; border-color: var(--success); }
-    .log-area.fail { color: #ff8a80; border-color: var(--error); }
-
-    .badge {
-      display: inline-block;
-      background: var(--primary-glow);
-      border: 1px solid var(--primary);
-      color: var(--accent);
-      font-size: 10px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 20px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      margin-left: 8px;
-      vertical-align: middle;
-    }
-  </style>
+.badge{display:inline-block;background:var(--pg);border:1px solid var(--p);color:var(--ac);font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase;margin-left:8px;vertical-align:middle}
+.cnt{font-size:11px;color:var(--ac);font-weight:600;margin-top:6px}
+</style>
 </head>
 <body>
 
-  <!-- Header -->
-  <div class="header">
-    <div class="logo">
-      <div class="logo-icon">🌱</div>
-      <div class="logo-text">Saathi <span>AI</span></div>
-    </div>
-    <p>Push Notification Sender &nbsp;·&nbsp; Expo FCM Gateway<span class="badge">Admin</span></p>
+<div class="hdr">
+  <div class="logo">
+    <div class="logo-ic">🌱</div>
+    <div class="logo-tx">Saathi <span>AI</span></div>
   </div>
+  <p>Push Notification Sender &nbsp;·&nbsp; Expo FCM Gateway <span class="badge">Admin</span></p>
+</div>
 
-  <div class="card">
+<div class="card">
 
-    <!-- Notification Content -->
-    <div class="section-title">📨 Notification Content</div>
+  <!-- SECTION: Content -->
+  <div class="sec">📨 Notification Content</div>
 
-    <div class="field">
-      <label>Title <span>*</span></label>
-      <input id="notif-title" type="text" placeholder="e.g. Soil Alert 🔴 — Low Nitrogen Detected" maxlength="100" />
-    </div>
-
-    <div class="field">
-      <label>Message (Body) <span>*</span></label>
-      <textarea id="notif-body" placeholder="Your soil nitrogen level is critically low. Tap to see recommendations."></textarea>
-    </div>
-
-    <div class="field">
-      <label>Subtitle / Subheading</label>
-      <input id="notif-subtitle" type="text" placeholder="e.g. Field #3 — Rabi Season" maxlength="80" />
-      <div class="hint">Shown below the title on iOS. Android may show it as ticker text.</div>
-    </div>
-
-    <div class="field">
-      <label>Redirect URL / Deep Link</label>
-      <input id="notif-url" type="text" placeholder="saathiai://history  OR  https://saathiai.org/news" />
-      <div class="hint">
-        Use <strong>saathiai://history</strong> to open History screen,
-        <strong>saathiai://ai-chat</strong> for AI Chat,
-        or any <code>https://</code> URL to open in browser.
+  <!-- Icon upload + Title/Body -->
+  <div class="field">
+    <label>Notification Icon <small style="color:var(--tm);font-weight:400">(optional — per notification)</small></label>
+    <div class="icon-row">
+      <div class="icon-drop" id="icon-drop" onclick="document.getElementById('icon-file').click()" title="Click to upload icon">
+        <img id="icon-preview-img" alt="icon"/>
+        <div class="ph" id="ph-icon">🖼️</div>
+        <div class="ph-lbl" id="ph-lbl">Upload</div>
       </div>
-    </div>
-
-    <div class="field">
-      <label>Notification Type</label>
-      <select id="notif-type">
-        <option value="system">🔔 System</option>
-        <option value="alert">🔴 Soil Alert</option>
-        <option value="insight">🧠 AI Insight</option>
-        <option value="reminder">⏰ Reminder</option>
-        <option value="sync">✅ Sync Complete</option>
-        <option value="battery">🔋 Battery Alert</option>
-      </select>
-    </div>
-
-    <!-- Live Preview -->
-    <div class="preview-label">📱 Live Preview</div>
-    <div class="preview-wrap">
-      <div class="preview-icon">🌱</div>
-      <div class="preview-content">
-        <div class="preview-app">Saathi AI  ·  now</div>
-        <div class="preview-title" id="prev-title">Your notification title will appear here</div>
-        <div class="preview-body" id="prev-body">Your notification message will appear here...</div>
-        <div class="preview-sub" id="prev-sub"></div>
-      </div>
-    </div>
-
-    <hr class="divider" />
-
-    <!-- Target -->
-    <div class="section-title">🎯 Send To</div>
-    <div class="target-tabs">
-      <button class="tab active" onclick="setMode('tokens')" id="tab-tokens">Specific Tokens</button>
-      <button class="tab" onclick="setMode('broadcast')" id="tab-broadcast">Broadcast All Users</button>
-    </div>
-
-    <div id="panel-tokens">
-      <div class="hint" style="margin-bottom:14px;">
-        Enter one or more <strong>Expo Push Tokens</strong> (format: <code>ExponentPushToken[xxxx]</code>).
-        You can find each user's token in your database table <code>user_devices</code> or from the app logs.
-      </div>
-      <div class="token-list" id="token-list">
-        <div class="token-row">
-          <input type="text" class="token-input" placeholder="ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" />
-          <button class="btn-icon" onclick="addToken()" title="Add another token">+</button>
+      <div class="icon-right">
+        <input type="text" id="icon-url" placeholder="https://saathiai.org/assets/icon.png  (public URL)"/>
+        <div class="hint" style="margin-top:6px">
+          Upload an image <strong>OR</strong> paste a public HTTPS URL.<br/>
+          This icon appears in the notification preview on the device.<br/>
+          <span style="color:var(--ac)">💡 Host your icon at saathiai.org/public/ and paste the URL here.</span>
         </div>
       </div>
     </div>
+    <input type="file" id="icon-file" accept="image/*"/>
+  </div>
 
-    <div id="panel-broadcast" style="display:none;">
-      <div class="hint">
-        This will send to <strong>all registered user devices</strong> by fetching tokens from your backend API
-        at <code>https://www.saathiai.org/api/notifications/tokens</code>.
-        Make sure that endpoint is implemented and returns <code>{ tokens: ["ExponentPushToken[...]", ...] }</code>.
+  <!-- Large Image -->
+  <div class="field">
+    <label>Large Notification Image <small style="color:var(--tm);font-weight:400">(optional — banner image below text)</small></label>
+    <div class="icon-row">
+      <div class="icon-drop" id="img-drop" onclick="document.getElementById('img-file').click()" title="Click to upload image" style="width:80px;height:80px;border-radius:8px">
+        <img id="img-preview-img" alt="img"/>
+        <div class="ph" id="ph-img">🌄</div>
+        <div class="ph-lbl" id="ph-img-lbl">Banner</div>
       </div>
-      <div class="field" style="margin-top:14px;">
-        <label>Backend API Token (for fetching all tokens)</label>
-        <input id="api-token" type="password" placeholder="Your server API secret / admin JWT" />
+      <div class="icon-right">
+        <input type="text" id="image-url" placeholder="https://saathiai.org/assets/soil-banner.png"/>
+        <div class="hint" style="margin-top:6px">
+          Shows as an expandable image beneath the notification text (Android &amp; iOS).<br/>
+          Must be a public HTTPS URL to display on device.
+        </div>
       </div>
     </div>
-
-    <hr class="divider" />
-
-    <!-- Send -->
-    <div class="preview-label">🚀 Fire It Off</div>
-    <button class="btn-send" id="btn-send" onclick="sendNotification()">
-      <span class="btn-label">Send Notification</span>
-      <div class="spinner"></div>
-    </button>
-
-    <div id="response-log" class="log-area"></div>
+    <input type="file" id="img-file" accept="image/*"/>
   </div>
 
-  <!-- Toast -->
-  <div class="toast" id="toast">
-    <div class="toast-dot"></div>
-    <span id="toast-msg"></span>
+  <div class="field">
+    <label>Title <span>*</span></label>
+    <input id="f-title" type="text" placeholder="e.g. Soil Alert 🔴 — Low Nitrogen Detected" maxlength="100"/>
   </div>
+
+  <div class="field">
+    <label>Message (Body) <span>*</span></label>
+    <textarea id="f-body" placeholder="Your soil nitrogen level is critically low. Tap to view recommendations."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Subtitle / Subheading</label>
+    <input id="f-sub" type="text" placeholder="e.g. Field #3 — Rabi Season" maxlength="80"/>
+    <div class="hint">Visible on iOS lock screen below the title.</div>
+  </div>
+
+  <div class="field">
+    <label>Redirect URL / Deep Link</label>
+    <input id="f-url" type="text" placeholder="saathiai://history  OR  https://saathiai.org/news"/>
+    <div class="hint">
+      <strong>saathiai://history</strong> → History &nbsp;|&nbsp;
+      <strong>saathiai://ai-chat</strong> → AI Chat &nbsp;|&nbsp;
+      <strong>saathiai://connect</strong> → Agni Device
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Notification Type</label>
+    <select id="f-type">
+      <option value="system">🔔 System</option>
+      <option value="alert">🔴 Soil Alert</option>
+      <option value="insight">🧠 AI Insight</option>
+      <option value="reminder">⏰ Reminder</option>
+      <option value="sync">✅ Sync Complete</option>
+      <option value="battery">🔋 Battery Alert</option>
+    </select>
+  </div>
+
+  <!-- Live Preview -->
+  <div style="font-size:11px;color:var(--tm);font-weight:500;margin-bottom:9px">📱 Live Preview</div>
+  <div class="prev-wrap">
+    <div class="prev-top">
+      <div class="prev-ic" id="prev-icon-box">
+        <img id="prev-icon" alt=""/>
+        <span id="prev-icon-emoji">🌱</span>
+      </div>
+      <div class="prev-c">
+        <div class="prev-app">Saathi AI &nbsp;·&nbsp; now</div>
+        <div class="prev-title" id="prev-t">Your notification title appears here</div>
+        <div class="prev-body" id="prev-b">Your notification message appears here...</div>
+        <div class="prev-sub" id="prev-s"></div>
+      </div>
+    </div>
+    <div id="prev-img-wrap">
+      <img id="prev-banner" src="" alt="banner"/>
+    </div>
+  </div>
+
+  <hr/>
+
+  <!-- SECTION: Target -->
+  <div class="sec">🎯 Send To</div>
+  <div class="tabs">
+    <button class="tab on" id="tab-single" onclick="setMode('single')">Specific Token(s)</button>
+    <button class="tab" id="tab-bc" onclick="setMode('bc')">Broadcast — All Users</button>
+  </div>
+
+  <!-- Single mode -->
+  <div id="panel-single">
+    <div class="hint" style="margin-bottom:12px">
+      Paste one or more <strong>Expo Push Tokens</strong> (format: <code>ExponentPushToken[...]</code>).
+      Get them from your Neon DB: <code style="color:var(--ac)">SELECT expo_push_token FROM user_devices;</code>
+    </div>
+    <div class="t-list" id="t-list">
+      <div class="t-row">
+        <input type="text" class="ti" placeholder="ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"/>
+        <button class="ic-btn" onclick="addToken()">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Broadcast mode -->
+  <div id="panel-bc" style="display:none">
+    <div class="hint" style="margin-bottom:14px">
+      <strong>Step 1</strong> — Run this SQL on your Neon DB console:
+      <br/><br/>
+      <code style="background:var(--s2);display:block;padding:10px 12px;border-radius:8px;color:var(--ac);font-size:11.5px;line-height:1.7;border:1px solid var(--b)">SELECT expo_push_token
+FROM user_devices
+WHERE expo_push_token IS NOT NULL;</code>
+      <br/>
+      <strong>Step 2</strong> — Copy the result column and paste all tokens below (one per line):
+    </div>
+    <textarea id="bc-area" placeholder="ExponentPushToken[aaa...]&#10;ExponentPushToken[bbb...]&#10;ExponentPushToken[ccc...]&#10;&#10;Paste one token per line — copied directly from your Neon DB query result."></textarea>
+    <div class="cnt" id="bc-count">0 tokens pasted</div>
+  </div>
+
+  <hr/>
+
+  <!-- Send -->
+  <div style="font-size:11px;color:var(--tm);font-weight:500;margin-bottom:12px">🚀 Fire It Off</div>
+  <button class="btn-send" id="btn-send" onclick="doSend()">
+    <span class="lbl">Send Notification</span>
+    <div class="spin"></div>
+  </button>
+
+  <div id="log" class="log"></div>
+</div>
+
+<div class="toast" id="toast">
+  <div class="dot"></div>
+  <span id="toast-msg"></span>
+</div>
 
 <script>
-  // ─── Live Preview ──────────────────────────────────────
-  document.getElementById('notif-title').addEventListener('input', e => {
-    document.getElementById('prev-title').textContent = e.target.value || 'Your notification title will appear here';
-  });
-  document.getElementById('notif-body').addEventListener('input', e => {
-    document.getElementById('prev-body').textContent = e.target.value || 'Your notification message will appear here...';
-  });
-  document.getElementById('notif-subtitle').addEventListener('input', e => {
-    document.getElementById('prev-sub').textContent = e.target.value;
-  });
+// ── State ──────────────────────────────────────────────
+let mode = 'single';
+let uploadedIconUrl = null; // object URL from file upload (preview only)
+let uploadedBannerUrl = null;
 
-  // ─── Mode Tabs ──────────────────────────────────────────
-  let currentMode = 'tokens';
-  function setMode(mode) {
-    currentMode = mode;
-    document.getElementById('tab-tokens').classList.toggle('active', mode === 'tokens');
-    document.getElementById('tab-broadcast').classList.toggle('active', mode === 'broadcast');
-    document.getElementById('panel-tokens').style.display = mode === 'tokens' ? 'block' : 'none';
-    document.getElementById('panel-broadcast').style.display = mode === 'broadcast' ? 'block' : 'none';
-  }
+// ── Mode tabs ──────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('tab-single').classList.toggle('on', m==='single');
+  document.getElementById('tab-bc').classList.toggle('on', m==='bc');
+  document.getElementById('panel-single').style.display = m==='single'?'block':'none';
+  document.getElementById('panel-bc').style.display = m==='bc'?'block':'none';
+}
 
-  // ─── Token Rows ─────────────────────────────────────────
-  function addToken() {
-    const list = document.getElementById('token-list');
-    const row = document.createElement('div');
-    row.className = 'token-row';
-    row.innerHTML = `
-      <input type="text" class="token-input" placeholder="ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" />
-      <button class="btn-icon red" onclick="this.parentElement.remove()" title="Remove">×</button>
-    `;
-    list.appendChild(row);
-    row.querySelector('input').focus();
-  }
+// ── Icon upload ────────────────────────────────────────
+function setupUpload(fileId, previewImgId, dropId, phId, phLblId, urlId, prevIconId, isBanner) {
+  const file = document.getElementById(fileId);
+  const prev = document.getElementById(previewImgId);
+  const ph   = document.getElementById(phId);
+  const lbl  = document.getElementById(phLblId);
 
-  function getTokens() {
-    return [...document.querySelectorAll('.token-input')]
-      .map(i => i.value.trim())
-      .filter(Boolean);
-  }
-
-  // ─── Toast ──────────────────────────────────────────────
-  function showToast(msg, type = 'success') {
-    const t = document.getElementById('toast');
-    t.className = `toast ${type}`;
-    document.getElementById('toast-msg').textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3800);
-  }
-
-  // ─── Log ────────────────────────────────────────────────
-  function showLog(text, ok) {
-    const el = document.getElementById('response-log');
-    el.textContent = text;
-    el.className = `log-area visible ${ok ? 'ok' : 'fail'}`;
-  }
-
-  // ─── Build Expo Message ─────────────────────────────────
-  function buildMessage(to) {
-    const title   = document.getElementById('notif-title').value.trim();
-    const body    = document.getElementById('notif-body').value.trim();
-    const subtitle= document.getElementById('notif-subtitle').value.trim();
-    const url     = document.getElementById('notif-url').value.trim();
-    const type    = document.getElementById('notif-type').value;
-
-    const msg = {
-      to,
-      title,
-      body,
-      sound: 'default',
-      priority: 'high',
-      data: { type, ...(url ? { url } : {}) },
-      channelId: type === 'alert' ? 'alerts' : 'default',
-    };
-
-    if (subtitle) msg.subtitle = subtitle;
-
-    return msg;
-  }
-
-  // ─── Send ────────────────────────────────────────────────
-  async function sendNotification() {
-    const title = document.getElementById('notif-title').value.trim();
-    const body  = document.getElementById('notif-body').value.trim();
-
-    if (!title) { showToast('Please enter a notification title', 'error'); return; }
-    if (!body)  { showToast('Please enter a notification message', 'error'); return; }
-
-    let tokens = [];
-
-    if (currentMode === 'tokens') {
-      tokens = getTokens();
-      if (!tokens.length) { showToast('Add at least one Expo Push Token', 'error'); return; }
-      const bad = tokens.filter(t => !t.startsWith('ExponentPushToken['));
-      if (bad.length) { showToast('Token format must be ExponentPushToken[...]', 'error'); return; }
+  file.addEventListener('change', () => {
+    const f = file.files[0]; if (!f) return;
+    const url = URL.createObjectURL(f);
+    prev.src = url; prev.style.display = 'block';
+    if (ph) ph.style.display = 'none';
+    if (lbl) lbl.style.display = 'none';
+    document.getElementById(urlId).value = ''; // clear URL field
+    if (!isBanner) {
+      uploadedIconUrl = url; updateIconPreview();
     } else {
-      // Broadcast: fetch tokens from backend
-      const apiToken = document.getElementById('api-token').value.trim();
-      showToast('Fetching all tokens from backend...', 'success');
-      try {
-        const res = await fetch('https://www.saathiai.org/api/notifications/tokens', {
-          headers: { Authorization: `Bearer ${apiToken}` }
-        });
-        const data = await res.json();
-        tokens = data.tokens || [];
-        if (!tokens.length) { showToast('No tokens found on server', 'error'); return; }
-      } catch (e) {
-        showToast('Failed to fetch tokens from backend', 'error');
-        showLog('Error: ' + e.message, false);
-        return;
-      }
+      uploadedBannerUrl = url; updateBannerPreview();
     }
+  });
+}
 
-    // Set button loading
-    const btn = document.getElementById('btn-send');
-    btn.classList.add('loading');
-    btn.disabled = true;
+setupUpload('icon-file','icon-preview-img','icon-drop','ph-icon','ph-lbl','icon-url',null,false);
+setupUpload('img-file','img-preview-img','img-drop','ph-img','ph-img-lbl','image-url',null,true);
 
-    // Chunk tokens into batches of 100 (Expo limit)
-    const CHUNK = 100;
-    const chunks = [];
-    for (let i = 0; i < tokens.length; i += CHUNK) chunks.push(tokens.slice(i, i + CHUNK));
+// ── URL fields trigger preview ─────────────────────────
+document.getElementById('icon-url').addEventListener('input', e => {
+  const v = e.target.value.trim();
+  if (v) { uploadedIconUrl = null; clearUpload('icon-preview-img','ph-icon','ph-lbl'); }
+  updateIconPreview();
+});
+document.getElementById('image-url').addEventListener('input', e => {
+  const v = e.target.value.trim();
+  if (v) { uploadedBannerUrl = null; clearUpload('img-preview-img','ph-img','ph-img-lbl'); }
+  updateBannerPreview();
+});
 
-    let allResults = [];
-    let hasError = false;
+function clearUpload(imgId, phId, lblId) {
+  const img = document.getElementById(imgId);
+  img.src=''; img.style.display='none';
+  const ph = document.getElementById(phId); if(ph) ph.style.display='';
+  const lb = document.getElementById(lblId); if(lb) lb.style.display='';
+}
 
-    try {
-      for (const chunk of chunks) {
-        const messages = chunk.map(t => buildMessage(t));
+function getIconSrc() {
+  return uploadedIconUrl || document.getElementById('icon-url').value.trim() || null;
+}
+function getBannerSrc() {
+  return uploadedBannerUrl || document.getElementById('image-url').value.trim() || null;
+}
 
-        const res = await fetch('https://exp.host/--/api/v2/push/send', {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Accept-Encoding': 'gzip, deflate',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(messages),
-        });
+function updateIconPreview() {
+  const src = getIconSrc();
+  const img = document.getElementById('prev-icon');
+  const emoji = document.getElementById('prev-icon-emoji');
+  if (src) { img.src=src; img.style.display='block'; emoji.style.display='none'; }
+  else     { img.style.display='none'; emoji.style.display=''; }
+}
 
-        const json = await res.json();
-        allResults.push(...(json.data || []));
+function updateBannerPreview() {
+  const src = getBannerSrc();
+  const wrap = document.getElementById('prev-img-wrap');
+  const img  = document.getElementById('prev-banner');
+  if (src) { img.src=src; wrap.style.display='block'; }
+  else     { wrap.style.display='none'; }
+}
 
-        if (!res.ok) hasError = true;
+// ── Live text preview ──────────────────────────────────
+document.getElementById('f-title').addEventListener('input', e =>
+  document.getElementById('prev-t').textContent = e.target.value || 'Your notification title appears here');
+document.getElementById('f-body').addEventListener('input', e =>
+  document.getElementById('prev-b').textContent = e.target.value || 'Your notification message appears here...');
+document.getElementById('f-sub').addEventListener('input', e =>
+  document.getElementById('prev-s').textContent = e.target.value);
 
-        const failures = (json.data || []).filter(r => r.status === 'error');
-        if (failures.length) hasError = true;
-      }
+// ── Token list ─────────────────────────────────────────
+function addToken() {
+  const list = document.getElementById('t-list');
+  const row  = document.createElement('div');
+  row.className = 't-row';
+  row.innerHTML = `<input type="text" class="ti" placeholder="ExponentPushToken[...]"/>
+    <button class="ic-btn rm" onclick="this.parentElement.remove()">×</button>`;
+  list.appendChild(row);
+  row.querySelector('input').focus();
+}
 
-      const ok = allResults.filter(r => r.status === 'ok').length;
-      const fail = allResults.filter(r => r.status === 'error').length;
-
-      if (fail === 0) {
-        showToast(`✅ Sent to ${ok} device${ok !== 1 ? 's' : ''} successfully!`, 'success');
-      } else {
-        showToast(`⚠️ ${ok} sent, ${fail} failed — check log`, 'error');
-      }
-
-      showLog(JSON.stringify(allResults, null, 2), !hasError);
-    } catch (err) {
-      showToast('Network error — check console', 'error');
-      showLog('Error: ' + err.message, false);
-    } finally {
-      btn.classList.remove('loading');
-      btn.disabled = false;
-    }
+function getTokens() {
+  if (mode === 'single') {
+    return [...document.querySelectorAll('.ti')].map(i=>i.value.trim()).filter(Boolean);
+  } else {
+    return document.getElementById('bc-area').value
+      .split('\n').map(l=>l.trim()).filter(l=>l.startsWith('ExponentPushToken['));
   }
+}
+
+// ── Broadcast count ────────────────────────────────────
+document.getElementById('bc-area') && document.getElementById('bc-area').addEventListener('input', () => {
+  const n = getTokens().length;
+  document.getElementById('bc-count').textContent = `${n} token${n!==1?'s':''} ready to send`;
+});
+
+// ── Toast ──────────────────────────────────────────────
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.className = `toast ${type}`;
+  document.getElementById('toast-msg').textContent = msg;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 3800);
+}
+
+// ── Log ────────────────────────────────────────────────
+function showLog(text, ok) {
+  const el = document.getElementById('log');
+  el.textContent = text;
+  el.className = `log vis ${ok?'ok':'fail'}`;
+}
+
+// ── Build message ──────────────────────────────────────
+function buildMsg(to) {
+  const title    = document.getElementById('f-title').value.trim();
+  const body     = document.getElementById('f-body').value.trim();
+  const subtitle = document.getElementById('f-sub').value.trim();
+  const url      = document.getElementById('f-url').value.trim();
+  const type     = document.getElementById('f-type').value;
+  const iconUrl  = document.getElementById('icon-url').value.trim();
+  const bannerUrl= document.getElementById('image-url').value.trim();
+
+  const msg = {
+    to, title, body,
+    sound: 'default',
+    priority: 'high',
+    channelId: type === 'alert' ? 'alerts' : 'default',
+    data: { type, ...(url ? {url} : {}) },
+  };
+  if (subtitle) msg.subtitle = subtitle;
+  // Only public HTTPS URLs work for Expo Push API (not object URLs)
+  if (iconUrl && iconUrl.startsWith('http')) msg.icon = iconUrl;
+  if (bannerUrl && bannerUrl.startsWith('http')) msg.image = bannerUrl;
+  return msg;
+}
+
+// ── Send ───────────────────────────────────────────────
+async function doSend() {
+  const title = document.getElementById('f-title').value.trim();
+  const body  = document.getElementById('f-body').value.trim();
+  if (!title) { toast('Enter a notification title', 'fail'); return; }
+  if (!body)  { toast('Enter a notification message', 'fail'); return; }
+
+  const tokens = getTokens();
+  if (!tokens.length) {
+    toast(mode==='single'
+      ? 'Paste at least one Expo Push Token'
+      : 'No valid tokens found — paste tokens (one per line) in the broadcast box', 'fail');
+    return;
+  }
+
+  const bad = tokens.filter(t => !t.startsWith('ExponentPushToken['));
+  if (bad.length && mode==='single') {
+    toast('Token must start with ExponentPushToken[...]', 'fail'); return;
+  }
+
+  const btn = document.getElementById('btn-send');
+  btn.classList.add('ld'); btn.disabled = true;
+
+  let ok=0, fail=0, allRes=[];
+  const CHUNK = 100;
+
+  try {
+    for (let i=0; i<tokens.length; i+=CHUNK) {
+      const batch = tokens.slice(i, i+CHUNK);
+      const msgs  = batch.map(t => buildMsg(t));
+
+      const res = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','Accept':'application/json'},
+        body: JSON.stringify(msgs),
+      });
+
+      const json = await res.json();
+      const data = json.data || [];
+      allRes.push(...data);
+      ok   += data.filter(r=>r.status==='ok').length;
+      fail += data.filter(r=>r.status==='error').length;
+    }
+
+    if (fail===0) {
+      toast(`✅ Sent to ${ok} device${ok!==1?'s':''}!`, 'ok');
+    } else {
+      toast(`⚠️ ${ok} sent · ${fail} failed — see log`, 'fail');
+    }
+    showLog(JSON.stringify(allRes, null, 2), fail===0);
+  } catch(e) {
+    toast('Network error — see log', 'fail');
+    showLog('Error: '+e.message, false);
+  } finally {
+    btn.classList.remove('ld'); btn.disabled = false;
+  }
+}
 </script>
 </body>
 </html>

@@ -14,13 +14,13 @@ export interface UserProfile {
 }
 
 /**
- * GET /api/dashboard — Dashboard data + AI status.
- * Also returns user profile embedded in the response.
+ * GET /api/user — Fetches the freshly-saved user profile directly.
+ * Using /user instead of /dashboard to avoid stale cached data after a profile update.
  * Requires Authorization header.
  */
 export async function getUserProfile(): Promise<UserProfile> {
-  const { data: raw } = await apiClient.get<any>('/dashboard');
-  const user = raw?.user ?? raw;
+  const { data } = await apiClient.get<any>('/user');
+  const user = data?.user ?? data;
 
   return {
     id: user?.id ?? user?._id ?? user?.userId ?? '',
