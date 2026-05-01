@@ -103,9 +103,10 @@ export function normalizeSoilTest(raw: any): SoilTest {
  */
 export async function getSoilTests(userId?: string): Promise<SoilTest[]> {
   const normalizedUserId = typeof userId === 'string' ? userId.trim() : '';
-  const endpoint = normalizedUserId.length > 0
-    ? `/api/soil-tests/${encodeURIComponent(normalizedUserId)}`
-    : '/api/soil-tests';
+  const endpoint = normalizedUserId.length > 0 
+    ? `/soil-tests/${encodeURIComponent(normalizedUserId)}`
+    : '/soil-tests';
+    
   const { data } = await apiClient.get<any>(endpoint);
   const raw: any[] = Array.isArray(data) ? data : (data?.tests ?? []);
   return raw.map(normalizeSoilTest);
@@ -115,7 +116,7 @@ export async function getSoilTests(userId?: string): Promise<SoilTest[]> {
  * GET /api/soil-tests/test/:id — Fetch a single soil test with full detail.
  */
 export async function getSoilTest(id: string): Promise<SoilTest> {
-  const { data } = await apiClient.get<any>(`/api/soil-tests/test/${id}`);
+  const { data } = await apiClient.get<any>(`/soil-tests/test/${id}`);
   return normalizeSoilTest(data?.test ?? data);
 }
 
@@ -125,7 +126,7 @@ export async function getSoilTest(id: string): Promise<SoilTest> {
 export async function saveSoilTest(
   payload: Omit<SoilTest, 'id' | 'userId' | 'testDate' | 'createdAt'>
 ): Promise<SoilTest> {
-  const { data } = await apiClient.post<any>('/api/soil-tests', payload);
+  const { data } = await apiClient.post<any>('/soil-tests', payload);
   return normalizeSoilTest(data?.test ?? data);
 }
 
@@ -215,6 +216,6 @@ export function normalizeSoilPayload(input: SoilPipelinePayload): Record<string,
  */
 export async function sendSoilDataToPipeline(input: SoilPipelinePayload): Promise<SoilTest> {
   const payload = normalizeSoilPayload(input);
-  const { data } = await apiClient.post<any>('/api/soil-tests', payload);
+  const { data } = await apiClient.post<any>('/soil-tests', payload);
   return normalizeSoilTest(data?.test ?? data);
 }

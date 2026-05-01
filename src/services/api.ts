@@ -177,11 +177,9 @@ export async function apiCall<T = any>(endpoint: string, options: RequestInit = 
 }
 
 export async function fetchSoilHistory<T = any[]>(userId: string): Promise<T> {
-  const normalizedUserId = typeof userId === 'string' ? userId.trim() : '';
-  if (!normalizedUserId) return [] as T;
-
   try {
-    const payload = await apiCall(`/soil-tests/${encodeURIComponent(normalizedUserId)}`);
+    const endpoint = userId ? `/soil-tests/${encodeURIComponent(userId)}` : '/soil-tests';
+    const payload = await apiCall(endpoint);
     return (payload ?? []) as T;
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : 'Failed to fetch soil tests');

@@ -6,6 +6,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import axios, {
   AxiosError,
   AxiosResponse,
@@ -16,7 +17,7 @@ export const API_BASE_URL = 'https://www.saathiai.org';
 /** Alias used by src/features/auth/services/auth.ts */
 export const BASE_URL = API_BASE_URL;
 
-const TOKEN_KEY   = 'saathi_auth_token';
+const TOKEN_KEY = 'saathi_auth_token';
 const REFRESH_KEY = 'saathi_refresh_token';
 
 // ─── In-memory cache ──────────────────────────────────────────────────────────
@@ -39,17 +40,34 @@ async function getToken(): Promise<string | null> {
   if (_cachedToken) {
     return _cachedToken;
   }
-  const stored = await AsyncStorage.getItem(TOKEN_KEY);
+  let stored = await AsyncStorage.getItem(TOKEN_KEY);
+  
+  if (!stored) {
+    stored = await SecureStore.getItemAsync(TOKEN_KEY);
+  }
+
+  // Fallback to legacy token keys if still not found
+  if (!stored) {
+    const LEGACY_TOKEN_KEYS = ['auth_token', 'access_token', 'saathi_access_token', 'saathi_token'] as const;
+    for (const key of LEGACY_TOKEN_KEYS) {
+      const legacyToken = await SecureStore.getItemAsync(key);
+      if (legacyToken) {
+        stored = legacyToken;
+        break;
+      }
+    }
+  }
+
   if (stored) {
     _cachedToken = stored;
-    console.log('[API] Token loaded from AsyncStorage');
+    console.log('[API] Token loaded from storage');
   }
   return stored;
 }
 
 // ─── Axios instance ───────────────────────────────────────────────────────────
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URL + '/api',
   timeout: 15_000,
   headers: {
     'Content-Type': 'application/json',
