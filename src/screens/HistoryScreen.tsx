@@ -96,13 +96,13 @@ export default function HistoryScreen({ navigation }: any) {
   const { addSoilMarkers } = useSoilMarkers();
   // isFocused kept for potential future use but map no longer depends on it
   const isFocused = useIsFocused();
-  
+
   const [logs, setLogs] = useState<SoilTest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
-  
+
   const [selectedParameter, setSelectedParameter] = useState<ParameterName>('Nitrogen');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('30 Days');
   const [mapMode, setMapMode] = useState<'satellite' | 'standard' | 'osm'>(Platform.OS === 'android' ? 'satellite' : 'standard');
@@ -131,7 +131,7 @@ export default function HistoryScreen({ navigation }: any) {
 
   const handleOpenTimeMenu = useCallback(() => {
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(e => 
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(e =>
         console.log('[History] Haptics error:', e)
       );
     } catch (e) {
@@ -142,7 +142,7 @@ export default function HistoryScreen({ navigation }: any) {
 
   const handleOpenParamMenu = useCallback(() => {
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(e => 
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(e =>
         console.log('[History] Haptics error:', e)
       );
     } catch (e) {
@@ -153,7 +153,7 @@ export default function HistoryScreen({ navigation }: any) {
 
   const handleSelectTimeFilter = useCallback((filter: TimeFilter) => {
     try {
-      Haptics.selectionAsync().catch(e => 
+      Haptics.selectionAsync().catch(e =>
         console.log('[History] Haptics error:', e)
       );
     } catch (e) {
@@ -166,7 +166,7 @@ export default function HistoryScreen({ navigation }: any) {
 
   const handleSelectParam = useCallback((param: ParameterName) => {
     try {
-      Haptics.selectionAsync().catch(e => 
+      Haptics.selectionAsync().catch(e =>
         console.log('[History] Haptics error:', e)
       );
     } catch (e) {
@@ -192,21 +192,21 @@ export default function HistoryScreen({ navigation }: any) {
       console.log('[History] No user ID - skipping fetch');
       return;
     }
-    
+
     try {
       setLoading(true);
       setError(null);
       console.log('[History] Fetching soil tests for user:', user.id);
       const data = await getSoilTests(user.id);
       console.log('[History] Successfully fetched', data.length, 'soil tests');
-      
+
       // Sort by date descending
-      const sorted = [...data].sort((a, b) => 
+      const sorted = [...data].sort((a, b) =>
         new Date(b.testDate).getTime() - new Date(a.testDate).getTime()
       );
-      
+
       setLogs(sorted);
-      
+
       // Sync with global SoilMarkersContext
       const contextMarkers = sorted
         .filter(l => l.latitude !== null && l.longitude !== null)
@@ -224,7 +224,7 @@ export default function HistoryScreen({ navigation }: any) {
           locationDetails: l.location ?? undefined,
           deviceId: l.deviceId,
         }));
-      
+
       if (contextMarkers.length > 0) {
         addSoilMarkers(contextMarkers);
       }
@@ -272,13 +272,13 @@ export default function HistoryScreen({ navigation }: any) {
   // Filter logs based on time range
   const filteredLogs = useMemo(() => {
     if (timeFilter === 'All Time') return logs;
-    
+
     const now = new Date();
     let daysToSubtract = 30;
     if (timeFilter === '60 Days') daysToSubtract = 60;
     if (timeFilter === '90 Days') daysToSubtract = 90;
     if (timeFilter === '1 Year') daysToSubtract = 365;
-    
+
     const cutoff = subDays(now, daysToSubtract);
     return logs.filter(log => isAfter(parseISO(log.testDate), cutoff));
   }, [logs, timeFilter]);
@@ -286,11 +286,11 @@ export default function HistoryScreen({ navigation }: any) {
   // Calculate statistics for the selected parameter
   const stats = useMemo(() => {
     if (!filteredLogs.length) return { avg: 0, total: 0, change: 0 };
-    
+
     const key = getParamKey(selectedParameter);
     const values = filteredLogs.map(l => Number(l[key]));
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
-    
+
     // Calculate change between first half and second half of filtered logs
     let change = 0;
     if (filteredLogs.length >= 2) {
@@ -301,7 +301,7 @@ export default function HistoryScreen({ navigation }: any) {
         change = ((recentAvg - olderAvg) / olderAvg) * 100;
       }
     }
-    
+
     return {
       avg,
       total: filteredLogs.length,
@@ -313,14 +313,14 @@ export default function HistoryScreen({ navigation }: any) {
   const chartData = useMemo(() => {
     const key = getParamKey(selectedParameter);
     const points = filteredLogs.slice(0, 7).reverse();
-    
+
     if (points.length === 0) {
       return {
         labels: ['No Data'],
         datasets: [{ data: [0] }]
       };
     }
-    
+
     return {
       labels: points.map(l => format(parseISO(l.testDate), 'MMM d')),
       datasets: [{
@@ -348,10 +348,10 @@ export default function HistoryScreen({ navigation }: any) {
   };
 
   const mapInitialRegion = useMemo(() => {
-    const validLogs = logs.filter(l => 
-      l.latitude !== null && 
-      l.longitude !== null && 
-      !isNaN(Number(l.latitude)) && 
+    const validLogs = logs.filter(l =>
+      l.latitude !== null &&
+      l.longitude !== null &&
+      !isNaN(Number(l.latitude)) &&
       !isNaN(Number(l.longitude))
     );
 
@@ -371,10 +371,10 @@ export default function HistoryScreen({ navigation }: any) {
       };
     }
     return {
-      latitude: 20.5937,
-      longitude: 78.9629,
-      latitudeDelta: 20,
-      longitudeDelta: 20,
+      latitude: 21.066245,
+      longitude: 86.488949,
+      latitudeDelta: 0.05,
+      longitudeDelta: 0.05,
     };
   }, [logs]);
 
@@ -396,7 +396,7 @@ export default function HistoryScreen({ navigation }: any) {
         date: log.testDate
       }));
   }, [logs]);
-  
+
   const openDetails = (log: SoilTest) => {
     setSelectedLog(log);
     setIsModalVisible(true);
@@ -418,42 +418,11 @@ export default function HistoryScreen({ navigation }: any) {
     );
   }
 
-  // ── Full-screen empty state when user has zero soil tests ────────────────
-  if (!loading && logs.length === 0 && !error) {
-    return (
-      <View style={styles.container}>
-        <StatusBar barStyle="dark-content" />
-        <LinearGradient colors={[COLORS.backgroundTop, COLORS.backgroundBottom]} style={StyleSheet.absoluteFill} />
-
-        {/* Keep the header so the screen isn't disorienting */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>Analytics Lab</Text>
-          </View>
-        </View>
-
-        <View style={styles.fullEmptyState}>
-          <LottieView
-            source={require('../../assets/animations/soil-analysis-data.json')}
-            autoPlay
-            loop
-            style={{ width: 220, height: 220 }}
-            resizeMode="contain"
-          />
-          <Text style={styles.fullEmptyTitle}>No Data Available</Text>
-          <Text style={styles.fullEmptySubtitle}>
-            Your soil analysis history will appear here once tests are recorded.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <LinearGradient colors={[COLORS.backgroundTop, COLORS.backgroundBottom]} style={StyleSheet.absoluteFill} />
-      
+
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Analytics Lab</Text>
@@ -533,8 +502,8 @@ export default function HistoryScreen({ navigation }: any) {
                 mapMode === 'satellite'
                   ? 'satellite'
                   : (mapMode === 'standard'
-                      ? 'standard'
-                      : (Platform.OS === 'android' ? 'none' : 'standard'))
+                    ? 'standard'
+                    : (Platform.OS === 'android' ? 'none' : 'standard'))
               }
               onMapReady={() => {
                 if (!mapReadyRef.current) {
@@ -598,8 +567,8 @@ export default function HistoryScreen({ navigation }: any) {
                 mapMode === 'satellite'
                   ? 'satellite'
                   : (mapMode === 'standard'
-                      ? 'standard'
-                      : (Platform.OS === 'android' ? 'none' : 'standard'))
+                    ? 'standard'
+                    : (Platform.OS === 'android' ? 'none' : 'standard'))
               }
               showsUserLocation={true}
               showsMyLocationButton={true}
@@ -673,8 +642,8 @@ export default function HistoryScreen({ navigation }: any) {
 
         {/* 2. Premium Apple Style Dropdown Filters */}
         <View style={styles.dropdownRow}>
-          <Pressable 
-            style={({ pressed }) => [styles.appleDropdownBtn, pressed && { opacity: 0.7 }]} 
+          <Pressable
+            style={({ pressed }) => [styles.appleDropdownBtn, pressed && { opacity: 0.7 }]}
             onPress={handleOpenTimeMenu}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -684,8 +653,8 @@ export default function HistoryScreen({ navigation }: any) {
             <Ionicons name="chevron-down" size={14} color={COLORS.subtitle} />
           </Pressable>
 
-          <Pressable 
-            style={({ pressed }) => [styles.appleDropdownBtn, pressed && { opacity: 0.7 }]} 
+          <Pressable
+            style={({ pressed }) => [styles.appleDropdownBtn, pressed && { opacity: 0.7 }]}
             onPress={handleOpenParamMenu}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -804,40 +773,40 @@ export default function HistoryScreen({ navigation }: any) {
               <Text style={styles.noData}>No soil tests in the selected {timeFilter} range.</Text>
             </View>
           ) : (
-            <ScrollView 
-              style={{ marginTop: 25, maxHeight: 450 }} 
+            <ScrollView
+              style={{ marginTop: 25, maxHeight: 450 }}
               nestedScrollEnabled={true}
               showsVerticalScrollIndicator={true}
             >
-                {filteredLogs.map((log, index) => (
-                  <View style={styles.timelineRow} key={log.id || index.toString()}>
-                    <View style={styles.timelineLineContainer}>
-                      <View style={styles.timelineDot} />
-                      {index !== filteredLogs.length - 1 && <View style={styles.timelineLine} />}
-                    </View>
-                    <TouchableOpacity style={styles.timelineContent} onPress={() => openDetails(log)} activeOpacity={0.7}>
-                      <View style={styles.logIcon}><Ionicons name="leaf" size={18} color={COLORS.accent} /></View>
-                      <View style={styles.logInfo}>
-                        <Text style={styles.logDate}>{format(parseISO(log.testDate), 'MMM d, yyyy')}</Text>
-                        <Text style={styles.logTime}>{format(parseISO(log.testDate), 'hh:mm a')}</Text>
-                      </View>
-                      <View style={styles.logValues}>
-                        <Text style={[styles.logMainValue, { color: getParamColor(selectedParameter) }]}>
-                          {selectedParameter === 'pH Level' ? 'pH' : (selectedParameter === 'Moisture' ? 'M' : selectedParameter.charAt(0))}{' '}
-                          {Number(log[getParamKey(selectedParameter)]).toFixed(selectedParameter === 'pH Level' ? 1 : 0)}
-                          <Text style={styles.logUnitSmall}> {UNITS[selectedParameter]}</Text>
-                        </Text>
-                        <Text style={styles.logSubValue}>
-                          {selectedParameter !== 'pH Level' && `pH:${Number(log.ph).toFixed(1)} `}
-                          {selectedParameter !== 'Nitrogen' && `N:${Number(log.nitrogen).toFixed(0)} `}
-                          {selectedParameter !== 'Phosphorus' && `P:${Number(log.phosphorus).toFixed(0)} `}
-                          {selectedParameter !== 'Potassium' && `K:${Number(log.potassium).toFixed(0)}`}
-                        </Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-                    </TouchableOpacity>
+              {filteredLogs.map((log, index) => (
+                <View style={styles.timelineRow} key={log.id || index.toString()}>
+                  <View style={styles.timelineLineContainer}>
+                    <View style={styles.timelineDot} />
+                    {index !== filteredLogs.length - 1 && <View style={styles.timelineLine} />}
                   </View>
-                ))}
+                  <TouchableOpacity style={styles.timelineContent} onPress={() => openDetails(log)} activeOpacity={0.7}>
+                    <View style={styles.logIcon}><Ionicons name="leaf" size={18} color={COLORS.accent} /></View>
+                    <View style={styles.logInfo}>
+                      <Text style={styles.logDate}>{format(parseISO(log.testDate), 'MMM d, yyyy')}</Text>
+                      <Text style={styles.logTime}>{format(parseISO(log.testDate), 'hh:mm a')}</Text>
+                    </View>
+                    <View style={styles.logValues}>
+                      <Text style={[styles.logMainValue, { color: getParamColor(selectedParameter) }]}>
+                        {selectedParameter === 'pH Level' ? 'pH' : (selectedParameter === 'Moisture' ? 'M' : selectedParameter.charAt(0))}{' '}
+                        {Number(log[getParamKey(selectedParameter)]).toFixed(selectedParameter === 'pH Level' ? 1 : 0)}
+                        <Text style={styles.logUnitSmall}> {UNITS[selectedParameter]}</Text>
+                      </Text>
+                      <Text style={styles.logSubValue}>
+                        {selectedParameter !== 'pH Level' && `pH:${Number(log.ph).toFixed(1)} `}
+                        {selectedParameter !== 'Nitrogen' && `N:${Number(log.nitrogen).toFixed(0)} `}
+                        {selectedParameter !== 'Phosphorus' && `P:${Number(log.phosphorus).toFixed(0)} `}
+                        {selectedParameter !== 'Potassium' && `K:${Number(log.potassium).toFixed(0)}`}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                  </TouchableOpacity>
+                </View>
+              ))}
             </ScrollView>
           )}
         </View>
@@ -966,8 +935,8 @@ export default function HistoryScreen({ navigation }: any) {
                     </>
                   )}
                 </View>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={styles.modalExportButton}
                   onPress={() => {
                     setIsModalVisible(false);
@@ -993,8 +962,8 @@ export default function HistoryScreen({ navigation }: any) {
       >
         <View style={StyleSheet.absoluteFill}>
           {Platform.OS === 'ios' && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
-          <Pressable 
-            style={styles.actionSheetOverlay} 
+          <Pressable
+            style={styles.actionSheetOverlay}
             onPress={() => setIsTimeMenuVisible(false)}
           >
             <View style={styles.actionSheetContent} onStartShouldSetResponder={() => true}>
@@ -1008,7 +977,7 @@ export default function HistoryScreen({ navigation }: any) {
                   <Pressable
                     key={filter}
                     style={({ pressed }) => [
-                      styles.actionSheetItem, 
+                      styles.actionSheetItem,
                       isActive && styles.actionSheetItemActive,
                       pressed && { backgroundColor: '#F1F5F9' }
                     ]}
@@ -1035,8 +1004,8 @@ export default function HistoryScreen({ navigation }: any) {
       >
         <View style={StyleSheet.absoluteFill}>
           {Platform.OS === 'ios' && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
-          <Pressable 
-            style={styles.actionSheetOverlay} 
+          <Pressable
+            style={styles.actionSheetOverlay}
             onPress={() => setIsParamMenuVisible(false)}
           >
             <View style={styles.actionSheetContent} onStartShouldSetResponder={() => true}>
@@ -1051,7 +1020,7 @@ export default function HistoryScreen({ navigation }: any) {
                   <Pressable
                     key={param}
                     style={({ pressed }) => [
-                      styles.actionSheetItem, 
+                      styles.actionSheetItem,
                       isActive && styles.actionSheetItemActive,
                       pressed && { backgroundColor: '#F1F5F9' }
                     ]}
