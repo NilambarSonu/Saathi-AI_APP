@@ -115,7 +115,22 @@ api.interceptors.response.use(
       _retried?: boolean;
     };
 
-    console.error(`[API] Error: ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url} [${error.response?.status || 'Network/Timeout'}]`, error.message);
+    const status = error.response?.status;
+    const method = originalRequest?.method?.toUpperCase() || 'UNKNOWN';
+    const url = originalRequest?.url || 'UNKNOWN';
+    
+    // Construct a cleaner log message. We avoid the word "Error" for 4xx to prevent alarming the user.
+    const logMsg = `[API] ${status && status >= 400 && status < 500 ? 'Warning' : 'Error'}: ${method} ${url} [${status || 'Network/Timeout'}] - ${error.message}`;
+
+    if (status && status >= 400 && status < 500) {
+      console.warn(logMsg);
+    } else {
+      console.error(logMsg);
+    }
+    
+    if (error.response?.data) {
+      console.warn(`[API] Server Response Data:`, JSON.stringify(error.response.data));
+    }
 
     if (error.response?.status !== 401 || originalRequest._retried) {
       return Promise.reject(error);

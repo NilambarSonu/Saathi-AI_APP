@@ -17,9 +17,43 @@ export default function RegisterScreen() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: '', color: Colors.textSecondary });
   const [isLoading, setIsLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<null | 'google' | 'facebook' | 'x'>(null);
   const { setSession } = useAuthStore();
+
+  const checkStrength = (pass: string) => {
+    let score = 0;
+    if (pass.length >= 8) score++;
+    if (/[A-Z]/.test(pass)) score++;
+    if (/[a-z]/.test(pass)) score++;
+    if (/[0-9]/.test(pass)) score++;
+    if (/[^A-Za-z0-9]/.test(pass)) score++;
+
+    let label = '';
+    let color = Colors.error;
+    if (pass.length === 0) {
+      label = '';
+      color = Colors.textSecondary;
+    } else if (score <= 2) {
+      label = 'Weak';
+      color = Colors.error;
+    } else if (score <= 4) {
+      label = 'Fair';
+      color = Colors.warning;
+    } else {
+      label = 'Strong';
+      color = Colors.success;
+    }
+    setPasswordStrength({ score, label, color });
+  };
+
+  const handlePasswordChange = (text: string) => {
+    setPassword(text);
+    checkStrength(text);
+  };
 
   async function handleSocialLogin(provider: 'google' | 'facebook' | 'x') {
     setSocialLoading(provider);
@@ -38,8 +72,12 @@ export default function RegisterScreen() {
   }
 
   async function handleRegister() {
-    if (!name || !email || !password) {
-      Alert.alert('Missing fields', 'Name, email and password are required.');
+    if (!name.trim()) {
+      Alert.alert('Missing Name', 'Please enter your full name.');
+      return;
+    }
+    if (!email.trim() || !password) {
+      Alert.alert('Missing fields', 'Email and password are required.');
       return;
     }
     if (password !== confirmPassword) {
@@ -53,7 +91,16 @@ export default function RegisterScreen() {
 
     setIsLoading(true);
     try {
-      const response = await registerAccount({ name, email, phone: phone || undefined, password });
+      // Map name to username: lowercase, trim, spaces to underscores
+      const generatedUsername = name.toLowerCase().trim().replace(/\s+/g, '_');
+      
+      const response = await registerAccount({ 
+        name: name.trim(), 
+        username: generatedUsername,
+        email: email.trim(), 
+        phone: phone.trim() || undefined, 
+        password 
+      });
 
       if (response.requiresOTP) {
         router.push({
@@ -62,7 +109,12 @@ export default function RegisterScreen() {
         });
       }
     } catch (err: any) {
-      Alert.alert('Registration Failed', err.message || 'Please try again.');
+      console.error('[Register] Error:', err);
+      // Try to extract detailed error message from server response
+      const serverMessage = err.response?.data?.message || err.response?.data?.error;
+      const errorMessage = serverMessage || err.message || 'Please check your connection and try again.';
+      
+      Alert.alert('Registration Failed', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -95,61 +147,145 @@ export default function RegisterScreen() {
               <Text style={[styles.tabText, styles.tabTextActive]}>Register</Text>
             </View>
           </View>
-
           <Text style={styles.label}>FULL NAME</Text>
-          <TextInput
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="Ramesh Kumar"
-            placeholderTextColor="#B0C4B8"
-            autoComplete="name"
-          />
+          <View style={styles.inputContainer}>
+            <FontAwesome name="user" size={16} color="#8A9E8E" style={styles.inputIcon} />
+            <TextInput
+              style={styles.inputField}
+              value={name}
+              onChangeText={setName}
+              placeholder="Ramesh Kumar"
+              placeholderTextColor="#B0C4B8"
+              autoCapitalize="words"
+              autoComplete="name"
+            />
+          </View>
 
           <Text style={styles.label}>EMAIL ADDRESS</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="ramesh@gmail.com"
-            placeholderTextColor="#B0C4B8"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-          />
+          <View style={styles.inputContainer}>
+            <FontAwesome name="envelope" size={16} color="#8A9E8E" style={styles.inputIcon} />
+            <TextInput
+              style={styles.inputField}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="ramesh@gmail.com"
+              placeholderTextColor="#B0C4B8"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+            />
+          </View>
 
           <Text style={styles.label}>PHONE (OPTIONAL)</Text>
-          <TextInput
-            style={styles.input}
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="+91 98765 43210"
-            placeholderTextColor="#B0C4B8"
-            keyboardType="phone-pad"
-            autoComplete="tel"
-          />
+          <View style={styles.inputContainer}>
+            <FontAwesome name="phone" size={16} color="#8A9E8E" style={styles.inputIcon} />
+            <TextInput
+              style={styles.inputField}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+91 9876543210"
+              placeholderTextColor="#B0C4B8"
+              keyboardType="phone-pad"
+              autoComplete="tel"
+            />
+          </View>
 
           <Text style={styles.label}>PASSWORD</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Create a strong password (min 8 chars)"
-            placeholderTextColor="#B0C4B8"
-            secureTextEntry
-            autoComplete="new-password"
-          />
+          <View style={styles.inputContainer}>
+            <FontAwesome name="lock" size={16} color="#8A9E8E" style={styles.inputIcon} />
+            <TextInput
+              style={styles.inputField}
+              value={password}
+              onChangeText={handlePasswordChange}
+              placeholder="Create a strong password (min 8 chars)"
+              placeholderTextColor="#B0C4B8"
+              secureTextEntry={!showPassword}
+              autoComplete="new-password"
+            />
+            <TouchableOpacity
+              style={styles.eyeBtn}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <FontAwesome name={showPassword ? 'eye-slash' : 'eye'} size={18} color="#8A9E8E" />
+            </TouchableOpacity>
+          </View>
+
+          {password.length > 0 && (
+            <>
+              <View style={styles.strengthContainer}>
+                <View style={styles.strengthBarBackground}>
+                  <View style={[styles.strengthBar, { width: `${(passwordStrength.score / 5) * 100}%`, backgroundColor: passwordStrength.color }]} />
+                </View>
+                <Text style={[styles.strengthText, { color: passwordStrength.color }]}>{passwordStrength.label}</Text>
+              </View>
+              
+              <View style={styles.requirementsContainer}>
+                <View style={styles.requirementItem}>
+                  <FontAwesome 
+                    name={password.length >= 8 ? 'check-circle' : 'circle-o'} 
+                    size={12} 
+                    color={password.length >= 8 ? Colors.success : Colors.textMuted} 
+                  />
+                  <Text style={[styles.requirementText, password.length >= 8 && styles.requirementMet]}>
+                    At least 8 characters
+                  </Text>
+                </View>
+                <View style={styles.requirementItem}>
+                  <FontAwesome 
+                    name={/[A-Z]/.test(password) ? 'check-circle' : 'circle-o'} 
+                    size={12} 
+                    color={/[A-Z]/.test(password) ? Colors.success : Colors.textMuted} 
+                  />
+                  <Text style={[styles.requirementText, /[A-Z]/.test(password) && styles.requirementMet]}>
+                    Contains uppercase letter
+                  </Text>
+                </View>
+                <View style={styles.requirementItem}>
+                  <FontAwesome 
+                    name={/[0-9]/.test(password) ? 'check-circle' : 'circle-o'} 
+                    size={12} 
+                    color={/[0-9]/.test(password) ? Colors.success : Colors.textMuted} 
+                  />
+                  <Text style={[styles.requirementText, /[0-9]/.test(password) && styles.requirementMet]}>
+                    Contains a number
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
 
           <Text style={styles.label}>CONFIRM PASSWORD</Text>
-          <TextInput
-            style={styles.input}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder="Confirm your password"
-            placeholderTextColor="#B0C4B8"
-            secureTextEntry
-            autoComplete="new-password"
-          />
+          <View style={styles.inputContainer}>
+            <FontAwesome name="lock" size={16} color="#8A9E8E" style={styles.inputIcon} />
+            <TextInput
+              style={styles.inputField}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="Confirm your password"
+              placeholderTextColor="#B0C4B8"
+              secureTextEntry={!showConfirmPassword}
+              autoComplete="new-password"
+            />
+            <TouchableOpacity
+              style={styles.eyeBtn}
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              <FontAwesome name={showConfirmPassword ? 'eye-slash' : 'eye'} size={18} color="#8A9E8E" />
+            </TouchableOpacity>
+          </View>
+
+          {confirmPassword.length > 0 && (
+            <View style={styles.matchContainer}>
+              <FontAwesome
+                name={password === confirmPassword ? 'check-circle' : 'times-circle'}
+                size={14}
+                color={password === confirmPassword ? Colors.success : Colors.error}
+              />
+              <Text style={[styles.matchText, { color: password === confirmPassword ? Colors.success : Colors.error }]}>
+                {password === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
+              </Text>
+            </View>
+          )}
 
           <TouchableOpacity
             style={[styles.btnPrimary, isLoading && { opacity: 0.7 }]}
@@ -225,10 +361,85 @@ const styles = StyleSheet.create({
     fontFamily: 'Sora_600SemiBold', fontSize: 11, color: Colors.textSecondary,
     letterSpacing: 0.6, marginBottom: 6, textTransform: 'uppercase',
   },
-  input: {
-    height: 52, backgroundColor: Colors.background, borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: 14, paddingHorizontal: 16, fontFamily: 'Sora_400Regular',
-    fontSize: 14, color: Colors.textPrimary, marginBottom: 16,
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 52,
+    backgroundColor: Colors.background,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  inputField: {
+    flex: 1,
+    fontFamily: 'Sora_400Regular',
+    fontSize: 14,
+    color: Colors.textPrimary,
+    height: '100%',
+    padding: 0,
+  },
+  eyeBtn: {
+    padding: 8,
+    marginRight: -8,
+  },
+  strengthContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: -12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  strengthBarBackground: {
+    height: 4,
+    backgroundColor: Colors.border,
+    borderRadius: 2,
+    flex: 1,
+    overflow: 'hidden',
+  },
+  strengthBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  strengthText: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 10,
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  matchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: -12,
+    marginBottom: 12,
+  },
+  matchText: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 10,
+  },
+  requirementsContainer: {
+    marginBottom: 16,
+    paddingLeft: 4,
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  requirementText: {
+    fontFamily: 'Sora_400Regular',
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  requirementMet: {
+    color: Colors.success,
+    fontFamily: 'Sora_600SemiBold',
   },
   btnPrimary: {
     height: 54, backgroundColor: Colors.primary, borderRadius: 16,

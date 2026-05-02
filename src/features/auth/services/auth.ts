@@ -46,7 +46,7 @@ export async function registerAccount(data: {
 }) {
   // Map `name` → `username` since server expects `username`
   const payload = {
-    username: data.username || data.name || '',
+    username: (data.username || data.name || '').toLowerCase().trim().replace(/\s+/g, '_'),
     email: data.email,
     password: data.password,
     ...(data.phone ? { phone: data.phone } : {}),

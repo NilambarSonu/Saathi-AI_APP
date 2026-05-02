@@ -67,7 +67,8 @@ export default function VerifyOTPScreen() {
         Alert.alert('Verification Failed', 'Could not verify email. Please try again.');
       }
     } catch (err: any) {
-      Alert.alert('Invalid OTP', err.message || 'The code is incorrect or expired.');
+      const serverMessage = err.response?.data?.error || err.message || 'The code is incorrect or expired.';
+      Alert.alert('Verification Failed', serverMessage);
       setOtp(Array(OTP_LENGTH).fill(''));
       inputRefs.current[0]?.focus();
     } finally {
