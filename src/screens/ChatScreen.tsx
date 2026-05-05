@@ -54,6 +54,7 @@ export default function AIChatScreen() {
 
   const scrollViewRef = useRef<ScrollView>(null);
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const textInputRef = useRef<TextInput>(null);
 
   const quickActions = [
     { icon: 'Fertilizer', emoji: '💧', title: 'Fertilizer Plan' },
@@ -71,6 +72,15 @@ export default function AIChatScreen() {
       keyboardDidHideListener.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (keyboardVisible) {
+      // Scroll input field above keyboard when keyboard appears
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [keyboardVisible]);
 
   const handleSend = async (text?: string) => {
     const messageText = text || inputText.trim();
@@ -178,7 +188,7 @@ export default function AIChatScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
         <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity
@@ -339,11 +349,17 @@ export default function AIChatScreen() {
             </TouchableOpacity>
 
             <TextInput
+              ref={textInputRef}
               style={styles.textInput}
               placeholder="Ask Saathi AI..."
               placeholderTextColor="#A8BFB0"
               value={inputText}
               onChangeText={setInputText}
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToEnd({ animated: true });
+                }, 200);
+              }}
               multiline
               maxLength={500}
             />
@@ -549,7 +565,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.9)',
   },
-  inputGlassKeyboard: { bottom: 10 },
+  inputGlassKeyboard: { bottom: Platform.OS === 'android' ? 0 : 0 },
   inputWrapper: { flexDirection: 'row', alignItems: 'flex-end', padding: 6 },
   iconBtn: { width: 40, height: 44, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   textInput: {
