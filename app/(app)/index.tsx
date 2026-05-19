@@ -46,10 +46,9 @@ const DOT_COLOR = '#38B000';   // same vivid green the user loved
 export default function AppIndex() {
   const { currentIndex, setCurrentIndex } = useNavigationStore();
   const swipeRef = useRef<SwipeContainerHandle>(null);
-  const { theme, homeTheme, isDarkMode } = useTheme();
-  const isDarkModeTab = currentIndex === 0 || currentIndex === 1 || currentIndex === 3;
-  const chromeTheme = isDarkModeTab ? homeTheme : theme;
-  const chromeIsDark = isDarkModeTab && isDarkMode;
+  const { theme, darkModeTheme, isDarkMode } = useTheme();
+  const chromeTheme = darkModeTheme;
+  const chromeIsDark = isDarkMode;
 
   // After a swipe gesture ends, the SwipeContainer calls this with the final index
   const handleSwipeChange = useCallback(

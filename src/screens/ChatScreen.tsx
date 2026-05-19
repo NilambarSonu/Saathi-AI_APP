@@ -29,7 +29,7 @@ import * as Speech from 'expo-speech';
 import { useChat, ChatMessage as BaseChatMessage } from '@/features/ai_assistant/hooks/useChat';
 import { api } from '@/services/api';
 import { useNavigationStore } from '@/store/navigationStore';
-import { useTheme } from '@/context/ThemeContext';
+import { useDarkModeTheme } from '@/context/ThemeContext';
 
 export interface ChatMessage extends BaseChatMessage {
   type?: 'text' | 'file_attachment';
@@ -38,7 +38,7 @@ export interface ChatMessage extends BaseChatMessage {
 }
 
 export default function AIChatScreen() {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark } = useDarkModeTheme();
   const params = useLocalSearchParams<{ 
     sessionId?: string; 
     sessionTitle?: string;
@@ -280,8 +280,14 @@ Please provide:
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]}>
+      {isDark && (
+        <LinearGradient
+          colors={[theme.bg0, theme.bg1, theme.background]}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
-        <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.sep1 }]}>
+        <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { backgroundColor: isDark ? 'rgba(24, 33, 27, 0.92)' : theme.surface, borderBottomColor: theme.sep1 }]}>
           <View style={styles.headerLeft}>
             <TouchableOpacity
               style={[styles.backBtn, { backgroundColor: theme.surfaceAlt }]}
@@ -406,7 +412,9 @@ Please provide:
                   <View
                     style={[
                       styles.msgBubble,
-                      isUser ? styles.msgBubbleUser : [styles.msgBubbleAI, { backgroundColor: theme.surface }],
+                      isUser
+                        ? [styles.msgBubbleUser, isDark && { backgroundColor: 'rgba(34, 197, 94, 0.18)', borderWidth: 1, borderColor: 'rgba(110, 231, 183, 0.18)' }]
+                        : [styles.msgBubbleAI, { backgroundColor: theme.surface }, isDark && { borderWidth: 1, borderColor: theme.sep2 }],
                       msg.id.includes('-err') && [styles.msgBubbleError, { borderColor: theme.error }],
                     ]}
                   >
@@ -427,7 +435,7 @@ Please provide:
               <View style={[styles.msgAvatarAI, { backgroundColor: theme.fillGreen }]}>
                 <Image source={require('assets/images/favicon.png')} style={{ width: 18, height: 18 }} />
               </View>
-              <View style={[styles.msgBubble, styles.messageBubbleTyping, { backgroundColor: theme.surface }]}>
+              <View style={[styles.msgBubble, styles.messageBubbleTyping, { backgroundColor: theme.surface }, isDark && { borderWidth: 1, borderColor: theme.sep2 }]}>
                 <ActivityIndicator size="small" color={theme.purple} style={{ marginRight: 8 }} />
                 <Text style={[styles.loadingTextPhrase, { color: theme.purple }]}>{loadingText || 'Thinking...'}</Text>
               </View>
@@ -461,7 +469,10 @@ Please provide:
           style={[
             styles.inputGlass, 
             keyboardVisible && styles.inputGlassKeyboard,
-            { backgroundColor: isDark ? 'rgba(30, 30, 30, 0.85)' : 'rgba(255, 255, 255, 0.85)' }
+            {
+              backgroundColor: isDark ? 'rgba(24, 33, 27, 0.86)' : 'rgba(255, 255, 255, 0.85)',
+              borderColor: isDark ? 'rgba(110, 231, 183, 0.18)' : 'rgba(255,255,255,0.2)'
+            }
           ]}
         >
           <View style={styles.inputWrapper}>

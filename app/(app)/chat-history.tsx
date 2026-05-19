@@ -12,9 +12,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
-import { useTheme } from '@/context/ThemeContext';
+import { useDarkModeTheme } from '@/context/ThemeContext';
 import { api, ChatSession } from '@/services/api';
 
 function safeDateLabel(value?: string | null): string {
@@ -51,7 +52,7 @@ function SessionCard({
   onDelete: () => void;
   onContinue: () => void;
 }) {
-  const { theme } = useTheme();
+  const { theme } = useDarkModeTheme();
   return (
     <Pressable
       style={({ pressed }) => [styles.sessionCard, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && { opacity: 0.85 }]}
@@ -92,7 +93,7 @@ function SessionCard({
 
 export default function ChatHistoryScreen() {
   const router = useRouter();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark } = useDarkModeTheme();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -177,6 +178,12 @@ export default function ChatHistoryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {isDark && (
+        <LinearGradient
+          colors={[theme.bg0, theme.bg1, theme.background]}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
       <View style={styles.header}>
         <View>
           <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Chat History</Text>

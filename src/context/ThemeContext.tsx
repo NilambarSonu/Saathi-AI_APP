@@ -10,6 +10,7 @@ interface ThemeContextType {
   isDark: boolean;
   isDarkMode: boolean;
   theme: ThemeColors;
+  darkModeTheme: ThemeColors;
   homeTheme: ThemeColors;
   setMode: (mode: ThemeMode) => void;
   toggleTheme: () => void;
@@ -50,7 +51,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isDarkMode = mode === 'system' ? systemColorScheme === 'dark' : mode === 'dark';
-  const homeTheme = isDarkMode ? Colors.dark : Colors.light;
+  const darkModeTheme = isDarkMode ? Colors.dark : Colors.light;
+  const homeTheme = darkModeTheme;
   const theme = Colors.light;
   const isDark = false;
 
@@ -59,7 +61,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [isDarkMode, setMode]);
 
   return (
-    <ThemeContext.Provider value={{ mode, isDark, isDarkMode, theme, homeTheme, setMode, toggleTheme }}>
+    <ThemeContext.Provider value={{ mode, isDark, isDarkMode, theme, darkModeTheme, homeTheme, setMode, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
@@ -81,7 +83,7 @@ export function useDarkModeTheme() {
   const context = useTheme();
   return {
     ...context,
-    theme: context.homeTheme,
+    theme: context.darkModeTheme,
     isDark: context.isDarkMode,
   };
 }

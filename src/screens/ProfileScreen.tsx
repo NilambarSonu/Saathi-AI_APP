@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
 import { useAuthStore } from '@/store/authStore';
-import { useTheme } from '@/context/ThemeContext';
+import { useDarkModeTheme } from '@/context/ThemeContext';
 import { logout, sendPasswordChangeOtp, changePassword } from '@/features/auth/services/auth';
 import {
   getUserProfile,
@@ -192,7 +192,7 @@ function ActionRow({ label, sublabel, icon, onPress, danger, badge, theme }: {
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, setUser, clearUser } = useAuthStore();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark } = useDarkModeTheme();
 
   const [name, setName] = useState(user?.username || '');
   const [location, setLocation] = useState(user?.location || '');
@@ -402,6 +402,12 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
+      {isDark && (
+        <LinearGradient
+          colors={[theme.bg0, theme.bg1, theme.background]}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
       {/* ── Hero Header ───────────────────────────────────────── */}
       <View style={[styles.heroWrapper, { backgroundColor: theme.surface, shadowColor: theme.primary }]}>
@@ -410,7 +416,7 @@ export default function ProfileScreen() {
           style={styles.hero}
           imageStyle={{ opacity: 0.9 }}
         >
-          <View style={styles.heroOverlay} />
+          <View style={[styles.heroOverlay, isDark && { backgroundColor: 'rgba(0, 0, 0, 0.52)' }]} />
           <View style={styles.heroBubble1} />
           <View style={styles.heroBubble2} />
 
