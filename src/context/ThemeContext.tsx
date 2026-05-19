@@ -74,6 +74,10 @@ export function useTheme() {
 }
 
 export function useHomeTheme() {
+  return useDarkModeTheme();
+}
+
+export function useDarkModeTheme() {
   const context = useTheme();
   return {
     ...context,

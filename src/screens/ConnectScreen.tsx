@@ -32,7 +32,7 @@ import { useLiveData } from '@/features/ble/LiveDataContext';
 import { agniBluetoothManager } from '@/features/ble/AgniBluetoothManager';
 import type { State as BleState } from 'react-native-ble-plx';
 import { ReceivedFile } from '@/features/ble/types';
-import { useTheme } from '@/context/ThemeContext';
+import { useDarkModeTheme } from '@/context/ThemeContext';
 
 
 const { width } = Dimensions.get('window');
@@ -128,7 +128,7 @@ type StatusBadgeProps = {
 };
 
 function StatusBadge({ status, bluetoothState }: StatusBadgeProps) {
-  const { isDark } = useTheme();
+  const { isDark } = useDarkModeTheme();
   const visual = useMemo(() => getStatusVisual(status, bluetoothState, isDark), [status, bluetoothState, isDark]);
 
   return (
@@ -156,7 +156,7 @@ type TabSwitcherProps = {
 };
 
 function TabSwitcher({ activeTab, onChange }: TabSwitcherProps) {
-  const { theme } = useTheme();
+  const { theme } = useDarkModeTheme();
   const [containerWidth, setContainerWidth] = useState(0);
   const x = useSharedValue(0);
   const tabs: Array<{ key: TabKey; label: string }> = [
@@ -223,7 +223,7 @@ function TabSwitcher({ activeTab, onChange }: TabSwitcherProps) {
 }
 
 function QuickStartView() {
-  const { theme } = useTheme();
+  const { theme } = useDarkModeTheme();
   return (
     <View style={s.guideContent}>
       <View style={s.guideHeader}>
@@ -252,7 +252,7 @@ function QuickStartView() {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function ConnectScreen() {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark } = useDarkModeTheme();
   const navigation = useNavigation<any>();
   const {
     status, bluetoothState, logs,
@@ -518,6 +518,12 @@ export default function ConnectScreen() {
 
   return (
     <SafeAreaView style={[s.screen, { backgroundColor: theme.background }]}>
+        {isDark && (
+          <LinearGradient
+            colors={[theme.bg0, theme.bg1, theme.background]}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
         <ScrollView
           contentContainerStyle={s.scroll}
           showsVerticalScrollIndicator={false}

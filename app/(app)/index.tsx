@@ -47,9 +47,9 @@ export default function AppIndex() {
   const { currentIndex, setCurrentIndex } = useNavigationStore();
   const swipeRef = useRef<SwipeContainerHandle>(null);
   const { theme, homeTheme, isDarkMode } = useTheme();
-  const isHomeTab = currentIndex === 0;
-  const chromeTheme = isHomeTab ? homeTheme : theme;
-  const chromeIsDark = isHomeTab && isDarkMode;
+  const isDarkModeTab = currentIndex === 0 || currentIndex === 1 || currentIndex === 3;
+  const chromeTheme = isDarkModeTab ? homeTheme : theme;
+  const chromeIsDark = isDarkModeTab && isDarkMode;
 
   // After a swipe gesture ends, the SwipeContainer calls this with the final index
   const handleSwipeChange = useCallback(

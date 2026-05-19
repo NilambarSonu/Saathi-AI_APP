@@ -33,7 +33,7 @@ import { exportSoilReport } from '@/services/pdfExport';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigationStore } from '@/store/navigationStore';
 import { useSoilMarkers } from '@/context/SoilMarkersContext';
-import { useTheme } from '@/context/ThemeContext';
+import { useDarkModeTheme } from '@/context/ThemeContext';
 import LottieView from 'lottie-react-native';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
@@ -92,7 +92,7 @@ const getParamColor = (theme: any, param: ParameterName): string => {
 };
 
 export default function HistoryScreen({ navigation }: any) {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark } = useDarkModeTheme();
   const { user } = useAuthStore();
   const { currentIndex } = useNavigationStore();
   const { addSoilMarkers } = useSoilMarkers();
@@ -480,19 +480,19 @@ export default function HistoryScreen({ navigation }: any) {
                   onPress={() => handleSetMapMode('satellite')}
                   style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'satellite' && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }], pressed && { opacity: 0.7 }]}
                 >
-                  <Text style={[styles.mapTypeLabel, mapMode === 'satellite' && [styles.mapTypeLabelActive, { color: COLORS_THEMED.accent }]]}>Satellite</Text>
+                  <Text style={[styles.mapTypeLabel, { color: isDark ? theme.textSecondary : '#64748B' }, mapMode === 'satellite' && [styles.mapTypeLabelActive, { color: COLORS_THEMED.accent }]]}>Satellite</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => handleSetMapMode('standard')}
                   style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'standard' && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }], pressed && { opacity: 0.7 }]}
                 >
-                  <Text style={[styles.mapTypeLabel, mapMode === 'standard' && [styles.mapTypeLabelActive, { color: COLORS_THEMED.accent }]]}>Standard</Text>
+                  <Text style={[styles.mapTypeLabel, { color: isDark ? theme.textSecondary : '#64748B' }, mapMode === 'standard' && [styles.mapTypeLabelActive, { color: COLORS_THEMED.accent }]]}>Standard</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => handleSetMapMode('osm')}
                   style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'osm' && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }], pressed && { opacity: 0.7 }]}
                 >
-                  <Text style={[styles.mapTypeLabel, mapMode === 'osm' && [styles.mapTypeLabelActive, { color: COLORS_THEMED.accent }]]}>OSM</Text>
+                  <Text style={[styles.mapTypeLabel, { color: isDark ? theme.textSecondary : '#64748B' }, mapMode === 'osm' && [styles.mapTypeLabelActive, { color: COLORS_THEMED.accent }]]}>OSM</Text>
                 </Pressable>
               </View>
               {/* Expand button */}
@@ -1046,7 +1046,7 @@ export default function HistoryScreen({ navigation }: any) {
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <View style={[styles.paramColorDot, { backgroundColor: color, marginRight: 12 }]} />
-                      <Text style={[styles.actionSheetText, isActive && { color: color, fontFamily: 'Sora_600SemiBold' }]}>
+                      <Text style={[styles.actionSheetText, { color: isDark ? theme.textSecondary : '#475569' }, isActive && { color: color, fontFamily: 'Sora_600SemiBold' }]}>
                         {param}
                       </Text>
                     </View>
