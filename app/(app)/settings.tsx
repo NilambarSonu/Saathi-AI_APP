@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
 import { useAuthStore } from '@/store/authStore';
+import { useTheme } from '@/context/ThemeContext';
 import apiClient from '@/api/axiosConfig';
 import { getUserData } from '@/features/auth/services/user';
 import { logout } from '@/features/auth/services/auth';
@@ -27,41 +28,40 @@ const LANGUAGES = [
 ];
 
 interface SettingsState {
-  darkMode: boolean;
   language: string;
   autoSync: boolean;
 }
 
-function SectionCard({ title, icon, color, children }: {
-  title: string; icon: string; color: string; children: React.ReactNode;
+function SectionCard({ title, icon, color, children, theme }: {
+  title: string; icon: string; color: string; children: React.ReactNode; theme: any;
 }) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
       <View style={styles.cardHeader}>
         <View style={[styles.cardIconBg, { backgroundColor: color + '20' }]}>
           <Ionicons name={icon as any} size={18} color={color} />
         </View>
-        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>{title}</Text>
       </View>
       {children}
     </View>
   );
 }
 
-function ToggleRow({ label, description, value, onToggle }: {
-  label: string; description?: string; value: boolean; onToggle: (v: boolean) => void;
+function ToggleRow({ label, description, value, onToggle, theme }: {
+  label: string; description?: string; value: boolean; onToggle: (v: boolean) => void; theme: any;
 }) {
   return (
     <View style={styles.toggleRow}>
       <View style={{ flex: 1, marginRight: 12 }}>
-        <Text style={styles.toggleLabel}>{label}</Text>
-        {description ? <Text style={styles.toggleDesc}>{description}</Text> : null}
+        <Text style={[styles.toggleLabel, { color: theme.textPrimary }]}>{label}</Text>
+        {description ? <Text style={[styles.toggleDesc, { color: theme.textSecondary }]}>{description}</Text> : null}
       </View>
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: Colors.borderLight, true: Colors.primary + '70' }}
-        thumbColor={value ? Colors.primary : Colors.textMuted}
+        trackColor={{ false: theme.border, true: theme.primary + '70' }}
+        thumbColor={value ? theme.primary : '#f4f3f4'}
       />
     </View>
   );
@@ -70,8 +70,11 @@ function ToggleRow({ label, description, value, onToggle }: {
 export default function SettingsScreen() {
   const router = useRouter();
   const { clearUser } = useAuthStore();
+  const { setMode, isDarkMode } = useTheme();
+  const theme = Colors.light;
+  const isDark = false;
+  
   const [settings, setSettings] = useState<SettingsState>({
-    darkMode: false,
     language: 'en',
     autoSync: true,
   });
@@ -82,7 +85,13 @@ export default function SettingsScreen() {
   useEffect(() => {
     AsyncStorage.getItem(SETTINGS_KEY).then(val => {
       if (val) {
-        try { setSettings(s => ({ ...s, ...JSON.parse(val) })); } catch {}
+        try { 
+          const parsed = JSON.parse(val);
+          setSettings({
+            language: parsed.language || 'en',
+            autoSync: parsed.autoSync !== undefined ? parsed.autoSync : true,
+          });
+        } catch {}
       }
     });
   }, []);
@@ -154,45 +163,46 @@ export default function SettingsScreen() {
   const selectedLang = LANGUAGES.find(l => l.code === settings.language);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <Text style={styles.headerSub}>Customize your Saathi AI experience</Text>
+        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Settings</Text>
+        <Text style={[styles.headerSub, { color: theme.textSecondary }]}>Customize your Saathi AI experience</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         {/* Appearance */}
-        <SectionCard title="Appearance" icon="moon-outline" color={Colors.purple}>
+        <SectionCard title="Appearance" icon="moon-outline" color={theme.purple} theme={theme}>
           <ToggleRow
             label="Dark Mode"
             description="Switch to dark theme for better low-light visibility"
-            value={settings.darkMode}
-            onToggle={(v) => handleToggle('darkMode', v)}
+            value={isDarkMode}
+            onToggle={(v) => setMode(v ? 'dark' : 'light')}
+            theme={theme}
           />
         </SectionCard>
 
         {/* Language */}
-        <SectionCard title="Language & Region" icon="globe-outline" color={Colors.blue}>
+        <SectionCard title="Language & Region" icon="globe-outline" color={theme.blue} theme={theme}>
           <View style={styles.langSection}>
-            <Text style={styles.toggleLabel}>Interface Language</Text>
-            <Pressable style={styles.langSelector} onPress={() => setShowLangPicker(!showLangPicker)}>
-              <Text style={styles.langSelected}>{selectedLang?.label || '🇬🇧 English'}</Text>
-              <Ionicons name={showLangPicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textSecondary} />
+            <Text style={[styles.toggleLabel, { color: theme.textPrimary }]}>Interface Language</Text>
+            <Pressable style={[styles.langSelector, { backgroundColor: theme.background, borderColor: theme.border }]} onPress={() => setShowLangPicker(!showLangPicker)}>
+              <Text style={[styles.langSelected, { color: theme.textPrimary }]}>{selectedLang?.label || '🇬🇧 English'}</Text>
+              <Ionicons name={showLangPicker ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textSecondary} />
             </Pressable>
             {showLangPicker && (
-              <View style={styles.langList}>
+              <View style={[styles.langList, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
                 {LANGUAGES.map(lang => (
                   <Pressable
                     key={lang.code}
-                    style={[styles.langOption, settings.language === lang.code && styles.langOptionActive]}
+                    style={[styles.langOption, settings.language === lang.code && [styles.langOptionActive, { backgroundColor: theme.surfaceAlt }]]}
                     onPress={() => handleLanguageChange(lang.code)}
                   >
-                    <Text style={[styles.langOptionText, settings.language === lang.code && styles.langOptionTextActive]}>
+                    <Text style={[styles.langOptionText, { color: theme.textSecondary }, settings.language === lang.code && [styles.langOptionTextActive, { color: theme.primary }]]}>
                       {lang.label}
                     </Text>
                     {settings.language === lang.code && (
-                      <Ionicons name="checkmark" size={16} color={Colors.primary} />
+                      <Ionicons name="checkmark" size={16} color={theme.primary} />
                     )}
                   </Pressable>
                 ))}
@@ -202,51 +212,52 @@ export default function SettingsScreen() {
         </SectionCard>
 
         {/* Sync & Storage */}
-        <SectionCard title="Sync & Storage" icon="phone-portrait-outline" color={Colors.primary}>
+        <SectionCard title="Sync & Storage" icon="phone-portrait-outline" color={theme.primary} theme={theme}>
           <ToggleRow
             label="Auto Sync"
             description="Automatically sync soil test data when connected to the internet"
             value={settings.autoSync}
             onToggle={(v) => handleToggle('autoSync', v)}
+            theme={theme}
           />
         </SectionCard>
 
         {/* Data Management */}
-        <SectionCard title="Data Management" icon="server-outline" color={Colors.amber}>
+        <SectionCard title="Data Management" icon="server-outline" color={theme.amber} theme={theme}>
           <Pressable
-            style={[styles.actionBtn, isExporting && { opacity: 0.6 }]}
+            style={[styles.actionBtn, { backgroundColor: theme.background, borderColor: theme.border }, isExporting && { opacity: 0.6 }]}
             onPress={handleExportData}
             disabled={isExporting}
           >
             {isExporting ? (
-              <ActivityIndicator size="small" color={Colors.blue} />
+              <ActivityIndicator size="small" color={theme.blue} />
             ) : (
-              <Ionicons name="download-outline" size={18} color={Colors.blue} />
+              <Ionicons name="download-outline" size={18} color={theme.blue} />
             )}
-            <Text style={[styles.actionBtnText, { color: Colors.blue }]}>
+            <Text style={[styles.actionBtnText, { color: theme.blue }]}>
               {isExporting ? 'Exporting...' : 'Export All Data (JSON)'}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
           </Pressable>
-          <Text style={styles.actionNote}>Downloads all your soil tests and AI recommendations as a JSON file.</Text>
+          <Text style={[styles.actionNote, { color: theme.textMuted }]}>Downloads all your soil tests and AI recommendations as a JSON file.</Text>
         </SectionCard>
 
         {/* Danger Zone */}
-        <View style={[styles.card, styles.dangerCard]}>
+        <View style={[styles.card, styles.dangerCard, { backgroundColor: isDark ? '#2D1A1A' : '#FFF5F5', borderColor: theme.error + '40' }]}>
           <View style={styles.cardHeader}>
-            <View style={[styles.cardIconBg, { backgroundColor: Colors.error + '20' }]}>
-              <Ionicons name="warning-outline" size={18} color={Colors.error} />
+            <View style={[styles.cardIconBg, { backgroundColor: theme.error + '20' }]}>
+              <Ionicons name="warning-outline" size={18} color={theme.error} />
             </View>
-            <Text style={[styles.cardTitle, { color: Colors.error }]}>Danger Zone</Text>
+            <Text style={[styles.cardTitle, { color: theme.error }]}>Danger Zone</Text>
           </View>
-          <Text style={styles.dangerNote}>Irreversible actions — proceed with caution</Text>
+          <Text style={[styles.dangerNote, { color: theme.error + 'AA' }]}>Irreversible actions — proceed with caution</Text>
           <View style={styles.dangerRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.toggleLabel, { color: Colors.error }]}>Delete Account</Text>
-              <Text style={styles.toggleDesc}>Permanently delete your account and all data</Text>
+              <Text style={[styles.toggleLabel, { color: theme.error }]}>Delete Account</Text>
+              <Text style={[styles.toggleDesc, { color: theme.textSecondary }]}>Permanently delete your account and all data</Text>
             </View>
             <Pressable
-              style={[styles.deleteBtn, isDeleting && { opacity: 0.6 }]}
+              style={[styles.deleteBtn, { backgroundColor: theme.error }, isDeleting && { opacity: 0.6 }]}
               onPress={handleDeleteAccount}
               disabled={isDeleting}
             >
@@ -267,73 +278,70 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
   header: {
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.md,
   },
-  headerTitle: { fontFamily: 'Sora_800ExtraBold', fontSize: 26, color: Colors.textPrimary },
-  headerSub: { fontFamily: 'Sora_400Regular', fontSize: 13, color: Colors.textSecondary, marginTop: 4 },
+  headerTitle: { fontFamily: 'Sora_800ExtraBold', fontSize: 26 },
+  headerSub: { fontFamily: 'Sora_400Regular', fontSize: 13, marginTop: 4 },
   scroll: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md },
 
   card: {
-    backgroundColor: Colors.surface,
     borderRadius: Spacing.radius.xl,
     padding: Spacing.lg,
     ...Spacing.shadows.sm,
     marginBottom: Spacing.lg,
+    borderWidth: 1,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.md },
   cardIconBg: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  cardTitle: { fontFamily: 'Sora_700Bold', fontSize: 15, color: Colors.textPrimary },
+  cardTitle: { fontFamily: 'Sora_700Bold', fontSize: 15 },
 
   toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
-  toggleLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 14, color: Colors.textPrimary, marginBottom: 2 },
-  toggleDesc: { fontFamily: 'Sora_400Regular', fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
+  toggleLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 14, marginBottom: 2 },
+  toggleDesc: { fontFamily: 'Sora_400Regular', fontSize: 12, lineHeight: 18 },
 
   langSection: { gap: 8 },
   langSelector: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: Colors.background, borderRadius: Spacing.radius.md,
+    borderRadius: Spacing.radius.md,
     paddingHorizontal: 12, paddingVertical: 10,
-    borderWidth: 1, borderColor: Colors.border,
+    borderWidth: 1,
     marginTop: 8,
   },
-  langSelected: { fontFamily: 'Sora_600SemiBold', fontSize: 14, color: Colors.textPrimary },
+  langSelected: { fontFamily: 'Sora_600SemiBold', fontSize: 14 },
   langList: {
-    backgroundColor: Colors.surface,
     borderRadius: Spacing.radius.md,
-    borderWidth: 1, borderColor: Colors.borderLight,
+    borderWidth: 1,
     marginTop: 4, overflow: 'hidden',
   },
   langOption: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 14, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: Colors.borderLight,
+    borderBottomWidth: 1,
   },
-  langOptionActive: { backgroundColor: Colors.surfaceAlt },
-  langOptionText: { fontFamily: 'Sora_400Regular', fontSize: 14, color: Colors.textSecondary },
-  langOptionTextActive: { fontFamily: 'Sora_600SemiBold', color: Colors.primary },
+  langOptionActive: {},
+  langOptionText: { fontFamily: 'Sora_400Regular', fontSize: 14 },
+  langOptionTextActive: { fontFamily: 'Sora_600SemiBold' },
 
   actionBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: Colors.background, borderRadius: Spacing.radius.md,
+    borderRadius: Spacing.radius.md,
     paddingHorizontal: 12, paddingVertical: 12,
-    borderWidth: 1, borderColor: Colors.border,
+    borderWidth: 1,
   },
   actionBtnText: { flex: 1, fontFamily: 'Sora_600SemiBold', fontSize: 14 },
-  actionNote: { fontFamily: 'Sora_400Regular', fontSize: 11, color: Colors.textMuted, marginTop: 8, paddingLeft: 4 },
+  actionNote: { fontFamily: 'Sora_400Regular', fontSize: 11, marginTop: 8, paddingLeft: 4 },
 
-  dangerCard: { borderWidth: 1, borderColor: Colors.error + '40', backgroundColor: '#FFF5F5' },
-  dangerNote: { fontFamily: 'Sora_400Regular', fontSize: 12, color: Colors.error + 'AA', marginBottom: Spacing.md },
+  dangerCard: { borderWidth: 1 },
+  dangerNote: { fontFamily: 'Sora_400Regular', fontSize: 12, marginBottom: Spacing.md },
   dangerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   deleteBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: Colors.error, borderRadius: Spacing.radius.md,
+    borderRadius: Spacing.radius.md,
     paddingHorizontal: 14, paddingVertical: 9,
   },
   deleteBtnText: { fontFamily: 'Sora_700Bold', fontSize: 13, color: '#fff' },
 });
-
-

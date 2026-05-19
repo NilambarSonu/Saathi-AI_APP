@@ -12,6 +12,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useNavigationStore } from '@/store/navigationStore';
 import { tabBarY } from '@/constants/Animations';
+import { useTheme } from '@/context/ThemeContext';
 
 import DashboardScreen from '@/screens/DashboardScreen';
 import ConnectScreen from '@/screens/ConnectScreen';
@@ -40,13 +41,15 @@ const TABS = [
   { icon: 'person-outline', lib: 'Ionicons', label: 'PROFILE' },
 ] as const;
 
-const ACTIVE_COLOR = '#0a843dff';
-const INACTIVE_COLOR = '#9CAF9F';
 const DOT_COLOR = '#38B000';   // same vivid green the user loved
 
 export default function AppIndex() {
   const { currentIndex, setCurrentIndex } = useNavigationStore();
   const swipeRef = useRef<SwipeContainerHandle>(null);
+  const { theme, homeTheme, isDarkMode } = useTheme();
+  const isHomeTab = currentIndex === 0;
+  const chromeTheme = isHomeTab ? homeTheme : theme;
+  const chromeIsDark = isHomeTab && isDarkMode;
 
   // After a swipe gesture ends, the SwipeContainer calls this with the final index
   const handleSwipeChange = useCallback(
@@ -70,7 +73,7 @@ export default function AppIndex() {
   const isChat = currentIndex === 2;
 
   return (
-    <View style={s.root}>
+    <View style={[s.root, { backgroundColor: chromeTheme.background }]}>
       <SwipeContainer
         ref={swipeRef}
         screens={SCREENS as any}
@@ -85,7 +88,17 @@ export default function AppIndex() {
             { transform: [{ translateY: tabBarY }] },
           ]}
         >
-          <BlurView intensity={88} tint="light" style={s.pill}>
+          <BlurView 
+            intensity={chromeIsDark ? 40 : 88} 
+            tint={chromeIsDark ? "dark" : "light"} 
+            style={[
+              s.pill, 
+              { 
+                backgroundColor: chromeTheme.tabBarBackground,
+                borderColor: chromeTheme.tabBarBorder
+              }
+            ]}
+          >
             {TABS.map((tab, idx) => (
               <TabItem
                 key={idx}
@@ -93,6 +106,7 @@ export default function AppIndex() {
                 idx={idx}
                 isFocused={idx === currentIndex}
                 onPress={handleTabPress}
+                theme={chromeTheme}
               />
             ))}
           </BlurView>
@@ -103,22 +117,23 @@ export default function AppIndex() {
 }
 
 // ── Tab item ─────────────────────────────────────────────────────────────────
-// Uses plain React state (isFocused from Zustand) — simple & 100% reliable.
-// The dot and icon color update one React frame after the animation starts, 
-// which is imperceptible.
 function TabItem({
   tab,
   idx,
   isFocused,
   onPress,
+  theme,
 }: {
   tab: (typeof TABS)[number];
   idx: number;
   isFocused: boolean;
   onPress: (idx: number) => void;
+  theme: ReturnType<typeof useTheme>['theme'];
 }) {
   const IconLib =
     tab.lib === 'Ionicons' ? Ionicons : MaterialCommunityIcons;
+
+  const color = isFocused ? theme.activeTab : theme.inactiveTab;
 
   return (
     <TouchableOpacity
@@ -131,12 +146,12 @@ function TabItem({
         <IconLib
           name={tab.icon as any}
           size={isFocused ? 25 : 23}
-          color={isFocused ? ACTIVE_COLOR : INACTIVE_COLOR}
+          color={color}
         />
 
         {/* ✅ The corner dot the user loves */}
         {isFocused && (
-          <View style={s.cornerDot} />
+          <View style={[s.cornerDot, { borderColor: theme.surface }]} />
         )}
       </View>
 
@@ -144,7 +159,7 @@ function TabItem({
       <Text
         style={[
           s.tabLabel,
-          { color: isFocused ? ACTIVE_COLOR : INACTIVE_COLOR },
+          { color }
         ]}
       >
         {tab.label}
@@ -155,7 +170,7 @@ function TabItem({
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000' },
+  root: { flex: 1 },
 
   tabContainer: {
     position: 'absolute',
@@ -166,12 +181,10 @@ const s = StyleSheet.create({
   },
   pill: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(240, 253, 244, 0.60)',
     borderRadius: 36,
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderWidth: 1.5,
-    borderColor: 'rgba(167, 243, 208, 0.35)',
     overflow: 'hidden',
   },
 
@@ -202,7 +215,6 @@ const s = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: DOT_COLOR,
     borderWidth: 1.5,
-    borderColor: '#fff',
   },
 
   tabLabel: {

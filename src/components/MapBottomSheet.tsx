@@ -1,10 +1,10 @@
 import React, { useCallback, useMemo, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop } from '@gorhom/bottom-sheet';
-import { Colors } from '../constants/Colors';
 import { Spacing } from '../constants/Spacing';
 import { SoilTest } from '@/features/soil_analysis/services/soil';
 import { getPhColor } from './MapComponent';
+import { useTheme } from '@/context/ThemeContext';
 
 interface SoilDetailsSheetProps {
   selectedTest: SoilTest | null;
@@ -13,6 +13,7 @@ interface SoilDetailsSheetProps {
 
 export default function SoilDetailsSheet({ selectedTest, onClose }: SoilDetailsSheetProps) {
   const bottomSheetRef = useRef<BottomSheet>(null);
+  const { theme } = useTheme();
 
   // Variables
   const snapPoints = useMemo(() => ['45%'], []);
@@ -60,50 +61,50 @@ export default function SoilDetailsSheet({ selectedTest, onClose }: SoilDetailsS
       onChange={handleSheetChanges}
       enablePanDownToClose={true}
       backdropComponent={renderBackdrop}
-      backgroundStyle={styles.sheetBackground}
-      handleIndicatorStyle={styles.indicator}
+      backgroundStyle={[s.sheetBackground, { backgroundColor: theme.modalBackground }]}
+      handleIndicatorStyle={[s.indicator, { backgroundColor: theme.sep1 }]}
     >
-      <View style={styles.contentContainer}>
+      <View style={s.contentContainer}>
         {selectedTest && (
           <>
-            <View style={styles.header}>
-              <Text style={styles.title}>Soil Analysis</Text>
-              <View style={[styles.phBadge, { backgroundColor: getPhColor(selectedTest.ph) + '1A', borderColor: getPhColor(selectedTest.ph) + '33' }]}>
-                <Text style={[styles.phValue, { color: getPhColor(selectedTest.ph) }]}>pH {selectedTest.ph.toFixed(1)}</Text>
+            <View style={[s.header, { borderBottomColor: theme.sep1 }]}>
+              <Text style={[s.title, { color: theme.textPrimary }]}>Soil Analysis</Text>
+              <View style={[s.phBadge, { backgroundColor: getPhColor(selectedTest.ph) + '1A', borderColor: getPhColor(selectedTest.ph) + '33' }]}>
+                <Text style={[s.phValue, { color: getPhColor(selectedTest.ph) }]}>pH {selectedTest.ph.toFixed(1)}</Text>
               </View>
             </View>
 
-            <View style={styles.infoRow}>
-              <View style={styles.infoBlock}>
-                <Text style={styles.infoLabel}>Category</Text>
-                <Text style={styles.infoValue}>{getPhCategory(selectedTest.ph)}</Text>
+            <View style={s.infoRow}>
+              <View style={s.infoBlock}>
+                <Text style={[s.infoLabel, { color: theme.textMuted }]}>Category</Text>
+                <Text style={[s.infoValue, { color: theme.label2 }]}>{getPhCategory(selectedTest.ph)}</Text>
               </View>
-              <View style={styles.infoBlock}>
-                <Text style={styles.infoLabel}>Date</Text>
-                <Text style={styles.infoValue}>{selectedTest.createdAt ? new Date(selectedTest.createdAt).toLocaleDateString() : 'N/A'}</Text>
-              </View>
-            </View>
-
-            <View style={styles.nutrientsContainer}>
-              <Text style={styles.nutrientsTitle}>Macronutrients</Text>
-              <View style={styles.npkGrid}>
-                <View style={styles.npkBox}>
-                  <Text style={styles.npkLabel}>Nitrogen (N)</Text>
-                  <Text style={styles.npkAmount}>{selectedTest.n} <Text style={styles.npkUnit}>ppm</Text></Text>
-                </View>
-                <View style={styles.npkBox}>
-                  <Text style={styles.npkLabel}>Phosphorus (P)</Text>
-                  <Text style={styles.npkAmount}>{selectedTest.p} <Text style={styles.npkUnit}>ppm</Text></Text>
-                </View>
-                <View style={[styles.npkBox, { borderRightWidth: 0 }]}>
-                  <Text style={styles.npkLabel}>Potassium (K)</Text>
-                  <Text style={styles.npkAmount}>{selectedTest.k} <Text style={styles.npkUnit}>ppm</Text></Text>
-                </View>
+              <View style={s.infoBlock}>
+                <Text style={[s.infoLabel, { color: theme.textMuted }]}>Date</Text>
+                <Text style={[s.infoValue, { color: theme.label2 }]}>{selectedTest.createdAt ? new Date(selectedTest.createdAt).toLocaleDateString() : 'N/A'}</Text>
               </View>
             </View>
 
-            <View style={styles.footerInfo}>
-                <Text style={styles.footerText}>
+            <View style={[s.nutrientsContainer, { backgroundColor: theme.surfaceAlt }]}>
+              <Text style={[s.nutrientsTitle, { color: theme.textSecondary }]}>Macronutrients</Text>
+              <View style={s.npkGrid}>
+                <View style={[s.npkBox, { borderRightColor: theme.sep1 }]}>
+                  <Text style={[s.npkLabel, { color: theme.textMuted }]}>Nitrogen (N)</Text>
+                  <Text style={[s.npkAmount, { color: theme.textPrimary }]}>{selectedTest.n} <Text style={[s.npkUnit, { color: theme.textMuted }]}>ppm</Text></Text>
+                </View>
+                <View style={[s.npkBox, { borderRightColor: theme.sep1 }]}>
+                  <Text style={[s.npkLabel, { color: theme.textMuted }]}>Phosphorus (P)</Text>
+                  <Text style={[s.npkAmount, { color: theme.textPrimary }]}>{selectedTest.p} <Text style={[s.npkUnit, { color: theme.textMuted }]}>ppm</Text></Text>
+                </View>
+                <View style={[s.npkBox, { borderRightWidth: 0 }]}>
+                  <Text style={[s.npkLabel, { color: theme.textMuted }]}>Potassium (K)</Text>
+                  <Text style={[s.npkAmount, { color: theme.textPrimary }]}>{selectedTest.k} <Text style={[s.npkUnit, { color: theme.textMuted }]}>ppm</Text></Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={s.footerInfo}>
+                <Text style={[s.footerText, { color: theme.textMuted }]}>
                   Lat: {selectedTest.latitude?.toFixed(6) || 'N/A'} • Lng: {selectedTest.longitude?.toFixed(6) || 'N/A'}
                 </Text>
             </View>
@@ -114,13 +115,11 @@ export default function SoilDetailsSheet({ selectedTest, onClose }: SoilDetailsS
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   sheetBackground: {
-    backgroundColor: '#fff',
     borderRadius: 24,
   },
   indicator: {
-    backgroundColor: '#D1D5DB',
     width: 40,
   },
   contentContainer: {
@@ -135,12 +134,10 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     paddingBottom: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6'
   },
   title: {
     fontFamily: 'Sora_700Bold',
     fontSize: 20,
-    color: '#111827',
   },
   phBadge: {
     paddingHorizontal: 12,
@@ -162,16 +159,13 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontFamily: 'Sora_600SemiBold',
     fontSize: 12,
-    color: '#6B7280',
     marginBottom: 4,
   },
   infoValue: {
     fontFamily: 'Sora_600SemiBold',
     fontSize: 15,
-    color: '#374151',
   },
   nutrientsContainer: {
-    backgroundColor: '#F9FAFB',
     borderRadius: 16,
     padding: Spacing.lg,
     marginBottom: Spacing.xl,
@@ -179,7 +173,6 @@ const styles = StyleSheet.create({
   nutrientsTitle: {
     fontFamily: 'Sora_600SemiBold',
     fontSize: 13,
-    color: '#4B5563',
     marginBottom: Spacing.md,
   },
   npkGrid: {
@@ -191,22 +184,18 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
   },
   npkLabel: {
     fontFamily: 'Sora_500Medium',
     fontSize: 11,
-    color: '#6B7280',
     marginBottom: 4,
   },
   npkAmount: {
     fontFamily: 'Sora_700Bold',
     fontSize: 18,
-    color: '#1F2937',
   },
   npkUnit: {
     fontSize: 11,
-    color: '#9CA3AF',
   },
   footerInfo: {
     alignItems: 'center',
@@ -215,6 +204,5 @@ const styles = StyleSheet.create({
   footerText: {
     fontFamily: 'Sora_400Regular',
     fontSize: 11,
-    color: '#9CA3AF',
   }
 });

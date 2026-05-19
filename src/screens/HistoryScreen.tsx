@@ -33,6 +33,7 @@ import { exportSoilReport } from '@/services/pdfExport';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigationStore } from '@/store/navigationStore';
 import { useSoilMarkers } from '@/context/SoilMarkersContext';
+import { useTheme } from '@/context/ThemeContext';
 import LottieView from 'lottie-react-native';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
@@ -79,18 +80,19 @@ const getParamKey = (param: ParameterName): keyof SoilTest => {
   }
 };
 
-const getParamColor = (param: ParameterName): string => {
+const getParamColor = (theme: any, param: ParameterName): string => {
   switch (param) {
-    case 'Nitrogen': return '#EF4444';
-    case 'Phosphorus': return '#8B5CF6';
-    case 'Potassium': return '#F59E0B';
-    case 'pH Level': return '#2563EB';
-    case 'Moisture': return '#10B981';
-    default: return '#10B981';
+    case 'Nitrogen': return theme.paramNitrogen;
+    case 'Phosphorus': return theme.paramPhosphorus;
+    case 'Potassium': return theme.paramPotassium;
+    case 'pH Level': return theme.paramPH;
+    case 'Moisture': return theme.paramMoisture;
+    default: return theme.paramMoisture;
   }
 };
 
 export default function HistoryScreen({ navigation }: any) {
+  const { theme, isDark } = useTheme();
   const { user } = useAuthStore();
   const { currentIndex } = useNavigationStore();
   const { addSoilMarkers } = useSoilMarkers();
@@ -117,6 +119,21 @@ export default function HistoryScreen({ navigation }: any) {
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const mapRef = useRef<MapView>(null);
   const fullMapRef = useRef<MapView>(null);
+
+  const COLORS_THEMED = {
+    backgroundTop: theme.bg0,
+    backgroundBottom: theme.background,
+    title: theme.textPrimary,
+    subtitle: theme.textSecondary,
+    card: theme.surface,
+    border: theme.border,
+    accent: theme.primary,
+    accentDark: theme.primaryDark,
+    warningBg: isDark ? '#3D2B16' : '#FFFBEB',
+    warningBorder: isDark ? '#5F4D1E' : '#FDE68A',
+    warningText: isDark ? theme.warning : '#92400E',
+    shadow: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.04)',
+  };
 
   // Safety fallback — only run once (mapReadyRef guards it from re-running on focus)
   useEffect(() => {
@@ -325,11 +342,11 @@ export default function HistoryScreen({ navigation }: any) {
       labels: points.map(l => format(parseISO(l.testDate), 'MMM d')),
       datasets: [{
         data: points.map(l => Number(l[key] ?? 0)),
-        color: (opacity = 1) => getParamColor(selectedParameter),
+        color: (opacity = 1) => getParamColor(theme, selectedParameter),
         strokeWidth: 3
       }]
     };
-  }, [filteredLogs, selectedParameter]);
+  }, [filteredLogs, selectedParameter, theme]);
 
   const handleExport = async () => {
     if (!logs.length || !user) {
@@ -419,15 +436,15 @@ export default function HistoryScreen({ navigation }: any) {
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      <LinearGradient colors={[COLORS.backgroundTop, COLORS.backgroundBottom]} style={StyleSheet.absoluteFill} />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <LinearGradient colors={[COLORS_THEMED.backgroundTop, COLORS_THEMED.backgroundBottom]} style={StyleSheet.absoluteFill} />
 
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Analytics Lab</Text>
+          <Text style={[styles.title, { color: COLORS_THEMED.title }]}>Analytics Lab</Text>
         </View>
-        <TouchableOpacity style={styles.exportButton} onPress={handleExport} disabled={isExporting}>
+        <TouchableOpacity style={[styles.exportButton, { backgroundColor: COLORS_THEMED.accent }]} onPress={handleExport} disabled={isExporting}>
           {isExporting ? (
             <ActivityIndicator size="small" color="#FFF" />
           ) : (
@@ -443,55 +460,55 @@ export default function HistoryScreen({ navigation }: any) {
         showsVerticalScrollIndicator={true}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS_THEMED.accent} />
         }
       >
         {error && (
-          <View style={styles.errorCard}>
-            <Ionicons name="alert-circle" size={20} color={COLORS.warningText} />
-            <Text style={styles.errorText}>{error}</Text>
+          <View style={[styles.errorCard, { backgroundColor: COLORS_THEMED.warningBg, borderColor: COLORS_THEMED.warningBorder }]}>
+            <Ionicons name="alert-circle" size={20} color={COLORS_THEMED.warningText} />
+            <Text style={[styles.errorText, { color: COLORS_THEMED.warningText }]}>{error}</Text>
           </View>
         )}
 
         {/* 1. Field Location - Map */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: COLORS_THEMED.card, borderColor: COLORS_THEMED.border }]}>
           <View style={[styles.cardHeader, { marginBottom: 9 }]}>
-            <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Field Locations</Text>
+            <Text style={[styles.cardTitle, { color: COLORS_THEMED.subtitle, marginBottom: 0 }]}>Field Locations</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={styles.mapControls}>
+              <View style={[styles.mapControls, { backgroundColor: isDark ? theme.bg1 : '#F1F5F9' }]}>
                 <Pressable
                   onPress={() => handleSetMapMode('satellite')}
-                  style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'satellite' && styles.mapTypeBtnActive, pressed && { opacity: 0.7 }]}
+                  style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'satellite' && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }], pressed && { opacity: 0.7 }]}
                 >
-                  <Text style={[styles.mapTypeLabel, mapMode === 'satellite' && styles.mapTypeLabelActive]}>Satellite</Text>
+                  <Text style={[styles.mapTypeLabel, mapMode === 'satellite' && [styles.mapTypeLabelActive, { color: COLORS_THEMED.accent }]]}>Satellite</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => handleSetMapMode('standard')}
-                  style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'standard' && styles.mapTypeBtnActive, pressed && { opacity: 0.7 }]}
+                  style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'standard' && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }], pressed && { opacity: 0.7 }]}
                 >
-                  <Text style={[styles.mapTypeLabel, mapMode === 'standard' && styles.mapTypeLabelActive]}>Standard</Text>
+                  <Text style={[styles.mapTypeLabel, mapMode === 'standard' && [styles.mapTypeLabelActive, { color: COLORS_THEMED.accent }]]}>Standard</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => handleSetMapMode('osm')}
-                  style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'osm' && styles.mapTypeBtnActive, pressed && { opacity: 0.7 }]}
+                  style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'osm' && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }], pressed && { opacity: 0.7 }]}
                 >
-                  <Text style={[styles.mapTypeLabel, mapMode === 'osm' && styles.mapTypeLabelActive]}>OSM</Text>
+                  <Text style={[styles.mapTypeLabel, mapMode === 'osm' && [styles.mapTypeLabelActive, { color: COLORS_THEMED.accent }]]}>OSM</Text>
                 </Pressable>
               </View>
               {/* Expand button */}
               <Pressable
                 onPress={() => setIsMapFullscreen(true)}
                 style={({ pressed }) => ({
-                  backgroundColor: pressed ? '#E2E8F0' : '#F1F5F9',
+                  backgroundColor: pressed ? (isDark ? theme.sep1 : '#E2E8F0') : (isDark ? theme.bg1 : '#F1F5F9'),
                   padding: 6,
                   borderRadius: 8,
                 })}
               >
-                <Ionicons name="expand-outline" size={16} color={COLORS.title} />
+                <Ionicons name="expand-outline" size={16} color={COLORS_THEMED.title} />
               </Pressable>
             </View>
           </View>
-          <View style={styles.mapContainer}>
+          <View style={[styles.mapContainer, { borderColor: isDark ? theme.sep2 : '#E2E8F0' }]}>
             {/* MapView is always mounted — never conditionally removed — to prevent reload on navigation */}
             <MapView
               ref={mapRef}
@@ -535,16 +552,16 @@ export default function HistoryScreen({ navigation }: any) {
                   title={`Test on ${format(parseISO(marker.date), 'MMM d, yyyy')}`}
                   tracksViewChanges={false}
                 >
-                  <View style={[styles.customMarker, { borderColor: getParamColor(selectedParameter) }]}>
-                    <View style={[styles.markerDot, { backgroundColor: getParamColor(selectedParameter) }]} />
+                  <View style={[styles.customMarker, { borderColor: getParamColor(theme, selectedParameter), backgroundColor: isDark ? theme.surface : '#FFF' }]}>
+                    <View style={[styles.markerDot, { backgroundColor: getParamColor(theme, selectedParameter) }]} />
                   </View>
                 </Marker>
               ))}
             </MapView>
             {/* Overlay spinner shown only while map tiles load for the first time */}
             {!isMapReady && (
-              <View style={[styles.mapLoaderOverlay, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }]}>
-                <ActivityIndicator size="small" color={COLORS.accent} />
+              <View style={[styles.mapLoaderOverlay, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)' }]}>
+                <ActivityIndicator size="small" color={COLORS_THEMED.accent} />
               </View>
             )}
           </View>
@@ -593,8 +610,8 @@ export default function HistoryScreen({ navigation }: any) {
                   title={`Test on ${format(parseISO(marker.date), 'MMM d, yyyy')}`}
                   tracksViewChanges={false}
                 >
-                  <View style={[styles.customMarker, { borderColor: getParamColor(selectedParameter) }]}>
-                    <View style={[styles.markerDot, { backgroundColor: getParamColor(selectedParameter) }]} />
+                  <View style={[styles.customMarker, { borderColor: getParamColor(theme, selectedParameter), backgroundColor: isDark ? theme.surface : '#FFF' }]}>
+                    <View style={[styles.markerDot, { backgroundColor: getParamColor(theme, selectedParameter) }]} />
                   </View>
                 </Marker>
               ))}
@@ -620,21 +637,21 @@ export default function HistoryScreen({ navigation }: any) {
               top: Platform.OS === 'android' ? 40 : 56,
               left: 16,
               zIndex: 10,
-              backgroundColor: '#FFF',
+              backgroundColor: isDark ? theme.bg1 : '#FFF',
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.2,
               shadowRadius: 4,
               elevation: 4,
             }]}>
-              <Pressable onPress={() => handleSetMapMode('satellite')} style={[styles.mapTypeBtn, mapMode === 'satellite' && styles.mapTypeBtnActive]}>
-                <Text style={[styles.mapTypeLabel, mapMode === 'satellite' && styles.mapTypeLabelActive]}>Satellite</Text>
+              <Pressable onPress={() => handleSetMapMode('satellite')} style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'satellite' && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }], pressed && { opacity: 0.7 }]}>
+                <Text style={[styles.mapTypeLabel, { color: theme.textSecondary }, mapMode === 'satellite' && [styles.mapTypeLabelActive, { color: theme.textPrimary }]]}>Satellite</Text>
               </Pressable>
-              <Pressable onPress={() => handleSetMapMode('standard')} style={[styles.mapTypeBtn, mapMode === 'standard' && styles.mapTypeBtnActive]}>
-                <Text style={[styles.mapTypeLabel, mapMode === 'standard' && styles.mapTypeLabelActive]}>Standard</Text>
+              <Pressable onPress={() => handleSetMapMode('standard')} style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'standard' && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }], pressed && { opacity: 0.7 }]}>
+                <Text style={[styles.mapTypeLabel, { color: theme.textSecondary }, mapMode === 'standard' && [styles.mapTypeLabelActive, { color: theme.textPrimary }]]}>Standard</Text>
               </Pressable>
-              <Pressable onPress={() => handleSetMapMode('osm')} style={[styles.mapTypeBtn, mapMode === 'osm' && styles.mapTypeBtnActive]}>
-                <Text style={[styles.mapTypeLabel, mapMode === 'osm' && styles.mapTypeLabelActive]}>OSM</Text>
+              <Pressable onPress={() => handleSetMapMode('osm')} style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'osm' && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }], pressed && { opacity: 0.7 }]}>
+                <Text style={[styles.mapTypeLabel, { color: theme.textSecondary }, mapMode === 'osm' && [styles.mapTypeLabelActive, { color: theme.textPrimary }]]}>OSM</Text>
               </Pressable>
             </View>
           </View>
@@ -643,38 +660,38 @@ export default function HistoryScreen({ navigation }: any) {
         {/* 2. Premium Apple Style Dropdown Filters */}
         <View style={styles.dropdownRow}>
           <Pressable
-            style={({ pressed }) => [styles.appleDropdownBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.appleDropdownBtn, { backgroundColor: theme.surface, borderColor: isDark ? theme.sep2 : '#E8EDF5' }, pressed && { opacity: 0.7 }]}
             onPress={handleOpenTimeMenu}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <Ionicons name="calendar-outline" size={16} color={COLORS.title} style={{ marginRight: 8 }} />
-              <Text style={styles.appleDropdownText} numberOfLines={1}>{timeFilter}</Text>
+              <Ionicons name="calendar-outline" size={16} color={COLORS_THEMED.title} style={{ marginRight: 8 }} />
+              <Text style={[styles.appleDropdownText, { color: COLORS_THEMED.title }]} numberOfLines={1}>{timeFilter}</Text>
             </View>
-            <Ionicons name="chevron-down" size={14} color={COLORS.subtitle} />
+            <Ionicons name="chevron-down" size={14} color={COLORS_THEMED.subtitle} />
           </Pressable>
 
           <Pressable
-            style={({ pressed }) => [styles.appleDropdownBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.appleDropdownBtn, { backgroundColor: theme.surface, borderColor: isDark ? theme.sep2 : '#E8EDF5' }, pressed && { opacity: 0.7 }]}
             onPress={handleOpenParamMenu}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <View style={[styles.paramColorDot, { backgroundColor: getParamColor(selectedParameter), marginRight: 8 }]} />
-              <Text style={styles.appleDropdownText} numberOfLines={1}>{selectedParameter}</Text>
+              <View style={[styles.paramColorDot, { backgroundColor: getParamColor(theme, selectedParameter), marginRight: 8 }]} />
+              <Text style={[styles.appleDropdownText, { color: COLORS_THEMED.title }]} numberOfLines={1}>{selectedParameter}</Text>
             </View>
-            <Ionicons name="chevron-down" size={14} color={COLORS.subtitle} />
+            <Ionicons name="chevron-down" size={14} color={COLORS_THEMED.subtitle} />
           </Pressable>
         </View>
 
         {/* 3. Trend Chart */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{selectedParameter} Trend Analysis</Text>
+        <View style={[styles.card, { backgroundColor: COLORS_THEMED.card, borderColor: COLORS_THEMED.border }]}>
+          <Text style={[styles.cardTitle, { color: COLORS_THEMED.subtitle }]}>{selectedParameter} Trend Analysis</Text>
           {loading ? (
-            <View style={styles.chartLoader}><ActivityIndicator color={COLORS.accent} /></View>
+            <View style={styles.chartLoader}><ActivityIndicator color={COLORS_THEMED.accent} /></View>
           ) : filteredLogs.length === 0 ? (
             <View style={styles.chartEmptyContainer}>
               <LottieView source={require('../../assets/animations/history-trend.json')} autoPlay loop style={styles.chartLottie} resizeMode="contain" />
-              <Text style={styles.noDataTitle}>No Trend Data</Text>
-              <Text style={styles.noData}>Insufficient data to show trend for {timeFilter}.</Text>
+              <Text style={[styles.noDataTitle, { color: COLORS_THEMED.title }]}>No Trend Data</Text>
+              <Text style={[styles.noData, { color: COLORS_THEMED.subtitle }]}>Insufficient data to show trend for {timeFilter}.</Text>
             </View>
           ) : (
             // overflow:hidden clips the wide chart SVG to the card boundary — fixes white bleed on L/R
@@ -685,14 +702,14 @@ export default function HistoryScreen({ navigation }: any) {
                   width={SCREEN_WIDTH + 45}
                   height={232}
                   chartConfig={{
-                    backgroundColor: '#FFF', backgroundGradientFrom: '#FFF', backgroundGradientTo: '#FFF',
+                    backgroundColor: theme.surface, backgroundGradientFrom: theme.surface, backgroundGradientTo: theme.surface,
                     decimalPlaces: selectedParameter === 'pH Level' ? 1 : 0,
-                    color: (opacity = 1) => getParamColor(selectedParameter),
-                    labelColor: (opacity = 1) => '#94A3B8',
+                    color: (opacity = 1) => getParamColor(theme, selectedParameter),
+                    labelColor: (opacity = 1) => isDark ? theme.textMuted : '#94A3B8',
                     style: { borderRadius: 16 },
-                    propsForDots: { r: '6', strokeWidth: '2', stroke: '#FFF' },
+                    propsForDots: { r: '6', strokeWidth: '2', stroke: theme.surface },
                     propsForLabels: { fontFamily: 'Sora_400Regular', fontSize: 10 },
-                    propsForBackgroundLines: { strokeDasharray: '4,4', stroke: '#F1F5F9', strokeWidth: 1 },
+                    propsForBackgroundLines: { strokeDasharray: '4,4', stroke: isDark ? theme.sep2 : '#F1F5F9', strokeWidth: 1 },
                   }}
                   bezier
                   style={{ ...styles.chart, marginLeft: -33, marginVertical: 0 }}
@@ -717,13 +734,14 @@ export default function HistoryScreen({ navigation }: any) {
                           SCREEN_WIDTH - 95
                         )),
                         top: Math.max(4, chartTooltip.y - 66),
+                        backgroundColor: isDark ? theme.surfaceAlt : '#1E293B'
                       },
                     ]}
                   >
-                    <Text style={styles.tooltipDateText}>
+                    <Text style={[styles.tooltipDateText, { color: isDark ? theme.textMuted : '#94A3B8' }]}>
                       {chartData.labels[chartTooltip.index]}
                     </Text>
-                    <Text style={[styles.tooltipValueText, { color: getParamColor(selectedParameter) }]}>
+                    <Text style={[styles.tooltipValueText, { color: getParamColor(theme, selectedParameter) }]}>
                       {selectedParameter === 'pH Level'
                         ? chartTooltip.value.toFixed(1)
                         : Math.round(chartTooltip.value).toString()}
@@ -737,22 +755,22 @@ export default function HistoryScreen({ navigation }: any) {
         </View>
 
         {/* 4. Stats */}
-        <View style={styles.statsBar}>
+        <View style={[styles.statsBar, { backgroundColor: COLORS_THEMED.card, borderColor: COLORS_THEMED.border }]}>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Avg {selectedParameter}</Text>
-            <Text style={[styles.statValue, { color: getParamColor(selectedParameter) }]}>
+            <Text style={[styles.statLabel, { color: COLORS_THEMED.subtitle }]}>Avg {selectedParameter}</Text>
+            <Text style={[styles.statValue, { color: getParamColor(theme, selectedParameter) }]}>
               {selectedParameter === 'pH Level' ? stats.avg.toFixed(1) : stats.avg.toFixed(0)}
-              <Text style={styles.unitText}> {UNITS[selectedParameter]}</Text>
+              <Text style={[styles.unitText, { color: COLORS_THEMED.subtitle }]}> {UNITS[selectedParameter]}</Text>
             </Text>
           </View>
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: isDark ? theme.sep2 : '#F1F5F9' }]} />
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Total Tests</Text>
-            <Text style={styles.statValue}>{stats.total}</Text>
+            <Text style={[styles.statLabel, { color: COLORS_THEMED.subtitle }]}>Total Tests</Text>
+            <Text style={[styles.statValue, { color: COLORS_THEMED.title }]}>{stats.total}</Text>
           </View>
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: isDark ? theme.sep2 : '#F1F5F9' }]} />
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Trend</Text>
+            <Text style={[styles.statLabel, { color: COLORS_THEMED.subtitle }]}>Trend</Text>
             <View style={styles.trendRow}>
               <Ionicons name={stats.change >= 0 ? "trending-up" : "trending-down"} size={16} color={stats.change >= 0 ? "#10B981" : "#EF4444"} />
               <Text style={[styles.trendText, { color: stats.change >= 0 ? "#10B981" : "#EF4444" }]}>{Math.abs(stats.change).toFixed(1)}%</Text>
@@ -761,16 +779,16 @@ export default function HistoryScreen({ navigation }: any) {
         </View>
 
         {/* 5. History log title */}
-        <View style={[styles.historyCard, { paddingBottom: 16 }]}>
-          <Text style={styles.cardTitle}>
+        <View style={[styles.historyCard, { backgroundColor: COLORS_THEMED.card, borderColor: COLORS_THEMED.border, paddingBottom: 16 }]}>
+          <Text style={[styles.cardTitle, { color: COLORS_THEMED.subtitle }]}>
             Test History Log ({timeFilter === 'All Time' ? 'All Time' : `Last ${timeFilter}`})
           </Text>
-          {loading && <View style={styles.chartLoader}><ActivityIndicator color={COLORS.accent} /></View>}
+          {loading && <View style={styles.chartLoader}><ActivityIndicator color={COLORS_THEMED.accent} /></View>}
           {!loading && filteredLogs.length === 0 ? (
             <View style={styles.noDataContainer}>
               <LottieView source={require('../../assets/animations/soil-analysis-data.json')} autoPlay loop style={styles.historyLottie} resizeMode="contain" />
-              <Text style={styles.noDataTitle}>No Records</Text>
-              <Text style={styles.noData}>No soil tests in the selected {timeFilter} range.</Text>
+              <Text style={[styles.noDataTitle, { color: COLORS_THEMED.title }]}>No Records</Text>
+              <Text style={[styles.noData, { color: COLORS_THEMED.subtitle }]}>No soil tests in the selected {timeFilter} range.</Text>
             </View>
           ) : (
             <ScrollView
@@ -781,29 +799,29 @@ export default function HistoryScreen({ navigation }: any) {
               {filteredLogs.map((log, index) => (
                 <View style={styles.timelineRow} key={log.id || index.toString()}>
                   <View style={styles.timelineLineContainer}>
-                    <View style={styles.timelineDot} />
-                    {index !== filteredLogs.length - 1 && <View style={styles.timelineLine} />}
+                    <View style={[styles.timelineDot, { backgroundColor: COLORS_THEMED.accent, borderColor: isDark ? theme.bg1 : '#FFF', shadowColor: COLORS_THEMED.accent }]} />
+                    {index !== filteredLogs.length - 1 && <View style={[styles.timelineLine, { backgroundColor: isDark ? theme.sep2 : '#E2E8F0' }]} />}
                   </View>
-                  <TouchableOpacity style={styles.timelineContent} onPress={() => openDetails(log)} activeOpacity={0.7}>
-                    <View style={styles.logIcon}><Ionicons name="leaf" size={18} color={COLORS.accent} /></View>
+                  <TouchableOpacity style={[styles.timelineContent, { backgroundColor: theme.surface, borderColor: COLORS_THEMED.border }]} onPress={() => openDetails(log)} activeOpacity={0.7}>
+                    <View style={[styles.logIcon, { backgroundColor: isDark ? theme.bg1 : '#F0FDF4' }]}><Ionicons name="leaf" size={18} color={COLORS_THEMED.accent} /></View>
                     <View style={styles.logInfo}>
-                      <Text style={styles.logDate}>{format(parseISO(log.testDate), 'MMM d, yyyy')}</Text>
-                      <Text style={styles.logTime}>{format(parseISO(log.testDate), 'hh:mm a')}</Text>
+                      <Text style={[styles.logDate, { color: COLORS_THEMED.title }]}>{format(parseISO(log.testDate), 'MMM d, yyyy')}</Text>
+                      <Text style={[styles.logTime, { color: COLORS_THEMED.subtitle }]}>{format(parseISO(log.testDate), 'hh:mm a')}</Text>
                     </View>
                     <View style={styles.logValues}>
-                      <Text style={[styles.logMainValue, { color: getParamColor(selectedParameter) }]}>
+                      <Text style={[styles.logMainValue, { color: getParamColor(theme, selectedParameter) }]}>
                         {selectedParameter === 'pH Level' ? 'pH' : (selectedParameter === 'Moisture' ? 'M' : selectedParameter.charAt(0))}{' '}
                         {Number(log[getParamKey(selectedParameter)]).toFixed(selectedParameter === 'pH Level' ? 1 : 0)}
                         <Text style={styles.logUnitSmall}> {UNITS[selectedParameter]}</Text>
                       </Text>
-                      <Text style={styles.logSubValue}>
+                      <Text style={[styles.logSubValue, { color: COLORS_THEMED.subtitle }]}>
                         {selectedParameter !== 'pH Level' && `pH:${Number(log.ph).toFixed(1)} `}
                         {selectedParameter !== 'Nitrogen' && `N:${Number(log.nitrogen).toFixed(0)} `}
                         {selectedParameter !== 'Phosphorus' && `P:${Number(log.phosphorus).toFixed(0)} `}
                         {selectedParameter !== 'Potassium' && `K:${Number(log.potassium).toFixed(0)}`}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                    <Ionicons name="chevron-forward" size={16} color={isDark ? theme.border : "#CBD5E1"} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -820,81 +838,81 @@ export default function HistoryScreen({ navigation }: any) {
         onRequestClose={() => setIsModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalGrabber} />
+          <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
+            <View style={[styles.modalGrabber, { backgroundColor: isDark ? theme.sep2 : '#CBD5E1' }]} />
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Test Details</Text>
+              <Text style={[styles.modalTitle, { color: COLORS_THEMED.title }]}>Test Details</Text>
               <TouchableOpacity onPress={() => setIsModalVisible(false)} style={styles.closeButton}>
-                <Ionicons name="close-circle-outline" size={28} color={COLORS.subtitle} />
+                <Ionicons name="close-circle-outline" size={28} color={COLORS_THEMED.subtitle} />
               </TouchableOpacity>
             </View>
 
             {selectedLog && (
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
                 {/* 1. Metrics Section */}
-                <Text style={styles.sectionTitle}>Metrics</Text>
+                <Text style={[styles.sectionTitle, { color: COLORS_THEMED.title }]}>Metrics</Text>
                 <View style={styles.modalHero}>
-                  <View style={styles.scoreCircle}>
-                    <Text style={styles.scoreValue}>{selectedLog.healthScore || 'N/A'}</Text>
-                    <Text style={styles.scoreLabel}>Health Score</Text>
+                  <View style={[styles.scoreCircle, { borderColor: isDark ? theme.bg1 : '#F0FDF4' }]}>
+                    <Text style={[styles.scoreValue, { color: COLORS_THEMED.accent }]}>{selectedLog.healthScore || 'N/A'}</Text>
+                    <Text style={[styles.scoreLabel, { color: COLORS_THEMED.subtitle }]}>Health Score</Text>
                   </View>
-                  <View style={styles.statusBadge}>
+                  <View style={[styles.statusBadge, { backgroundColor: isDark ? theme.bg1 : '#F8FAFC' }]}>
                     <View style={[styles.statusDot, { backgroundColor: selectedLog.status === 'Critical' ? '#EF4444' : '#10B981' }]} />
-                    <Text style={styles.statusText}>{selectedLog.status || 'Good'}</Text>
+                    <Text style={[styles.statusText, { color: COLORS_THEMED.title }]}>{selectedLog.status || 'Good'}</Text>
                   </View>
-                  <Text style={styles.modalDate}>
+                  <Text style={[styles.modalDate, { color: COLORS_THEMED.subtitle }]}>
                     {format(parseISO(selectedLog.testDate), 'MMMM d, yyyy • hh:mm a')}
                   </Text>
                 </View>
 
                 <View style={styles.modalStatsGrid}>
-                  <View style={styles.modalStatCard}>
-                    <Text style={styles.modalStatLabel}>Nitrogen</Text>
-                    <Text style={styles.modalStatValue}>{Number(selectedLog.nitrogen).toFixed(0)} <Text style={styles.modalUnit}>ppm</Text></Text>
+                  <View style={[styles.modalStatCard, { backgroundColor: isDark ? theme.bg1 : '#F8FAFC', borderColor: isDark ? theme.sep2 : '#F1F5F9' }]}>
+                    <Text style={[styles.modalStatLabel, { color: COLORS_THEMED.subtitle }]}>Nitrogen</Text>
+                    <Text style={[styles.modalStatValue, { color: COLORS_THEMED.title }]}>{Number(selectedLog.nitrogen).toFixed(0)} <Text style={styles.modalUnit}>ppm</Text></Text>
                   </View>
-                  <View style={styles.modalStatCard}>
-                    <Text style={styles.modalStatLabel}>Phosphorus</Text>
-                    <Text style={styles.modalStatValue}>{Number(selectedLog.phosphorus).toFixed(0)} <Text style={styles.modalUnit}>ppm</Text></Text>
+                  <View style={[styles.modalStatCard, { backgroundColor: isDark ? theme.bg1 : '#F8FAFC', borderColor: isDark ? theme.sep2 : '#F1F5F9' }]}>
+                    <Text style={[styles.modalStatLabel, { color: COLORS_THEMED.subtitle }]}>Phosphorus</Text>
+                    <Text style={[styles.modalStatValue, { color: COLORS_THEMED.title }]}>{Number(selectedLog.phosphorus).toFixed(0)} <Text style={styles.modalUnit}>ppm</Text></Text>
                   </View>
-                  <View style={styles.modalStatCard}>
-                    <Text style={styles.modalStatLabel}>Potassium</Text>
-                    <Text style={styles.modalStatValue}>{Number(selectedLog.potassium).toFixed(0)} <Text style={styles.modalUnit}>ppm</Text></Text>
+                  <View style={[styles.modalStatCard, { backgroundColor: isDark ? theme.bg1 : '#F8FAFC', borderColor: isDark ? theme.sep2 : '#F1F5F9' }]}>
+                    <Text style={[styles.modalStatLabel, { color: COLORS_THEMED.subtitle }]}>Potassium</Text>
+                    <Text style={[styles.modalStatValue, { color: COLORS_THEMED.title }]}>{Number(selectedLog.potassium).toFixed(0)} <Text style={styles.modalUnit}>ppm</Text></Text>
                   </View>
-                  <View style={styles.modalStatCard}>
-                    <Text style={styles.modalStatLabel}>pH Level</Text>
-                    <Text style={styles.modalStatValue}>{Number(selectedLog.ph).toFixed(1)}</Text>
+                  <View style={[styles.modalStatCard, { backgroundColor: isDark ? theme.bg1 : '#F8FAFC', borderColor: isDark ? theme.sep2 : '#F1F5F9' }]}>
+                    <Text style={[styles.modalStatLabel, { color: COLORS_THEMED.subtitle }]}>pH Level</Text>
+                    <Text style={[styles.modalStatValue, { color: COLORS_THEMED.title }]}>{Number(selectedLog.ph).toFixed(1)}</Text>
                   </View>
-                  <View style={styles.modalStatCard}>
-                    <Text style={styles.modalStatLabel}>Moisture</Text>
-                    <Text style={styles.modalStatValue}>{selectedLog.moisture != null ? `${Number(selectedLog.moisture).toFixed(1)}%` : 'N/A'}</Text>
+                  <View style={[styles.modalStatCard, { backgroundColor: isDark ? theme.bg1 : '#F8FAFC', borderColor: isDark ? theme.sep2 : '#F1F5F9' }]}>
+                    <Text style={[styles.modalStatLabel, { color: COLORS_THEMED.subtitle }]}>Moisture</Text>
+                    <Text style={[styles.modalStatValue, { color: COLORS_THEMED.title }]}>{selectedLog.moisture != null ? `${Number(selectedLog.moisture).toFixed(1)}%` : 'N/A'}</Text>
                   </View>
-                  <View style={styles.modalStatCard}>
-                    <Text style={styles.modalStatLabel}>Temp</Text>
-                    <Text style={styles.modalStatValue}>{selectedLog.temperature != null ? `${Number(selectedLog.temperature).toFixed(1)}°C` : 'N/A'}</Text>
+                  <View style={[styles.modalStatCard, { backgroundColor: isDark ? theme.bg1 : '#F8FAFC', borderColor: isDark ? theme.sep2 : '#F1F5F9' }]}>
+                    <Text style={[styles.modalStatLabel, { color: COLORS_THEMED.subtitle }]}>Temp</Text>
+                    <Text style={[styles.modalStatValue, { color: COLORS_THEMED.title }]}>{selectedLog.temperature != null ? `${Number(selectedLog.temperature).toFixed(1)}°C` : 'N/A'}</Text>
                   </View>
                 </View>
 
                 {/* 2. AI Recommendation Section */}
-                <Text style={styles.sectionTitle}>AI Recommendation</Text>
-                <View style={styles.recommendationCard}>
+                <Text style={[styles.sectionTitle, { color: COLORS_THEMED.title }]}>AI Recommendation</Text>
+                <View style={[styles.recommendationCard, { backgroundColor: COLORS_THEMED.warningBg, borderColor: COLORS_THEMED.warningBorder }]}>
                   <View style={styles.recommendationHeader}>
-                    <Ionicons name="sparkles" size={20} color={COLORS.accent} />
-                    <Text style={styles.recommendationTitle}>Insights</Text>
+                    <Ionicons name="sparkles" size={20} color={COLORS_THEMED.accent} />
+                    <Text style={[styles.recommendationTitle, { color: COLORS_THEMED.title }]}>Insights</Text>
                   </View>
                   {selectedLog.recommendation?.recommendations ? (
-                    <Text style={styles.recommendationText}>
+                    <Text style={[styles.recommendationText, { color: isDark ? theme.textSecondary : '#475569' }]}>
                       {selectedLog.recommendation.recommendations}
                     </Text>
                   ) : (
-                    <Text style={styles.recommendationText}>
+                    <Text style={[styles.recommendationText, { color: isDark ? theme.textSecondary : '#475569' }]}>
                       Based on your soil analysis, your soil health is currently stable. Maintain regular organic composting and ensure balanced irrigation.
                     </Text>
                   )}
                   {selectedLog.recommendation?.naturalFertilizers && selectedLog.recommendation.naturalFertilizers.length > 0 && (
                     <View style={{ marginTop: 12 }}>
-                      <Text style={[styles.recommendationTitle, { fontSize: 13, marginBottom: 8, marginLeft: 0 }]}>🌿 Natural Fertilizers</Text>
+                      <Text style={[styles.recommendationTitle, { color: COLORS_THEMED.title, fontSize: 13, marginBottom: 8, marginLeft: 0 }]}>🌿 Natural Fertilizers</Text>
                       {selectedLog.recommendation.naturalFertilizers.slice(0, 3).map((f, i) => (
-                        <Text key={i} style={[styles.recommendationText, { marginBottom: 4 }]}>
+                        <Text key={i} style={[styles.recommendationText, { color: isDark ? theme.textSecondary : '#475569', marginBottom: 4 }]}>
                           • <Text style={{ fontFamily: 'Sora_600SemiBold' }}>{f.name}</Text> — {f.amount}
                         </Text>
                       ))}
@@ -902,9 +920,9 @@ export default function HistoryScreen({ navigation }: any) {
                   )}
                   {selectedLog.recommendation?.chemicalFertilizers && selectedLog.recommendation.chemicalFertilizers.length > 0 && (
                     <View style={{ marginTop: 12 }}>
-                      <Text style={[styles.recommendationTitle, { fontSize: 13, marginBottom: 8, marginLeft: 0 }]}>🧪 Chemical Fertilizers</Text>
+                      <Text style={[styles.recommendationTitle, { color: COLORS_THEMED.title, fontSize: 13, marginBottom: 8, marginLeft: 0 }]}>🧪 Chemical Fertilizers</Text>
                       {selectedLog.recommendation.chemicalFertilizers.slice(0, 3).map((f, i) => (
-                        <Text key={i} style={[styles.recommendationText, { marginBottom: 4 }]}>
+                        <Text key={i} style={[styles.recommendationText, { color: isDark ? theme.textSecondary : '#475569', marginBottom: 4 }]}>
                           • <Text style={{ fontFamily: 'Sora_600SemiBold' }}>{f.name}</Text> — {f.amount}
                         </Text>
                       ))}
@@ -913,39 +931,39 @@ export default function HistoryScreen({ navigation }: any) {
                 </View>
 
                 {/* 3. Location Section */}
-                <Text style={styles.sectionTitle}>Location</Text>
-                <View style={styles.locationCard}>
+                <Text style={[styles.sectionTitle, { color: COLORS_THEMED.title }]}>Location</Text>
+                <View style={[styles.locationCard, { backgroundColor: isDark ? theme.bg1 : '#F8FAFC', borderColor: isDark ? theme.sep2 : '#F1F5F9' }]}>
                   {selectedLog.latitude != null ? (
                     <>
-                      <Ionicons name="location" size={24} color={COLORS.accent} style={{ marginRight: 12 }} />
+                      <Ionicons name="location" size={24} color={COLORS_THEMED.accent} style={{ marginRight: 12 }} />
                       <View>
-                        <Text style={styles.locationDetailTitle}>Coordinates</Text>
-                        <Text style={styles.locationDetailText}>
+                        <Text style={[styles.locationDetailTitle, { color: COLORS_THEMED.title }]}>Coordinates</Text>
+                        <Text style={[styles.locationDetailText, { color: COLORS_THEMED.subtitle }]}>
                           {Number(selectedLog.latitude).toFixed(6)}, {Number(selectedLog.longitude).toFixed(6)}
                         </Text>
                       </View>
                     </>
                   ) : (
                     <>
-                      <Ionicons name="location-outline" size={24} color={COLORS.subtitle} style={{ marginRight: 12 }} />
+                      <Ionicons name="location-outline" size={24} color={COLORS_THEMED.subtitle} style={{ marginRight: 12 }} />
                       <View>
-                        <Text style={styles.locationDetailTitle}>Location Unavailable</Text>
-                        <Text style={styles.locationDetailText}>No coordinates recorded</Text>
+                        <Text style={[styles.locationDetailTitle, { color: COLORS_THEMED.title }]}>Location Unavailable</Text>
+                        <Text style={[styles.locationDetailText, { color: COLORS_THEMED.subtitle }]}>No coordinates recorded</Text>
                       </View>
                     </>
                   )}
                 </View>
 
                 <TouchableOpacity
-                  style={styles.modalExportButton}
+                  style={[styles.modalExportButton, { backgroundColor: COLORS_THEMED.title }]}
                   onPress={() => {
                     setIsModalVisible(false);
                     exportSoilReport([selectedLog], user as any);
                   }}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="download-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.modalExportText}>Export Report</Text>
+                  <Ionicons name="download-outline" size={20} color={isDark ? theme.background : "#FFF"} style={{ marginRight: 8 }} />
+                  <Text style={[styles.modalExportText, { color: isDark ? theme.background : "#FFF" }]}>Export Report</Text>
                 </TouchableOpacity>
               </ScrollView>
             )}
@@ -961,15 +979,15 @@ export default function HistoryScreen({ navigation }: any) {
         onRequestClose={() => setIsTimeMenuVisible(false)}
       >
         <View style={StyleSheet.absoluteFill}>
-          {Platform.OS === 'ios' && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
+          <BlurView intensity={isDark ? 40 : 25} tint={isDark ? "dark" : "dark"} style={StyleSheet.absoluteFill} />
           <Pressable
             style={styles.actionSheetOverlay}
             onPress={() => setIsTimeMenuVisible(false)}
           >
-            <View style={styles.actionSheetContent} onStartShouldSetResponder={() => true}>
-              <View style={styles.actionSheetGrabber} />
-              <View style={styles.actionSheetHeader}>
-                <Text style={styles.actionSheetTitle}>Time Interval</Text>
+            <View style={[styles.actionSheetContent, { backgroundColor: theme.surface }]} onStartShouldSetResponder={() => true}>
+              <View style={[styles.actionSheetGrabber, { backgroundColor: isDark ? theme.sep2 : '#CBD5E1' }]} />
+              <View style={[styles.actionSheetHeader, { borderBottomColor: isDark ? theme.sep2 : '#F1F5F9' }]}>
+                <Text style={[styles.actionSheetTitle, { color: COLORS_THEMED.title }]}>Time Interval</Text>
               </View>
               {TIME_FILTERS.map((filter) => {
                 const isActive = timeFilter === filter;
@@ -978,15 +996,15 @@ export default function HistoryScreen({ navigation }: any) {
                     key={filter}
                     style={({ pressed }) => [
                       styles.actionSheetItem,
-                      isActive && styles.actionSheetItemActive,
-                      pressed && { backgroundColor: '#F1F5F9' }
+                      isActive && [styles.actionSheetItemActive, { backgroundColor: isDark ? theme.bg1 : '#F8FAFC' }],
+                      pressed && { backgroundColor: isDark ? theme.bg1 : '#F1F5F9' }
                     ]}
                     onPress={() => handleSelectTimeFilter(filter)}
                   >
-                    <Text style={[styles.actionSheetText, isActive && styles.actionSheetTextActive]}>
+                    <Text style={[styles.actionSheetText, { color: isDark ? theme.textSecondary : '#475569' }, isActive && [styles.actionSheetTextActive, { color: COLORS_THEMED.title }]]}>
                       {filter}
                     </Text>
-                    {isActive && <Ionicons name="checkmark-circle" size={20} color={COLORS.title} />}
+                    {isActive && <Ionicons name="checkmark-circle" size={20} color={COLORS_THEMED.title} />}
                   </Pressable>
                 );
               })}
@@ -1003,26 +1021,26 @@ export default function HistoryScreen({ navigation }: any) {
         onRequestClose={() => setIsParamMenuVisible(false)}
       >
         <View style={StyleSheet.absoluteFill}>
-          {Platform.OS === 'ios' && <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />}
+          <BlurView intensity={isDark ? 40 : 25} tint={isDark ? "dark" : "dark"} style={StyleSheet.absoluteFill} />
           <Pressable
             style={styles.actionSheetOverlay}
             onPress={() => setIsParamMenuVisible(false)}
           >
-            <View style={styles.actionSheetContent} onStartShouldSetResponder={() => true}>
-              <View style={styles.actionSheetGrabber} />
-              <View style={styles.actionSheetHeader}>
-                <Text style={styles.actionSheetTitle}>Soil Parameter</Text>
+            <View style={[styles.actionSheetContent, { backgroundColor: theme.surface }]} onStartShouldSetResponder={() => true}>
+              <View style={[styles.actionSheetGrabber, { backgroundColor: isDark ? theme.sep2 : '#CBD5E1' }]} />
+              <View style={[styles.actionSheetHeader, { borderBottomColor: isDark ? theme.sep2 : '#F1F5F9' }]}>
+                <Text style={[styles.actionSheetTitle, { color: COLORS_THEMED.title }]}>Soil Parameter</Text>
               </View>
               {PARAMETERS.map((param) => {
                 const isActive = selectedParameter === param;
-                const color = getParamColor(param);
+                const color = getParamColor(theme, param);
                 return (
                   <Pressable
                     key={param}
                     style={({ pressed }) => [
                       styles.actionSheetItem,
-                      isActive && styles.actionSheetItemActive,
-                      pressed && { backgroundColor: '#F1F5F9' }
+                      isActive && [styles.actionSheetItemActive, { backgroundColor: isDark ? theme.bg1 : '#F8FAFC' }],
+                      pressed && { backgroundColor: isDark ? theme.bg1 : '#F1F5F9' }
                     ]}
                     onPress={() => handleSelectParam(param)}
                   >
@@ -1113,7 +1131,6 @@ const styles = StyleSheet.create({
   },
   mapLoaderOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1123,7 +1140,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
   },
   scrollView: {
     flex: 1,
@@ -1208,7 +1224,6 @@ const styles = StyleSheet.create({
   divider: {
     width: 1,
     height: 30,
-    backgroundColor: '#F1F5F9',
   },
   trendRow: {
     flexDirection: 'row',
@@ -1308,7 +1323,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   map: {
     ...StyleSheet.absoluteFillObject,
@@ -1317,7 +1331,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
   },
   mapToggle: {
     fontFamily: 'Sora_600SemiBold',
@@ -1328,7 +1341,6 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#FFF',
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1348,13 +1360,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
   logIcon: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -1406,7 +1416,6 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -1443,7 +1452,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#FFF',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     paddingHorizontal: 24,
@@ -1474,7 +1482,6 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 8,
-    borderColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -1493,7 +1500,6 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 100,
@@ -1523,12 +1529,10 @@ const styles = StyleSheet.create({
   },
   modalStatCard: {
     width: '31%',
-    backgroundColor: '#F8FAFC',
     padding: 12,
     borderRadius: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
   },
   modalStatLabel: {
     fontFamily: 'Sora_400Regular',
@@ -1547,11 +1551,9 @@ const styles = StyleSheet.create({
     color: COLORS.subtitle,
   },
   recommendationCard: {
-    backgroundColor: COLORS.warningBg,
     padding: 20,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: COLORS.warningBorder,
     marginBottom: 20,
   },
   recommendationHeader: {
@@ -1614,14 +1616,11 @@ const styles = StyleSheet.create({
     marginRight: 8, // Reduced from 12
   },
   timelineDot: {
-    width: 10, // Reduced from 12
-    height: 10, // Reduced from 12
+    width: 10,
+    height: 10,
     borderRadius: 5,
-    backgroundColor: COLORS.accent,
     marginTop: 24,
     borderWidth: 2,
-    borderColor: '#FFF',
-    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -1630,7 +1629,6 @@ const styles = StyleSheet.create({
   timelineLine: {
     width: 2,
     flex: 1,
-    backgroundColor: '#E2E8F0',
     marginTop: 4,
   },
   timelineContent: {
@@ -1638,12 +1636,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
-    backgroundColor: '#FFF',
     borderRadius: 16,
     paddingHorizontal: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.02,
@@ -1660,7 +1656,6 @@ const styles = StyleSheet.create({
   modalGrabber: {
     width: 40,
     height: 4,
-    backgroundColor: '#CBD5E1',
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 16,
@@ -1668,11 +1663,9 @@ const styles = StyleSheet.create({
   locationCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
     marginBottom: 32,
   },
   locationDetailTitle: {
@@ -1703,7 +1696,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
-    backgroundColor: '#FFF',
   },
   emptyTitle: {
     fontFamily: 'Sora_700Bold',
@@ -1849,7 +1841,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   actionSheetContent: {
-    backgroundColor: '#FFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 8,
@@ -1865,7 +1856,6 @@ const styles = StyleSheet.create({
   actionSheetGrabber: {
     width: 36,
     height: 4,
-    backgroundColor: '#CBD5E1',
     borderRadius: 2,
     alignSelf: 'center',
     marginTop: 8,
@@ -1875,7 +1865,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
     marginBottom: 8,
   },
   actionSheetTitle: {
@@ -1892,12 +1881,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   actionSheetItemActive: {
-    backgroundColor: '#F8FAFC',
   },
   actionSheetText: {
     fontFamily: 'Sora_500Medium',
     fontSize: 15,
-    color: '#475569',
   },
   actionSheetTextActive: {
     fontFamily: 'Sora_600SemiBold',
@@ -1929,4 +1916,3 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-

@@ -12,10 +12,12 @@ import Animated, {
   withRepeat
 } from 'react-native-reanimated';
 import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
 import { useAuthStore } from '@/store/authStore';
 
 export default function SplashScreen() {
   const router = useRouter();
+  const { theme, isDark } = useTheme();
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
 
   // Animation Values
@@ -80,30 +82,29 @@ export default function SplashScreen() {
   }));
 
   return (
-    <View style={styles.container}>
-      {/* Background Gradient Simulator (using solid color for now as per prompt we just use linear gradient approximation if needed) */}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: Colors.primaryDark }]} />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? theme.bg0 : theme.primaryDark }]} />
       
-      <Animated.View style={[styles.logoBox, logoStyle]}>
+      <Animated.View style={[styles.logoBox, logoStyle, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.12)' : 'rgba(255,255,255,0.12)', borderColor: isDark ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255,255,255,0.2)' }]}>
         <Text style={{ fontSize: 40 }}>🌱</Text>
       </Animated.View>
 
       <Animated.View style={[styles.textContainer, titleStyle]}>
-        <Text style={styles.title}>Saathi AI</Text>
+        <Text style={[styles.title, { color: isDark ? theme.textPrimary : '#FFF' }]}>Saathi AI</Text>
       </Animated.View>
 
       <Animated.View style={[styles.textContainer, taglineStyle]}>
-        <Text style={styles.tagline}>The Organic Intelligence Platform</Text>
+        <Text style={[styles.tagline, { color: isDark ? theme.textSecondary : 'rgba(255,255,255,0.65)' }]}>The Organic Intelligence Platform</Text>
       </Animated.View>
 
       <View style={styles.loaderContainer}>
-        <Animated.View style={[styles.dot, { opacity: dot1Opacity }]} />
-        <Animated.View style={[styles.dot, { opacity: dot2Opacity }]} />
-        <Animated.View style={[styles.dot, { opacity: dot3Opacity }]} />
+        <Animated.View style={[styles.dot, { opacity: dot1Opacity, backgroundColor: isDark ? theme.primary : 'rgba(255,255,255,0.8)' }]} />
+        <Animated.View style={[styles.dot, { opacity: dot2Opacity, backgroundColor: isDark ? theme.primary : 'rgba(255,255,255,0.8)' }]} />
+        <Animated.View style={[styles.dot, { opacity: dot3Opacity, backgroundColor: isDark ? theme.primary : 'rgba(255,255,255,0.8)' }]} />
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Mitti-AI Innovations · Est. 2024</Text>
+        <Text style={[styles.footerText, { color: isDark ? theme.textMuted : 'rgba(255,255,255,0.4)' }]}>Mitti-AI Innovations · Est. 2024</Text>
       </View>
     </View>
   );

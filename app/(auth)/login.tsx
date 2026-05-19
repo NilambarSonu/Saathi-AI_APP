@@ -19,11 +19,12 @@ import { startSocialAuth } from '@/features/auth/services/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
-import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '@/store/authStore';
 
 export default function LoginScreen() {
+  const { theme } = useTheme();
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -58,7 +59,6 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       await login(usernameOrEmail.trim(), password);
-      // Clear any pending BLE intent to ensure we land on Home, not Connect
       await AsyncStorage.removeItem('saathi_ble_connect_intent');
       router.replace('/(app)');
     } catch (err: any) {
@@ -70,10 +70,7 @@ export default function LoginScreen() {
             ? 'Network request failed. Please check internet and backend server status.'
             : rawMessage || 'Invalid credentials. Please try again.';
 
-      Alert.alert(
-        'Login Failed',
-        message
-      );
+      Alert.alert('Login Failed', message);
     } finally {
       setIsLoading(false);
     }
@@ -86,7 +83,6 @@ export default function LoginScreen() {
       await setSession(session.user, session.token, session.refreshToken ?? null);
       await AsyncStorage.removeItem('saathi_ble_connect_intent');
       router.replace('/(app)');
-      // Browser closed — Linking listener in _layout.tsx handles the callback
     } catch (err: any) {
       Alert.alert('Social Auth Error', err?.message || 'Could not open login browser.');
     } finally {
@@ -104,19 +100,20 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
     >
-      <ScrollView style={styles.container} bounces={false} showsVerticalScrollIndicator={false}>
-        {/* Hero Header Image Background */}
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Header — image with dark overlay, always looks great */}
         <ImageBackground
           source={require('assets/images/auth_screen_mobile.png')}
           style={styles.hero}
           resizeMode="cover"
         >
-          {/* Subtle Dark Overlay to ensure text readability */}
           <View style={styles.heroOverlay}>
-            {/* Animated floating elements */}
             <Animated.View style={[styles.floatingDot, { top: 185, left: 15, width: 60, height: 60, opacity: 0.12 }]} />
             <Animated.View style={[styles.floatingDot, { top: 180, right: 80, width: 40, height: 40, opacity: 0.18 }]} />
-
             <Animated.View style={[styles.heroBadge, badgeStyle]} entering={FadeInDown.delay(200).springify()}>
               <Text style={styles.heroBadgeText}>🌱</Text>
             </Animated.View>
@@ -130,50 +127,53 @@ export default function LoginScreen() {
           </View>
         </ImageBackground>
 
-        {/* Auth Card */}
-        <Animated.View style={styles.card} entering={FadeInUp.delay(500).springify()}>
+        {/* Auth Card — adapts to dark mode */}
+        <Animated.View
+          style={[styles.card, { backgroundColor: theme.surface }]}
+          entering={FadeInUp.delay(500).springify()}
+        >
           {/* Tab switcher */}
-          <View style={styles.tabRow}>
-            <View style={[styles.tab, styles.tabActive]}>
-              <Text style={[styles.tabText, styles.tabTextActive]}>Login</Text>
+          <View style={[styles.tabRow, { backgroundColor: theme.surfaceAlt }]}>
+            <View style={[styles.tab, styles.tabActive, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.tabText, { color: theme.primary }]}>Login</Text>
             </View>
             <TouchableOpacity
               style={styles.tab}
               onPress={() => router.replace('/(auth)/register')}
             >
-              <Text style={styles.tabText}>Register</Text>
+              <Text style={[styles.tabText, { color: theme.textSecondary }]}>Register</Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity onPress={handleShowOnboardingAgain} style={styles.onboardingLinkBtn}>
-            <Text style={styles.onboardingLinkText}>Show onboarding screens again</Text>
+            <Text style={[styles.onboardingLinkText, { color: theme.primary }]}>Show onboarding screens again</Text>
           </TouchableOpacity>
 
           {/* Form */}
-          <Text style={styles.label}>USERNAME OR EMAIL</Text>
-          <View style={styles.inputContainer}>
-            <FontAwesome name="user" size={16} color="#8A9E8E" style={styles.inputIcon} />
+          <Text style={[styles.label, { color: theme.textSecondary }]}>USERNAME OR EMAIL</Text>
+          <View style={[styles.inputContainer, { backgroundColor: theme.background, borderColor: theme.sep1 }]}>
+            <FontAwesome name="user" size={16} color={theme.textMuted} style={styles.inputIcon} />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: theme.textPrimary }]}
               value={usernameOrEmail}
               onChangeText={setUsernameOrEmail}
               placeholder="farmer123 or you@gmail.com"
-              placeholderTextColor="#B0C4B8"
+              placeholderTextColor={theme.textMuted}
               autoCapitalize="none"
               keyboardType="email-address"
               autoComplete="email"
             />
           </View>
 
-          <Text style={styles.label}>PASSWORD</Text>
-          <View style={styles.inputContainer}>
-            <FontAwesome name="lock" size={16} color="#8A9E8E" style={styles.inputIcon} />
+          <Text style={[styles.label, { color: theme.textSecondary }]}>PASSWORD</Text>
+          <View style={[styles.inputContainer, { backgroundColor: theme.background, borderColor: theme.sep1 }]}>
+            <FontAwesome name="lock" size={16} color={theme.textMuted} style={styles.inputIcon} />
             <TextInput
-              style={[styles.input, { flex: 1 }]}
+              style={[styles.input, { flex: 1, color: theme.textPrimary }]}
               value={password}
               onChangeText={setPassword}
               placeholder="Enter your password"
-              placeholderTextColor="#B0C4B8"
+              placeholderTextColor={theme.textMuted}
               secureTextEntry={!showPassword}
               autoComplete="password"
             />
@@ -181,12 +181,12 @@ export default function LoginScreen() {
               style={styles.eyeBtn}
               onPress={() => setShowPassword(!showPassword)}
             >
-              <FontAwesome name={showPassword ? 'eye-slash' : 'eye'} size={16} color="#8A9E8E" />
+              <FontAwesome name={showPassword ? 'eye-slash' : 'eye'} size={16} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')} style={styles.forgotLink}>
-            <Text style={styles.forgotText}>Forgot Password?</Text>
+            <Text style={[styles.forgotText, { color: theme.primary }]}>Forgot Password?</Text>
           </TouchableOpacity>
 
           {/* Primary button */}
@@ -212,12 +212,12 @@ export default function LoginScreen() {
 
           {/* Divider */}
           <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
-            <View style={styles.dividerLine} />
+            <View style={[styles.dividerLine, { backgroundColor: theme.sep1 }]} />
+            <Text style={[styles.dividerText, { color: theme.textMuted }]}>OR CONTINUE WITH</Text>
+            <View style={[styles.dividerLine, { backgroundColor: theme.sep1 }]} />
           </View>
 
-          {/* Social buttons */}
+          {/* Social buttons — brand colors are intentionally fixed */}
           <View style={styles.socialRow}>
             <TouchableOpacity style={styles.socialBtnCircle} onPress={() => handleSocialLogin('google')}>
               <Animated.View
@@ -257,7 +257,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
   hero: {
     minHeight: 340,
     position: 'relative',
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     paddingTop: 110,
     paddingHorizontal: 20,
     paddingBottom: 50,
-    backgroundColor: 'rgba(0,0,0,0.4)', // 40% black overlay
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   floatingDot: {
     position: 'absolute',
@@ -308,7 +308,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   card: {
-    backgroundColor: Colors.surface,
     borderRadius: 28,
     margin: 0,
     marginTop: -20,
@@ -323,7 +322,6 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceAlt,
     borderRadius: 12,
     padding: 4,
     marginBottom: 15,
@@ -336,7 +334,6 @@ const styles = StyleSheet.create({
   onboardingLinkText: {
     fontFamily: 'Sora_600SemiBold',
     fontSize: 9,
-    color: Colors.primary,
   },
   tab: {
     flex: 1,
@@ -346,7 +343,6 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   tabActive: {
-    backgroundColor: Colors.surface,
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -355,13 +351,10 @@ const styles = StyleSheet.create({
   tabText: {
     fontFamily: 'Sora_600SemiBold',
     fontSize: 14,
-    color: Colors.textSecondary,
   },
-  tabTextActive: { color: Colors.primary },
   label: {
     fontFamily: 'Sora_600SemiBold',
     fontSize: 11,
-    color: Colors.textSecondary,
     letterSpacing: 0.6,
     marginBottom: 8,
     marginTop: 4,
@@ -371,9 +364,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 52,
-    backgroundColor: Colors.background,
     borderWidth: 1.5,
-    borderColor: Colors.border,
     borderRadius: 14,
     paddingHorizontal: 16,
     marginBottom: 16,
@@ -385,7 +376,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: 'Sora_400Regular',
     fontSize: 14,
-    color: Colors.textPrimary,
     padding: 0,
   },
   eyeBtn: {
@@ -400,14 +390,13 @@ const styles = StyleSheet.create({
   forgotText: {
     fontFamily: 'Sora_600SemiBold',
     fontSize: 12,
-    color: Colors.primary,
   },
   btnPrimary: {
     height: 54,
     borderRadius: 16,
     overflow: 'hidden',
     marginTop: 4,
-    shadowColor: Colors.primary,
+    shadowColor: '#1A7B3C',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -433,12 +422,10 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: Colors.border,
   },
   dividerText: {
     fontFamily: 'Sora_400Regular',
     fontSize: 11,
-    color: Colors.textSecondary,
     textAlign: 'center',
   },
   socialRow: {
@@ -468,5 +455,3 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 });
-
-

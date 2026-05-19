@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
 import {
   sendOtp,
   verifyOtp,
@@ -30,6 +31,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 type Step = 'email' | 'verify' | 'change_otp' | 'new_password';
 
 export default function ForgotPasswordScreen() {
+  const { theme, isDark } = useTheme();
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [changeOtp, setChangeOtp] = useState('');

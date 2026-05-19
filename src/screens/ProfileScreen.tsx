@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
 import { useAuthStore } from '@/store/authStore';
+import { useTheme } from '@/context/ThemeContext';
 import { logout, sendPasswordChangeOtp, changePassword } from '@/features/auth/services/auth';
 import {
   getUserProfile,
@@ -59,10 +60,10 @@ const getUserAvatar = (u: any): string | null => {
 };
 
 const getProviderLabel = (provider?: string) => {
-  if (!provider || provider === 'local') return { label: 'Email', color: Colors.primary, icon: 'mail-outline' };
+  if (!provider || provider === 'local') return { label: 'Email', color: '#1A7B3C', icon: 'mail-outline' };
   if (provider === 'google') return { label: 'Google', color: '#DB4437', icon: 'logo-google' };
   if (provider === 'facebook') return { label: 'Facebook', color: '#1877F2', icon: 'logo-facebook' };
-  return { label: provider, color: Colors.textSecondary, icon: 'person-outline' };
+  return { label: provider, color: '#6B7280', icon: 'person-outline' };
 };
 
 const getAccountAge = (createdAt?: string) => {
@@ -85,16 +86,16 @@ const mergeUser = (base: any, patch: any) => {
 
 
 // ─── Section Card ─────────────────────────────────────────────────────────────
-function SectionCard({ title, icon, color, children }: {
-  title: string; icon: string; color: string; children: React.ReactNode;
+function SectionCard({ title, icon, color, children, theme }: {
+  title: string; icon: string; color: string; children: React.ReactNode; theme: any;
 }) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
       <View style={styles.cardHeader}>
         <LinearGradient colors={[color + '30', color + '10']} style={styles.cardIconBg}>
           <Ionicons name={icon as any} size={17} color={color} />
         </LinearGradient>
-        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>{title}</Text>
       </View>
       {children}
     </View>
@@ -102,51 +103,56 @@ function SectionCard({ title, icon, color, children }: {
 }
 
 // ─── Field Row ────────────────────────────────────────────────────────────────
-function FieldRow({ label, value, onChangeText, readOnly, placeholder, icon }: {
+function FieldRow({ label, value, onChangeText, readOnly, placeholder, icon, theme }: {
   label: string; value: string; onChangeText?: (v: string) => void;
-  readOnly?: boolean; placeholder?: string; icon?: string;
+  readOnly?: boolean; placeholder?: string; icon?: string; theme: any;
 }) {
   const [focused, setFocused] = useState(false);
   return (
     <View style={styles.fieldRow}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={[styles.fieldInputWrap, focused && styles.fieldInputFocused, readOnly && styles.fieldInputReadOnlyWrap]}>
-        {icon && <Ionicons name={icon as any} size={15} color={readOnly ? Colors.textMuted : Colors.textSecondary} style={{ marginRight: 8 }} />}
+      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{label}</Text>
+      <View style={[
+        styles.fieldInputWrap, 
+        { backgroundColor: theme.background, borderColor: theme.borderLight },
+        focused && { borderColor: theme.primary, backgroundColor: theme.primary + '08' }, 
+        readOnly && { backgroundColor: theme.surfaceAlt, borderColor: 'transparent' }
+      ]}>
+        {icon && <Ionicons name={icon as any} size={15} color={readOnly ? theme.textMuted : theme.textSecondary} style={{ marginRight: 8 }} />}
         <TextInput
-          style={[styles.fieldInput, readOnly && styles.fieldInputReadOnly]}
+          style={[styles.fieldInput, { color: theme.textPrimary }, readOnly && { color: theme.textMuted }]}
           value={value}
           onChangeText={onChangeText}
           editable={!readOnly}
           placeholder={placeholder || label}
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={theme.textMuted}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         />
-        {readOnly && <Ionicons name="lock-closed-outline" size={13} color={Colors.textMuted} />}
+        {readOnly && <Ionicons name="lock-closed-outline" size={13} color={theme.textMuted} />}
       </View>
     </View>
   );
 }
 
 // ─── Toggle Row ───────────────────────────────────────────────────────────────
-function ToggleRow({ label, description, value, onToggle, loading }: {
+function ToggleRow({ label, description, value, onToggle, loading, theme }: {
   label: string; description: string; value: boolean;
-  onToggle: (v: boolean) => void; loading?: boolean;
+  onToggle: (v: boolean) => void; loading?: boolean; theme: any;
 }) {
   return (
     <View style={styles.toggleRow}>
       <View style={{ flex: 1, marginRight: 12 }}>
-        <Text style={styles.toggleLabel}>{label}</Text>
-        <Text style={styles.toggleDesc}>{description}</Text>
+        <Text style={[styles.toggleLabel, { color: theme.textPrimary }]}>{label}</Text>
+        <Text style={[styles.toggleDesc, { color: theme.textSecondary }]}>{description}</Text>
       </View>
       {loading ? (
-        <ActivityIndicator size="small" color={Colors.primary} />
+        <ActivityIndicator size="small" color={theme.primary} />
       ) : (
         <Switch
           value={value}
           onValueChange={onToggle}
-          trackColor={{ false: Colors.borderLight, true: Colors.primary + '80' }}
-          thumbColor={value ? Colors.primary : '#ccc'}
+          trackColor={{ false: theme.borderLight, true: theme.primary + '80' }}
+          thumbColor={value ? theme.primary : '#ccc'}
         />
       )}
     </View>
@@ -154,8 +160,8 @@ function ToggleRow({ label, description, value, onToggle, loading }: {
 }
 
 // ─── Action Row ───────────────────────────────────────────────────────────────
-function ActionRow({ label, sublabel, icon, onPress, danger, badge }: {
-  label: string; sublabel?: string; icon: string; onPress: () => void; danger?: boolean; badge?: string;
+function ActionRow({ label, sublabel, icon, onPress, danger, badge, theme }: {
+  label: string; sublabel?: string; icon: string; onPress: () => void; danger?: boolean; badge?: string; theme: any;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true }).start();
@@ -163,20 +169,20 @@ function ActionRow({ label, sublabel, icon, onPress, danger, badge }: {
 
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
-      <Pressable style={styles.actionRow} onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
-        <View style={[styles.actionIconBg, danger && { backgroundColor: Colors.error + '18' }]}>
-          <Ionicons name={icon as any} size={17} color={danger ? Colors.error : Colors.textSecondary} />
+      <Pressable style={[styles.actionRow, { borderTopColor: theme.borderLight }]} onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
+        <View style={[styles.actionIconBg, { backgroundColor: theme.surfaceAlt }, danger && { backgroundColor: theme.error + '18' }]}>
+          <Ionicons name={icon as any} size={17} color={danger ? theme.error : theme.textSecondary} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.actionLabel, danger && { color: Colors.error }]}>{label}</Text>
-          {sublabel && <Text style={styles.actionSublabel}>{sublabel}</Text>}
+          <Text style={[styles.actionLabel, { color: theme.textPrimary }, danger && { color: theme.error }]}>{label}</Text>
+          {sublabel && <Text style={[styles.actionSublabel, { color: theme.textMuted }]}>{sublabel}</Text>}
         </View>
         {badge && (
           <View style={styles.actionBadge}>
             <Text style={styles.actionBadgeText}>{badge}</Text>
           </View>
         )}
-        <Ionicons name="chevron-forward" size={15} color={danger ? Colors.error + '80' : Colors.textMuted} />
+        <Ionicons name="chevron-forward" size={15} color={danger ? theme.error + '80' : theme.textMuted} />
       </Pressable>
     </Animated.View>
   );
@@ -186,6 +192,7 @@ function ActionRow({ label, sublabel, icon, onPress, danger, badge }: {
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, setUser, clearUser } = useAuthStore();
+  const { theme, isDark } = useTheme();
 
   const [name, setName] = useState(user?.username || '');
   const [location, setLocation] = useState(user?.location || '');
@@ -283,8 +290,6 @@ export default function ProfileScreen() {
     getUserProfile().then(data => {
       if (data) {
         const next = mergeUser(user, data);
-        // Never overwrite a valid id already in the store with an empty string
-        // The dashboard endpoint may return the id in a different field name
         const resolvedId = next.id || user?.id || '';
         setUser({
           id: resolvedId,
@@ -396,10 +401,10 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
 
       {/* ── Hero Header ───────────────────────────────────────── */}
-      <View style={styles.heroWrapper}>
+      <View style={[styles.heroWrapper, { backgroundColor: theme.surface, shadowColor: theme.primary }]}>
         <ImageBackground
           source={require('assets/images/Profile_page.png')}
           style={styles.hero}
@@ -461,25 +466,26 @@ export default function ProfileScreen() {
       >
 
         {/* Profile Info */}
-        <SectionCard title="Account Settings" icon="person-outline" color={Colors.primary}>
-          <FieldRow label="Full Name" value={name} onChangeText={setName} placeholder="Enter your full name" icon="person-outline" />
-          <FieldRow label="Email Address" value={user?.email || ''} readOnly icon="mail-outline" />
-          <FieldRow label="Phone Number" value={user?.phone || 'Not provided'} readOnly icon="call-outline" />
-          <FieldRow label="Village / City" value={location} onChangeText={setLocation} placeholder="e.g. Balasore, Odisha" icon="location-outline" />
+        <SectionCard title="Account Settings" icon="person-outline" color={theme.primary} theme={theme}>
+          <FieldRow label="Full Name" value={name} onChangeText={setName} placeholder="Enter your full name" icon="person-outline" theme={theme} />
+          <FieldRow label="Email Address" value={user?.email || ''} readOnly icon="mail-outline" theme={theme} />
+          <FieldRow label="Phone Number" value={user?.phone || 'Not provided'} readOnly icon="call-outline" theme={theme} />
+          <FieldRow label="Village / City" value={location} onChangeText={setLocation} placeholder="e.g. Balasore, Odisha" icon="location-outline" theme={theme} />
 
           <ActionRow
             label="Language Preferences"
             sublabel={user?.preferredLanguage || 'English'}
             icon="language-outline"
             onPress={() => Alert.alert('Language', 'Language selection coming soon!')}
+            theme={theme}
           />
 
           {hasChanges && (
-            <View style={styles.unsavedBanner}>
-              <Ionicons name="alert-circle-outline" size={15} color="#92400e" />
-              <Text style={styles.unsavedText}>Unsaved changes</Text>
+            <View style={[styles.unsavedBanner, { backgroundColor: isDark ? '#3D2B1A' : '#FEF3C7' }]}>
+              <Ionicons name="alert-circle-outline" size={15} color={isDark ? '#F59E0B' : '#92400e'} />
+              <Text style={[styles.unsavedText, { color: isDark ? '#F59E0B' : '#92400e' }]}>Unsaved changes</Text>
               <Pressable onPress={() => { setName(originalName); setLocation(originalLocation); }}>
-                <Text style={styles.discardText}>Discard</Text>
+                <Text style={[styles.discardText, { color: isDark ? '#FCD34D' : '#b45309' }]}>Discard</Text>
               </Pressable>
             </View>
           )}
@@ -503,69 +509,74 @@ export default function ProfileScreen() {
         </SectionCard>
 
         {/* Security */}
-        <SectionCard title="Security" icon="lock-closed-outline" color="#3b82f6">
+        <SectionCard title="Security" icon="lock-closed-outline" color="#3b82f6" theme={theme}>
           <ActionRow
             label="Change Password"
             sublabel={isOAuthUser ? `Managed by ${provider.label}` : 'Send reset link to your email'}
             icon="key-outline"
             onPress={handleChangePassword}
+            theme={theme}
           />
         </SectionCard>
 
         {/* AI Settings */}
-        <SectionCard title="AI Settings" icon="sparkles-outline" color="#a855f7">
+        <SectionCard title="AI Settings" icon="sparkles-outline" color="#a855f7" theme={theme}>
           <ToggleRow
             label="AI Pipeline Control"
             description="Enable automated AI analysis when syncing data from your Agni soil sensor."
             value={aiPricingEnabled}
             onToggle={handleAiPricingToggle}
             loading={aiPricingLoading}
+            theme={theme}
           />
         </SectionCard>
 
         {/* Privacy & Data Settings */}
-        <SectionCard title="Privacy & Data Settings" icon="shield-checkmark-outline" color="#10b981">
+        <SectionCard title="Privacy & Data Settings" icon="shield-checkmark-outline" color="#10b981" theme={theme}>
           <ActionRow
             label="Manage Privacy & Data"
             sublabel="Visibility, sharing, analytics, and emails"
             icon="options-outline"
             onPress={() => setPrivacyModalVisible(true)}
+            theme={theme}
           />
         </SectionCard>
 
         {/* Data Management */}
-        <SectionCard title="Data Management" icon="folder-open-outline" color="#8b5cf6">
+        <SectionCard title="Data Management" icon="folder-open-outline" color="#8b5cf6" theme={theme}>
           <ActionRow
             label="Export Historical Data"
             sublabel="Download your soil tests as JSON or CSV"
             icon="download-outline"
             onPress={handleExportData}
+            theme={theme}
           />
         </SectionCard>
 
         {/* Quick Links */}
-        <SectionCard title="Quick Links" icon="apps-outline" color="#f59e0b">
-          <ActionRow label="App Settings" sublabel="Notifications, language, theme" icon="settings-outline" onPress={() => router.push('/(app)/settings')} />
-          <ActionRow label="Chat History" sublabel="View past AI conversations" icon="chatbubbles-outline" onPress={() => router.push('/(app)/chat-history')} />
-          <ActionRow label="Buy Agni Device" sublabel="Get your soil sensor" icon="cart-outline" onPress={() => router.push('/(app)/buy-agni')} badge="New" />
-          <ActionRow label="About Saathi AI" sublabel="Version & legal info" icon="information-circle-outline" onPress={() => router.push('/(app)/about')} />
+        <SectionCard title="Quick Links" icon="apps-outline" color="#f59e0b" theme={theme}>
+          <ActionRow label="App Settings" sublabel="Notifications, language, theme" icon="settings-outline" onPress={() => router.push('/(app)/settings')} theme={theme} />
+          <ActionRow label="Chat History" sublabel="View past AI conversations" icon="chatbubbles-outline" onPress={() => router.push('/(app)/chat-history')} theme={theme} />
+          <ActionRow label="Buy Agni Device" sublabel="Get your soil sensor" icon="cart-outline" onPress={() => router.push('/(app)/buy-agni')} badge="New" theme={theme} />
+          <ActionRow label="About Saathi AI" sublabel="Version & legal info" icon="information-circle-outline" onPress={() => router.push('/(app)/about')} theme={theme} />
         </SectionCard>
 
         {/* Danger zone */}
-        <SectionCard title="Account Actions" icon="warning-outline" color={Colors.error}>
+        <SectionCard title="Account Actions" icon="warning-outline" color={theme.error} theme={theme}>
           <ActionRow
             label="Log Out"
             sublabel="You can log back in anytime"
             icon="log-out-outline"
             onPress={handleLogout}
             danger
+            theme={theme}
           />
         </SectionCard>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Saathi AI · Farmer First Technology</Text>
-          <Text style={styles.footerSub}>
+          <Text style={[styles.footerText, { color: theme.textMuted }]}>Saathi AI · Farmer First Technology</Text>
+          <Text style={[styles.footerSub, { color: theme.textMuted + '99' }]}>
             {'Farmer ID: '}
             {user?.id
               ? String(user.id).length > 12
@@ -594,28 +605,28 @@ export default function ProfileScreen() {
             style={StyleSheet.absoluteFill}
             onPress={() => { if (!isLoggingOut) setLogoutModalVisible(false); }}
           />
-          <View style={[styles.modalContent, { paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}>
             {/* Icon */}
             <View style={{ alignItems:'center', marginBottom:18 }}>
-              <LinearGradient colors={['#fee2e2','#fecaca']} style={{ width:72, height:72, borderRadius:36, alignItems:'center', justifyContent:'center', marginBottom:14 }}>
-                <Ionicons name="log-out-outline" size={32} color="#dc2626" />
+              <LinearGradient colors={isDark ? ['#3D1A1A', '#2D1A1A'] : ['#fee2e2','#fecaca']} style={{ width:72, height:72, borderRadius:36, alignItems:'center', justifyContent:'center', marginBottom:14 }}>
+                <Ionicons name="log-out-outline" size={32} color={isDark ? '#F87171' : "#dc2626"} />
               </LinearGradient>
-              <Text style={{ fontFamily:'Sora_800ExtraBold', fontSize:20, color:'#0F2419', textAlign:'center', marginBottom:8 }}>Logging out?</Text>
-              <Text style={{ fontFamily:'Sora_400Regular', fontSize:13, color:'#3D6650', textAlign:'center', lineHeight:20, paddingHorizontal:12 }}>
+              <Text style={{ fontFamily:'Sora_800ExtraBold', fontSize:20, color: theme.textPrimary, textAlign:'center', marginBottom:8 }}>Logging out?</Text>
+              <Text style={{ fontFamily:'Sora_400Regular', fontSize:13, color: theme.textSecondary, textAlign:'center', lineHeight:20, paddingHorizontal:12 }}>
                 {`Hey ${user?.username?.split(' ')[0] || 'Farmer'}, your soil data and crop history are safe.\nCome back anytime! 🌾`}
               </Text>
             </View>
 
             {/* User info strip */}
-            <View style={{ flexDirection:'row', alignItems:'center', gap:10, backgroundColor:'#F4FCF7', borderRadius:14, padding:13, marginBottom:22, borderWidth:1, borderColor:'#E8F8EE' }}>
-              <View style={{ width:40, height:40, borderRadius:20, backgroundColor:'#1A7A40', alignItems:'center', justifyContent:'center' }}>
+            <View style={{ flexDirection:'row', alignItems:'center', gap:10, backgroundColor: theme.background, borderRadius:14, padding:13, marginBottom:22, borderWidth:1, borderColor: theme.borderLight }}>
+              <View style={{ width:40, height:40, borderRadius:20, backgroundColor: theme.primary, alignItems:'center', justifyContent:'center' }}>
                 <Text style={{ fontFamily:'Sora_700Bold', fontSize:16, color:'#fff' }}>{getInitials(user)}</Text>
               </View>
               <View style={{ flex:1 }}>
-                <Text style={{ fontFamily:'Sora_700Bold', fontSize:13, color:'#0F2419' }}>{user?.username || 'Kisan'}</Text>
-                <Text style={{ fontFamily:'Sora_400Regular', fontSize:11, color:'#7B9E8B' }}>{user?.email || ''}</Text>
+                <Text style={{ fontFamily:'Sora_700Bold', fontSize:13, color: theme.textPrimary }}>{user?.username || 'Kisan'}</Text>
+                <Text style={{ fontFamily:'Sora_400Regular', fontSize:11, color: theme.textMuted }}>{user?.email || ''}</Text>
               </View>
-              <Ionicons name="checkmark-circle" size={20} color="#22A05A" />
+              <Ionicons name="checkmark-circle" size={20} color={theme.success} />
             </View>
 
             {/* Buttons */}
@@ -630,8 +641,8 @@ export default function ProfileScreen() {
             </Pressable>
 
             <Pressable onPress={() => setLogoutModalVisible(false)} disabled={isLoggingOut}
-              style={{ paddingVertical:14, borderRadius:14, alignItems:'center', borderWidth:1.5, borderColor:'#E2EDE7', backgroundColor:'#fff' }}>
-              <Text style={{ fontFamily:'Sora_700Bold', fontSize:15, color:'#1A7A40' }}>Stay Logged In</Text>
+              style={{ paddingVertical:14, borderRadius:14, alignItems:'center', borderWidth:1.5, borderColor: theme.borderLight, backgroundColor: theme.surface }}>
+              <Text style={{ fontFamily:'Sora_700Bold', fontSize:15, color: theme.primary }}>Stay Logged In</Text>
             </Pressable>
           </View>
         </View>
@@ -649,7 +660,7 @@ export default function ProfileScreen() {
             style={StyleSheet.absoluteFill}
             onPress={() => { if (!pwdLoading) setPwdModalVisible(false); }}
           />
-          <View style={[styles.modalContent, { paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}>
 
             {/* Header */}
             <View style={styles.modalHeader}>
@@ -657,10 +668,10 @@ export default function ProfileScreen() {
                 <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: '#3b82f618', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="lock-closed-outline" size={17} color="#3b82f6" />
                 </View>
-                <Text style={styles.modalTitle}>Change Password</Text>
+                <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Change Password</Text>
               </View>
-              <Pressable onPress={() => { if (!pwdLoading) setPwdModalVisible(false); }} style={styles.closeBtn}>
-                <Ionicons name="close" size={20} color={Colors.textSecondary} />
+              <Pressable onPress={() => { if (!pwdLoading) setPwdModalVisible(false); }} style={[styles.closeBtn, { backgroundColor: theme.surfaceAlt }]}>
+                <Ionicons name="close" size={20} color={theme.textSecondary} />
               </Pressable>
             </View>
 
@@ -672,10 +683,10 @@ export default function ProfileScreen() {
                   <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#3b82f618', alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name="mail-outline" size={30} color="#3b82f6" />
                   </View>
-                  <Text style={{ fontFamily: 'Sora_700Bold', fontSize: 17, color: Colors.textPrimary, textAlign: 'center' }}>Verify Your Identity</Text>
-                  <Text style={{ fontFamily: 'Sora_400Regular', fontSize: 13, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 }}>
+                  <Text style={{ fontFamily: 'Sora_700Bold', fontSize: 17, color: theme.textPrimary, textAlign: 'center' }}>Verify Your Identity</Text>
+                  <Text style={{ fontFamily: 'Sora_400Regular', fontSize: 13, color: theme.textSecondary, textAlign: 'center', lineHeight: 20 }}>
                     We'll send a 6-digit OTP to{' '}
-                    <Text style={{ fontFamily: 'Sora_700Bold', color: Colors.textPrimary }}>{user?.email}</Text>
+                    <Text style={{ fontFamily: 'Sora_700Bold', color: theme.textPrimary }}>{user?.email}</Text>
                     {' '}to confirm it's you.
                   </Text>
                   {pwdError ? <Text style={styles.pwdError}>{pwdError}</Text> : null}
@@ -694,59 +705,59 @@ export default function ProfileScreen() {
               {/* ── OTP + NEW PASSWORD step ── */}
               {pwdStep === 'otp' && (
                 <View style={{ paddingVertical: 8, gap: 4 }}>
-                  <View style={{ backgroundColor: '#f0fdf4', borderRadius: 12, padding: 12, marginBottom: 8, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                    <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
-                    <Text style={{ fontFamily: 'Sora_400Regular', fontSize: 12, color: Colors.primary, flex: 1 }}>
+                  <View style={{ backgroundColor: isDark ? '#1A4D2E' : '#f0fdf4', borderRadius: 12, padding: 12, marginBottom: 8, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <Ionicons name="checkmark-circle" size={16} color={theme.primary} />
+                    <Text style={{ fontFamily: 'Sora_400Regular', fontSize: 12, color: theme.primary, flex: 1 }}>
                       OTP sent to <Text style={{ fontFamily: 'Sora_700Bold' }}>{user?.email}</Text>
                     </Text>
                   </View>
-                  <View style={{ backgroundColor: '#fffbeb', borderRadius: 10, padding: 10, marginBottom: 16, flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
-                    <Ionicons name="warning-outline" size={14} color="#f59e0b" style={{ marginTop: 1 }} />
-                    <Text style={{ fontFamily: 'Sora_400Regular', fontSize: 11, color: '#92400e', flex: 1, lineHeight: 16 }}>
+                  <View style={{ backgroundColor: isDark ? '#5F4D1E' : '#fffbeb', borderRadius: 10, padding: 10, marginBottom: 16, flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+                    <Ionicons name="warning-outline" size={14} color={isDark ? '#FCD34D' : "#f59e0b"} style={{ marginTop: 1 }} />
+                    <Text style={{ fontFamily: 'Sora_400Regular', fontSize: 11, color: isDark ? '#FCD34D' : '#92400e', flex: 1, lineHeight: 16 }}>
                       {'Didn\'t receive it? Check your '}
                       <Text style={{ fontFamily: 'Sora_700Bold' }}>Spam / Junk folder</Text>
                       {'. OTP expires in 10 minutes.'}
                     </Text>
                   </View>
 
-                  <Text style={styles.pwdLabel}>6-DIGIT OTP FROM EMAIL</Text>
+                  <Text style={[styles.pwdLabel, { color: theme.textSecondary }]}>6-DIGIT OTP FROM EMAIL</Text>
                   <TextInput
-                    style={styles.pwdInput}
+                    style={[styles.pwdInput, { backgroundColor: theme.background, borderColor: theme.borderLight, color: theme.textPrimary }]}
                     value={pwdOtp}
                     onChangeText={t => { setPwdOtp(t.replace(/[^0-9]/g, '')); setPwdError(''); }}
                     placeholder="Enter 6-digit code"
-                    placeholderTextColor={Colors.textMuted}
+                    placeholderTextColor={theme.textMuted}
                     keyboardType="number-pad"
                     maxLength={6}
                   />
 
-                  <Text style={[styles.pwdLabel, { marginTop: 8 }]}>NEW PASSWORD</Text>
-                  <View style={styles.pwdInputRow}>
+                  <Text style={[styles.pwdLabel, { color: theme.textSecondary, marginTop: 8 }]}>NEW PASSWORD</Text>
+                  <View style={[styles.pwdInputRow, { backgroundColor: theme.background, borderColor: theme.borderLight }]}>
                     <TextInput
-                      style={[styles.pwdInput, { flex: 1, marginBottom: 0 }]}
+                      style={[styles.pwdInput, { backgroundColor: 'transparent', borderWidth: 0, flex: 1, marginBottom: 0, color: theme.textPrimary }]}
                       value={pwdNew}
                       onChangeText={t => { setPwdNew(t); setPwdError(''); }}
                       placeholder="Min 8 characters"
-                      placeholderTextColor={Colors.textMuted}
+                      placeholderTextColor={theme.textMuted}
                       secureTextEntry={!pwdShowNew}
                     />
                     <Pressable onPress={() => setPwdShowNew(v => !v)} style={styles.eyeBtn}>
-                      <Ionicons name={pwdShowNew ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
+                      <Ionicons name={pwdShowNew ? 'eye-off-outline' : 'eye-outline'} size={18} color={theme.textMuted} />
                     </Pressable>
                   </View>
 
-                  <Text style={[styles.pwdLabel, { marginTop: 8 }]}>CONFIRM PASSWORD</Text>
-                  <View style={styles.pwdInputRow}>
+                  <Text style={[styles.pwdLabel, { color: theme.textSecondary, marginTop: 8 }]}>CONFIRM PASSWORD</Text>
+                  <View style={[styles.pwdInputRow, { backgroundColor: theme.background, borderColor: theme.borderLight }]}>
                     <TextInput
-                      style={[styles.pwdInput, { flex: 1, marginBottom: 0 }]}
+                      style={[styles.pwdInput, { backgroundColor: 'transparent', borderWidth: 0, flex: 1, marginBottom: 0, color: theme.textPrimary }]}
                       value={pwdConfirm}
                       onChangeText={t => { setPwdConfirm(t); setPwdError(''); }}
                       placeholder="Repeat new password"
-                      placeholderTextColor={Colors.textMuted}
+                      placeholderTextColor={theme.textMuted}
                       secureTextEntry={!pwdShowConfirm}
                     />
                     <Pressable onPress={() => setPwdShowConfirm(v => !v)} style={styles.eyeBtn}>
-                      <Ionicons name={pwdShowConfirm ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
+                      <Ionicons name={pwdShowConfirm ? 'eye-off-outline' : 'eye-outline'} size={18} color={theme.textMuted} />
                     </Pressable>
                   </View>
 
@@ -755,7 +766,7 @@ export default function ProfileScreen() {
                     <View style={{ flexDirection: 'row', gap: 4, marginTop: 4, marginBottom: 4 }}>
                       {[1,2,3,4].map(i => (
                         <View key={i} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor:
-                          pwdNew.length >= i * 3 ? (pwdNew.length >= 10 ? Colors.primary : '#f59e0b') : Colors.borderLight
+                          pwdNew.length >= i * 3 ? (pwdNew.length >= 10 ? theme.primary : '#f59e0b') : theme.borderLight
                         }} />
                       ))}
                     </View>
@@ -774,7 +785,7 @@ export default function ProfileScreen() {
                   </Pressable>
 
                   <Pressable onPress={handleSendPwdOtp} style={{ alignSelf: 'center', marginTop: 12 }} disabled={pwdLoading}>
-                    <Text style={{ fontFamily: 'Sora_600SemiBold', fontSize: 12, color: Colors.primary }}>Resend OTP</Text>
+                    <Text style={{ fontFamily: 'Sora_600SemiBold', fontSize: 12, color: theme.primary }}>Resend OTP</Text>
                   </Pressable>
                 </View>
               )}
@@ -782,15 +793,15 @@ export default function ProfileScreen() {
               {/* ── SUCCESS ── */}
               {pwdStep === 'done' && (
                 <View style={{ alignItems: 'center', paddingVertical: 32, gap: 16 }}>
-                  <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="checkmark-circle" size={44} color={Colors.primary} />
+                  <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: isDark ? '#1A4D2E' : '#f0fdf4', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="checkmark-circle" size={44} color={theme.primary} />
                   </View>
-                  <Text style={{ fontFamily: 'Sora_800ExtraBold', fontSize: 20, color: Colors.textPrimary }}>Password Changed!</Text>
-                  <Text style={{ fontFamily: 'Sora_400Regular', fontSize: 13, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 }}>
+                  <Text style={{ fontFamily: 'Sora_800ExtraBold', fontSize: 20, color: theme.textPrimary }}>Password Changed!</Text>
+                  <Text style={{ fontFamily: 'Sora_400Regular', fontSize: 13, color: theme.textSecondary, textAlign: 'center', lineHeight: 20 }}>
                     Your password has been updated successfully. Use your new password next time you log in.
                   </Text>
                   <Pressable
-                    style={[styles.pwdBtn, { backgroundColor: Colors.primary }]}
+                    style={[styles.pwdBtn, { backgroundColor: theme.primary }]}
                     onPress={() => setPwdModalVisible(false)}
                   >
                     <Text style={styles.pwdBtnText}>Done ✓</Text>
@@ -812,11 +823,11 @@ export default function ProfileScreen() {
       >
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setPrivacyModalVisible(false)} />
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Privacy & Data Settings</Text>
-              <Pressable onPress={() => setPrivacyModalVisible(false)} style={styles.closeBtn}>
-                <Ionicons name="close" size={20} color={Colors.textSecondary} />
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Privacy & Data Settings</Text>
+              <Pressable onPress={() => setPrivacyModalVisible(false)} style={[styles.closeBtn, { backgroundColor: theme.surfaceAlt }]}>
+                <Ionicons name="close" size={20} color={theme.textSecondary} />
               </Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
@@ -825,30 +836,35 @@ export default function ProfileScreen() {
                 description="Allow other farmers to see your profile."
                 value={privacySettings.profileVisibility}
                 onToggle={(val) => handlePrivacyToggle('profileVisibility', val)}
+                theme={theme}
               />
               <ToggleRow
                 label="Data Sharing"
                 description="Share anonymized crop data to improve local models."
                 value={privacySettings.dataSharing}
                 onToggle={(val) => handlePrivacyToggle('dataSharing', val)}
+                theme={theme}
               />
               <ToggleRow
                 label="Analytics Tracking"
                 description="Help us improve by sending app usage data."
                 value={privacySettings.analytics}
                 onToggle={(val) => handlePrivacyToggle('analytics', val)}
+                theme={theme}
               />
               <ToggleRow
                 label="Email Notifications"
                 description="Receive important account updates."
                 value={privacySettings.emailNotifications}
                 onToggle={(val) => handlePrivacyToggle('emailNotifications', val)}
+                theme={theme}
               />
               <ToggleRow
                 label="Marketing Emails"
                 description="Receive offers and news from Saathi AI."
                 value={privacySettings.marketingEmails}
                 onToggle={(val) => handlePrivacyToggle('marketingEmails', val)}
+                theme={theme}
               />
             </ScrollView>
           </View>
@@ -860,18 +876,16 @@ export default function ProfileScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
+  root: { flex: 1 },
 
   // Hero
   heroWrapper: {
     borderBottomLeftRadius: 36,
     borderBottomRightRadius: 36,
-    shadowColor: '#1A6B3C',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.25,
     shadowRadius: 25,
     elevation: 10,
-    backgroundColor: '#fff',
     zIndex: 10,
   },
   hero: {
@@ -885,7 +899,7 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)', // Dark overlay for text legibility
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   heroBubble1: {
     position: 'absolute', width: 140, height: 140, borderRadius: 70,
@@ -950,7 +964,6 @@ const styles = StyleSheet.create({
 
   // Cards
   card: {
-    backgroundColor: Colors.surface,
     borderRadius: 20,
     padding: 18,
     marginBottom: 16,
@@ -960,40 +973,34 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   cardIconBg: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  cardTitle: { fontFamily: 'Sora_700Bold', fontSize: 15, color: Colors.textPrimary },
+  cardTitle: { fontFamily: 'Sora_700Bold', fontSize: 15 },
 
   // Fields
   fieldRow: { marginBottom: 6 },
-  fieldLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 10, color: Colors.textSecondary, marginBottom: 5, letterSpacing: 0.3 },
+  fieldLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 10, marginBottom: 5, letterSpacing: 0.3 },
   fieldInputWrap: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Colors.background,
     borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1.5, borderColor: Colors.borderLight,
+    borderWidth: 1.5,
   },
-  fieldInputFocused: { borderColor: Colors.primary, backgroundColor: Colors.primary + '08' },
-  fieldInputReadOnlyWrap: { backgroundColor: Colors.surfaceAlt, borderColor: 'transparent' },
   fieldInput: { 
     flex: 1, 
     fontFamily: 'Sora_400Regular', 
     fontSize: 14, 
-    color: Colors.textPrimary,
     paddingVertical: Platform.OS === 'ios' ? 0 : 2,
   },
-  fieldInputReadOnly: { color: Colors.textMuted },
 
   // Unsaved banner
   unsavedBanner: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FEF3C7', borderRadius: 10,
+    borderRadius: 10,
     padding: 10, marginBottom: 12, gap: 8,
   },
-  unsavedText: { fontFamily: 'Sora_400Regular', fontSize: 12, color: '#92400e', flex: 1 },
-  discardText: { fontFamily: 'Sora_700Bold', fontSize: 12, color: '#b45309' },
+  unsavedText: { fontFamily: 'Sora_400Regular', fontSize: 12, flex: 1 },
+  discardText: { fontFamily: 'Sora_700Bold', fontSize: 12 },
 
   // Save button
   saveBtn: { borderRadius: 14, overflow: 'hidden', marginTop: 4 },
@@ -1005,22 +1012,21 @@ const styles = StyleSheet.create({
 
   // Toggles
   toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
-  toggleLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 14, color: Colors.textPrimary, marginBottom: 2 },
-  toggleDesc: { fontFamily: 'Sora_400Regular', fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
+  toggleLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 14, marginBottom: 2 },
+  toggleDesc: { fontFamily: 'Sora_400Regular', fontSize: 12, lineHeight: 18 },
 
   // Action rows
   actionRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 10, gap: 12,
-    borderTopWidth: 1, borderTopColor: Colors.borderLight,
+    borderTopWidth: 1,
   },
   actionIconBg: {
     width: 34, height: 34, borderRadius: 10,
-    backgroundColor: Colors.surfaceAlt,
     alignItems: 'center', justifyContent: 'center',
   },
-  actionLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 14, color: Colors.textPrimary },
-  actionSublabel: { fontFamily: 'Sora_400Regular', fontSize: 11, color: Colors.textMuted, marginTop: 1 },
+  actionLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 14 },
+  actionSublabel: { fontFamily: 'Sora_400Regular', fontSize: 11, marginTop: 1 },
   actionBadge: {
     backgroundColor: '#f59e0b20', paddingHorizontal: 8, paddingVertical: 2,
     borderRadius: 8, borderWidth: 1, borderColor: '#f59e0b40',
@@ -1029,8 +1035,8 @@ const styles = StyleSheet.create({
 
   // Footer
   footer: { alignItems: 'center', paddingVertical: 16, gap: 4 },
-  footerText: { fontFamily: 'Sora_600SemiBold', fontSize: 12, color: Colors.textMuted },
-  footerSub: { fontFamily: 'Sora_400Regular', fontSize: 10, color: Colors.textMuted + '99' },
+  footerText: { fontFamily: 'Sora_600SemiBold', fontSize: 12 },
+  footerSub: { fontFamily: 'Sora_400Regular', fontSize: 10 },
 
   // Modal styles
   modalOverlay: {
@@ -1039,7 +1045,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: Colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 20,
@@ -1061,11 +1066,9 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontFamily: 'Sora_700Bold',
     fontSize: 18,
-    color: Colors.textPrimary,
   },
   closeBtn: {
     padding: 6,
-    backgroundColor: Colors.surfaceAlt,
     borderRadius: 20,
   },
   modalScroll: {
@@ -1078,29 +1081,23 @@ const styles = StyleSheet.create({
   pwdLabel: {
     fontFamily: 'Sora_600SemiBold',
     fontSize: 11,
-    color: Colors.textSecondary,
     letterSpacing: 0.5,
     marginBottom: 6,
     textTransform: 'uppercase',
   },
   pwdInput: {
     height: 50,
-    backgroundColor: Colors.background,
     borderWidth: 1.5,
-    borderColor: Colors.borderLight,
     borderRadius: 12,
     paddingHorizontal: 14,
     fontFamily: 'Sora_400Regular',
     fontSize: 14,
-    color: Colors.textPrimary,
     marginBottom: 4,
   },
   pwdInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.background,
     borderWidth: 1.5,
-    borderColor: Colors.borderLight,
     borderRadius: 12,
     marginBottom: 4,
     paddingRight: 4,
@@ -1124,7 +1121,6 @@ const styles = StyleSheet.create({
   pwdError: {
     fontFamily: 'Sora_400Regular',
     fontSize: 12,
-    color: Colors.error,
     textAlign: 'center',
     marginTop: 4,
   },

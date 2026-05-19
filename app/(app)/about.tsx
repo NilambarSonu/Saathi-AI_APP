@@ -16,44 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-
-// ─── Exact color palette from screenshots ─────────────────────────────────────
-const C = {
-  // Greens
-  darkGreen:   '#1B5E20',
-  midGreen:    '#2E7D32',
-  baseGreen:   '#388E3C',
-  tealGreen:   '#00897B',
-  accentGreen: '#4CAF50',
-  lightGreen:  '#81C784',
-  paleGreen:   '#E8F5E9',
-  mintBg:      '#F0FAF4',   // hero card background (very light mint)
-
-  // Blues (for icons/pills)
-  blue:        '#1565C0',
-  lightBlue:   '#E3F2FD',
-
-  // Neutrals
-  white:       '#FFFFFF',
-  bgPage:      '#F8F9FA',
-  cardBg:      '#FFFFFF',
-  border:      '#E0E0E0',
-  borderLight: '#EEEEEE',
-
-  // Text
-  txt1:        '#212121',   // primary - near black
-  txt2:        '#424242',   // secondary
-  txt3:        '#757575',   // tertiary / muted
-  txt4:        '#9E9E9E',   // placeholder
-
-  // Stars
-  star:        '#FFC107',
-
-  // Contact icon backgrounds
-  locBg:       '#E3F2FD',
-  phoneBg:     '#E8F5E9',
-  emailBg:     '#FFF3E0',
-};
+import { useTheme } from '@/context/ThemeContext';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const TESTIMONIALS = [
@@ -71,41 +34,36 @@ const TESTIMONIALS = [
   },
 ];
 
-const TECH_FEATURES = [
+const getTECH_FEATURES = (theme: any) => [
   {
     icon:  'analytics-outline' as const,
     color: '#00897B',
-    bg:    '#E0F2F1',
+    bg:    theme.fillGreen,
     title: 'Advanced Sensors',
     desc:  'Multi-parameter soil analysis with laboratory-grade accuracy',
   },
   {
     icon:  'hardware-chip-outline' as const,
     color: '#1565C0',
-    bg:    '#E3F2FD',
+    bg:    theme.fillBlue,
     title: 'AI Processing',
     desc:  'Machine learning algorithms trained on local soil data',
   },
   {
     icon:  'chatbubble-ellipses-outline' as const,
     color: '#F57C00',
-    bg:    '#FFF3E0',
+    bg:    theme.fillAmber,
     title: 'Local Language Support',
     desc:  'Recommendations in Odia, Hindi, and English with audio support',
   },
 ];
 
-const STATS = [
-  { val: '5+',  label: 'Years of Research' },
-  { val: '50+', label: 'Farming Partners' },
-];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function Stars({ count }: { count: number }) {
+function Stars({ count, theme }: { count: number; theme: any }) {
   return (
     <View style={{ flexDirection: 'row', gap: 2 }}>
       {[1, 2, 3, 4, 5].map(i => (
-        <Ionicons key={i} name="star" size={16} color={i <= count ? C.star : '#E0E0E0'} />
+        <Ionicons key={i} name="star" size={16} color={i <= count ? '#FFC107' : theme.sep2} />
       ))}
     </View>
   );
@@ -115,10 +73,13 @@ function Stars({ count }: { count: number }) {
 export default function AboutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
 
   const [fullName, setFullName] = useState('');
   const [email,    setEmail]    = useState('');
   const [message,  setMessage]  = useState('');
+
+  const TECH_FEATURES = getTECH_FEATURES(theme);
 
   const handleSend = () => {
     if (!fullName.trim() || !email.trim() || !message.trim()) {
@@ -134,17 +95,17 @@ export default function AboutScreen() {
     insets.top || (Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0);
 
   return (
-    <View style={[s.root, { paddingTop: topPad }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.white} />
+    <View style={[s.root, { paddingTop: topPad, backgroundColor: theme.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       {/* ── Nav bar (matches app header) ──────────────────────────────────── */}
-      <View style={s.navbar}>
-        <TouchableOpacity onPress={() => router.back()} style={s.navBack} hitSlop={12}>
-          <Ionicons name="chevron-back" size={22} color={C.midGreen} />
+      <View style={[s.navbar, { backgroundColor: theme.surface, borderBottomColor: theme.sep2 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={[s.navBack, { backgroundColor: theme.fillGreen }]} hitSlop={12}>
+          <Ionicons name="chevron-back" size={22} color={theme.primary} />
         </TouchableOpacity>
         <View style={s.navBrand}>
-          <Ionicons name="leaf" size={18} color={C.accentGreen} />
-          <Text style={s.navTitle}>Saathi AI</Text>
+          <Ionicons name="leaf" size={18} color={theme.success} />
+          <Text style={[s.navTitle, { color: theme.textPrimary }]}>Saathi AI</Text>
         </View>
         <View style={{ width: 36 }} />
       </View>
@@ -154,10 +115,10 @@ export default function AboutScreen() {
         contentContainerStyle={{ paddingBottom: 48 }}
       >
 
-        {/* ── 1. Hero card — light mint background ───────────────────────── */}
-        <View style={s.heroCard}>
-          <Text style={s.heroTitle}>About Saathi AI</Text>
-          <Text style={s.heroDesc}>
+        {/* ── 1. Hero card — themed background ───────────────────────── */}
+        <View style={[s.heroCard, { backgroundColor: theme.primaryLight }]}>
+          <Text style={[s.heroTitle, { color: theme.primary }]}>About Saathi AI</Text>
+          <Text style={[s.heroDesc, { color: theme.textSecondary }]}>
             Revolutionizing agriculture through organic intelligence, empowering
             farmers with AI-driven insights for sustainable farming practices.
           </Text>
@@ -165,14 +126,14 @@ export default function AboutScreen() {
 
         {/* ── 2. Our Mission ─────────────────────────────────────────────── */}
         <View style={s.section}>
-          <Text style={s.sectionHeading}>Our Mission</Text>
-          <Text style={s.bodyText}>
+          <Text style={[s.sectionHeading, { color: theme.textPrimary }]}>Our Mission</Text>
+          <Text style={[s.bodyText, { color: theme.textSecondary }]}>
             At Agni Innovations, we believe that technology should serve those
             who feed the world. Our mission is to bridge the gap between advanced
             agricultural science and traditional farming wisdom, making precision
             agriculture accessible to every farmer.
           </Text>
-          <Text style={[s.bodyText, { marginTop: 14 }]}>
+          <Text style={[s.bodyText, { color: theme.textSecondary, marginTop: 14 }]}>
             Saathi AI combines the power of artificial intelligence with deep
             understanding of local farming practices, delivering personalized
             recommendations in farmers' native languages.
@@ -219,15 +180,15 @@ export default function AboutScreen() {
         </LinearGradient>
 
         {/* Tech feature rows */}
-        <View style={s.techList}>
+        <View style={[s.techList, { backgroundColor: theme.primaryLight }]}>
           {TECH_FEATURES.map((feat, i) => (
             <View key={i} style={s.techRow}>
               <View style={[s.techIconBox, { backgroundColor: feat.bg }]}>
                 <Ionicons name={feat.icon} size={24} color={feat.color} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.techTitle}>{feat.title}</Text>
-                <Text style={s.techDesc}>{feat.desc}</Text>
+                <Text style={[s.techTitle, { color: theme.textPrimary }]}>{feat.title}</Text>
+                <Text style={[s.techDesc, { color: theme.textSecondary }]}>{feat.desc}</Text>
               </View>
             </View>
           ))}
@@ -235,75 +196,75 @@ export default function AboutScreen() {
 
         {/* ── 5. Meet Our Team ───────────────────────────────────────────── */}
         <View style={s.teamSection}>
-          <Text style={s.teamHeading}>Meet Our Team</Text>
+          <Text style={[s.teamHeading, { color: theme.primary }]}>Meet Our Team</Text>
 
           {/* Founder */}
-          <View style={s.teamCard}>
-            <View style={s.teamAvatarRing}>
+          <View style={[s.teamCard, { backgroundColor: theme.surface, borderColor: theme.sep2 }]}>
+            <View style={[s.teamAvatarRing, { borderColor: theme.primaryLight }]}>
               <Image
                 source={require('../../assets/images/founder.png')}
                 style={s.teamAvatarImg}
                 resizeMode="cover"
               />
             </View>
-            <Text style={s.teamName}>Nilambar Behera</Text>
-            <View style={s.teamRolePillBlue}>
-              <Text style={s.teamRoleTxtBlue}>Founder &amp; Lead Architect{'\n'}( IoT &amp; AI LLM)</Text>
+            <Text style={[s.teamName, { color: theme.textPrimary }]}>Nilambar Behera</Text>
+            <View style={[s.teamRolePillBlue, { backgroundColor: theme.fillBlue }]}>
+              <Text style={[s.teamRoleTxtBlue, { color: theme.blue }]}>Founder &amp; Lead Architect{'\n'}( IoT &amp; AI LLM)</Text>
             </View>
-            <Text style={s.teamLocation}>Bhadrak Auto.clg, BCA</Text>
+            <Text style={[s.teamLocation, { color: theme.textSecondary }]}>Bhadrak Auto.clg, BCA</Text>
           </View>
 
           {/* Co-Founder */}
-          <View style={s.teamCard}>
-            <View style={s.teamAvatarRing}>
+          <View style={[s.teamCard, { backgroundColor: theme.surface, borderColor: theme.sep2 }]}>
+            <View style={[s.teamAvatarRing, { borderColor: theme.primaryLight }]}>
               <Image
                 source={require('../../assets/images/co-founder.png')}
                 style={s.teamAvatarImg}
                 resizeMode="cover"
               />
             </View>
-            <Text style={s.teamName}>Sanatan Sethi</Text>
-            <View style={s.teamRolePillGreen}>
-              <Text style={s.teamRoleTxtGreen}>Co-Founder &amp; Mobile App{'\n'}Developer</Text>
+            <Text style={[s.teamName, { color: theme.textPrimary }]}>Sanatan Sethi</Text>
+            <View style={[s.teamRolePillGreen, { backgroundColor: theme.fillGreen }]}>
+              <Text style={[s.teamRoleTxtGreen, { color: theme.primary }]}>Co-Founder &amp; Mobile App{'\n'}Developer</Text>
             </View>
-            <Text style={s.teamLocation}>Bhadrak Auto.clg, BCA</Text>
+            <Text style={[s.teamLocation, { color: theme.textSecondary }]}>Bhadrak Auto.clg, BCA</Text>
           </View>
         </View>
 
         {/* ── 6. What Farmers Say ────────────────────────────────────────── */}
         <View style={s.section}>
-          <Text style={s.sectionHeading}>What Farmers Say</Text>
+          <Text style={[s.sectionHeading, { color: theme.textPrimary }]}>What Farmers Say</Text>
 
           {TESTIMONIALS.map((t, i) => (
-            <View key={i} style={s.testimonialCard}>
+            <View key={i} style={[s.testimonialCard, { backgroundColor: theme.surface, borderColor: theme.sep2 }]}>
               {/* Avatar circle */}
               <View style={s.testimonialHeader}>
-                <View style={s.testimonialAvatar}>
-                  <Ionicons name="person-outline" size={24} color={C.tealGreen} />
+                <View style={[s.testimonialAvatar, { backgroundColor: theme.primaryLight, borderColor: theme.primary }]}>
+                  <Ionicons name="person-outline" size={24} color={theme.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.testimonialName}>{t.name}</Text>
-                  <Text style={s.testimonialLabel}>{t.label}</Text>
+                  <Text style={[s.testimonialName, { color: theme.textPrimary }]}>{t.name}</Text>
+                  <Text style={[s.testimonialLabel, { color: theme.textMuted }]}>{t.label}</Text>
                 </View>
               </View>
-              <Text style={s.testimonialText}>{t.text}</Text>
-              <Stars count={t.stars} />
+              <Text style={[s.testimonialText, { color: theme.textSecondary }]}>{t.text}</Text>
+              <Stars count={t.stars} theme={theme} />
             </View>
           ))}
         </View>
 
         {/* ── 7. Get In Touch ────────────────────────────────────────────── */}
         <View style={s.section}>
-          <Text style={s.sectionHeading}>Get In Touch</Text>
+          <Text style={[s.sectionHeading, { color: theme.textPrimary }]}>Get In Touch</Text>
 
-          <Text style={s.contactGroupLabel}>Contact Information</Text>
+          <Text style={[s.contactGroupLabel, { color: theme.textPrimary }]}>Contact Information</Text>
 
           {/* Location */}
           <View style={s.contactInfoRow}>
-            <View style={[s.contactInfoIcon, { backgroundColor: C.locBg }]}>
-              <Ionicons name="location-outline" size={18} color={C.blue} />
+            <View style={[s.contactInfoIcon, { backgroundColor: theme.fillBlue }]}>
+              <Ionicons name="location-outline" size={18} color={theme.blue} />
             </View>
-            <Text style={s.contactInfoText}>FMU-TBI | Balasore, Odisha, India</Text>
+            <Text style={[s.contactInfoText, { color: theme.textSecondary }]}>FMU-TBI | Balasore, Odisha, India</Text>
           </View>
 
           {/* Phone */}
@@ -311,10 +272,10 @@ export default function AboutScreen() {
             style={s.contactInfoRow}
             onPress={() => Linking.openURL('tel:+917205095602')}
           >
-            <View style={[s.contactInfoIcon, { backgroundColor: C.phoneBg }]}>
-              <Ionicons name="call-outline" size={18} color={C.accentGreen} />
+            <View style={[s.contactInfoIcon, { backgroundColor: theme.fillGreen }]}>
+              <Ionicons name="call-outline" size={18} color={theme.primary} />
             </View>
-            <Text style={s.contactInfoText}>+91 7205095602</Text>
+            <Text style={[s.contactInfoText, { color: theme.textSecondary }]}>+91 7205095602</Text>
           </TouchableOpacity>
 
           {/* Email */}
@@ -322,39 +283,39 @@ export default function AboutScreen() {
             style={s.contactInfoRow}
             onPress={() => Linking.openURL('mailto:saathi.ai.innovation@gmail.com')}
           >
-            <View style={[s.contactInfoIcon, { backgroundColor: C.emailBg }]}>
-              <Ionicons name="mail-outline" size={18} color="#F57C00" />
+            <View style={[s.contactInfoIcon, { backgroundColor: theme.fillAmber }]}>
+              <Ionicons name="mail-outline" size={18} color={theme.amber} />
             </View>
-            <Text style={s.contactInfoText}>saathi.ai.innovation@gmail.com</Text>
+            <Text style={[s.contactInfoText, { color: theme.textSecondary }]}>saathi.ai.innovation@gmail.com</Text>
           </TouchableOpacity>
 
           {/* ── Contact form ──────────────────────────────────────────── */}
           <View style={{ marginTop: 20 }}>
-            <Text style={s.inputLabel}>Full Name</Text>
+            <Text style={[s.inputLabel, { color: theme.textPrimary }]}>Full Name</Text>
             <TextInput
-              style={s.input}
+              style={[s.input, { backgroundColor: theme.surface, borderColor: theme.sep2, color: theme.textPrimary }]}
               placeholder="Enter your name"
-              placeholderTextColor={C.txt4}
+              placeholderTextColor={theme.textMuted}
               value={fullName}
               onChangeText={setFullName}
             />
 
-            <Text style={s.inputLabel}>Email Address</Text>
+            <Text style={[s.inputLabel, { color: theme.textPrimary }]}>Email Address</Text>
             <TextInput
-              style={s.input}
+              style={[s.input, { backgroundColor: theme.surface, borderColor: theme.sep2, color: theme.textPrimary }]}
               placeholder="Enter your email"
-              placeholderTextColor={C.txt4}
+              placeholderTextColor={theme.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
               value={email}
               onChangeText={setEmail}
             />
 
-            <Text style={s.inputLabel}>Message</Text>
+            <Text style={[s.inputLabel, { color: theme.textPrimary }]}>Message</Text>
             <TextInput
-              style={s.textarea}
+              style={[s.textarea, { backgroundColor: theme.surface, borderColor: theme.sep2, color: theme.textPrimary }]}
               placeholder="Tell us about your farming needs"
-              placeholderTextColor={C.txt4}
+              placeholderTextColor={theme.textMuted}
               multiline
               numberOfLines={5}
               textAlignVertical="top"
@@ -362,7 +323,7 @@ export default function AboutScreen() {
               onChangeText={setMessage}
             />
 
-            <TouchableOpacity style={s.sendBtn} onPress={handleSend} activeOpacity={0.85}>
+            <TouchableOpacity style={[s.sendBtn, { backgroundColor: theme.primary }]} onPress={handleSend} activeOpacity={0.85}>
               <Text style={s.sendBtnTxt}>Send Message</Text>
             </TouchableOpacity>
           </View>
@@ -378,7 +339,6 @@ const s = StyleSheet.create({
 
   root: {
     flex: 1,
-    backgroundColor: C.white,
   },
 
   // ── Navbar ────────────────────────────────────────────────────────────────
@@ -388,15 +348,12 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical:   10,
-    backgroundColor:   C.white,
     borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
   },
   navBack: {
     width:          36,
     height:         36,
     borderRadius:   18,
-    backgroundColor: '#F0FAF4',
     alignItems:     'center',
     justifyContent: 'center',
   },
@@ -408,14 +365,12 @@ const s = StyleSheet.create({
   navTitle: {
     fontSize:   18,
     fontWeight: '700',
-    color:      C.txt1,
     fontFamily: 'Sora_700Bold',
   },
 
 
   // ── Hero card ─────────────────────────────────────────────────────────────
   heroCard: {
-    backgroundColor: C.mintBg,
     marginHorizontal: 16,
     marginTop:        16,
     borderRadius:     16,
@@ -425,13 +380,11 @@ const s = StyleSheet.create({
   heroTitle: {
     fontSize:   22,
     fontWeight: '800',
-    color:      C.tealGreen,
     fontFamily: 'Sora_800ExtraBold',
     marginBottom: 10,
   },
   heroDesc: {
     fontSize:   14,
-    color:      C.txt2,
     lineHeight: 22,
     fontFamily: 'Sora_400Regular',
     textAlign:  'center',
@@ -447,13 +400,11 @@ const s = StyleSheet.create({
   sectionHeading: {
     fontSize:     20,
     fontWeight:   '700',
-    color:        C.txt1,
     fontFamily:   'Sora_700Bold',
     marginBottom: 12,
   },
   bodyText: {
     fontSize:   14,
-    color:      C.txt2,
     lineHeight: 22,
     fontFamily: 'Sora_400Regular',
   },
@@ -564,7 +515,7 @@ const s = StyleSheet.create({
   techBannerTitle: {
     fontSize:   19,
     fontWeight: '700',
-    color:      C.white,
+    color:      '#FFFFFF',
     fontFamily: 'Sora_700Bold',
     textAlign:  'center',
   },
@@ -578,7 +529,6 @@ const s = StyleSheet.create({
 
   // ── Tech list ─────────────────────────────────────────────────────────────
   techList: {
-    backgroundColor: '#F0FAF4',
     paddingHorizontal: 20,
     paddingTop:        18,
     paddingBottom:     22,
@@ -600,13 +550,11 @@ const s = StyleSheet.create({
   techTitle: {
     fontSize:   14,
     fontWeight: '700',
-    color:      C.txt1,
     fontFamily: 'Sora_700Bold',
     marginBottom: 3,
   },
   techDesc: {
     fontSize:   13,
-    color:      C.txt3,
     lineHeight: 19,
     fontFamily: 'Sora_400Regular',
   },
@@ -620,13 +568,11 @@ const s = StyleSheet.create({
   teamHeading: {
     fontSize:     22,
     fontWeight:   '700',
-    color:        C.tealGreen,
     fontFamily:   'Sora_700Bold',
     marginBottom: 20,
     textAlign:    'center',
   },
   teamCard: {
-    backgroundColor: C.white,
     borderRadius:    16,
     padding:         24,
     alignItems:      'center',
@@ -638,14 +584,12 @@ const s = StyleSheet.create({
     shadowRadius:    6,
     elevation:       2,
     borderWidth:     1,
-    borderColor:     C.borderLight,
   },
   teamAvatarRing: {
     width:        88,
     height:       88,
     borderRadius: 44,
     borderWidth:  2,
-    borderColor:  C.lightGreen,
     alignItems:   'center',
     justifyContent: 'center',
     marginBottom:   14,
@@ -659,13 +603,11 @@ const s = StyleSheet.create({
   teamName: {
     fontSize:     18,
     fontWeight:   '700',
-    color:        C.txt1,
     fontFamily:   'Sora_700Bold',
     marginBottom: 10,
     textAlign:    'center',
   },
   teamRolePillBlue: {
-    backgroundColor: C.lightBlue,
     borderRadius:    20,
     paddingHorizontal: 16,
     paddingVertical:    7,
@@ -674,13 +616,11 @@ const s = StyleSheet.create({
   teamRoleTxtBlue: {
     fontSize:   13,
     fontWeight: '600',
-    color:      C.blue,
     fontFamily: 'Sora_600SemiBold',
     textAlign:  'center',
     lineHeight: 19,
   },
   teamRolePillGreen: {
-    backgroundColor: C.paleGreen,
     borderRadius:    20,
     paddingHorizontal: 16,
     paddingVertical:    7,
@@ -689,25 +629,21 @@ const s = StyleSheet.create({
   teamRoleTxtGreen: {
     fontSize:   13,
     fontWeight: '600',
-    color:      C.midGreen,
     fontFamily: 'Sora_600SemiBold',
     textAlign:  'center',
     lineHeight: 19,
   },
   teamLocation: {
     fontSize:   13,
-    color:      C.txt3,
     fontFamily: 'Sora_400Regular',
   },
 
   // ── Testimonials ──────────────────────────────────────────────────────────
   testimonialCard: {
-    backgroundColor: C.white,
     borderRadius:    12,
     padding:         16,
     marginBottom:    14,
     borderWidth:     1,
-    borderColor:     C.borderLight,
     shadowColor:     '#000',
     shadowOffset:    { width: 0, height: 1 },
     shadowOpacity:   0.05,
@@ -724,27 +660,22 @@ const s = StyleSheet.create({
     width:        44,
     height:       44,
     borderRadius: 22,
-    backgroundColor: C.mintBg,
     alignItems:   'center',
     justifyContent: 'center',
     borderWidth:  1,
-    borderColor:  C.lightGreen,
   },
   testimonialName: {
     fontSize:   15,
     fontWeight: '700',
-    color:      C.txt1,
     fontFamily: 'Sora_700Bold',
   },
   testimonialLabel: {
     fontSize:   12,
-    color:      C.txt3,
     fontFamily: 'Sora_400Regular',
     marginTop:  2,
   },
   testimonialText: {
     fontSize:   14,
-    color:      C.txt2,
     lineHeight: 21,
     fontFamily: 'Sora_400Regular',
     marginBottom: 10,
@@ -755,7 +686,6 @@ const s = StyleSheet.create({
   contactGroupLabel: {
     fontSize:     15,
     fontWeight:   '700',
-    color:        C.txt1,
     fontFamily:   'Sora_700Bold',
     marginBottom: 12,
   },
@@ -774,7 +704,6 @@ const s = StyleSheet.create({
   },
   contactInfoText: {
     fontSize:   14,
-    color:      C.txt2,
     fontFamily: 'Sora_400Regular',
     flex:       1,
   },
@@ -783,36 +712,28 @@ const s = StyleSheet.create({
   inputLabel: {
     fontSize:     13,
     fontWeight:   '600',
-    color:        C.txt1,
     fontFamily:   'Sora_600SemiBold',
     marginBottom: 6,
     marginTop:    14,
   },
   input: {
     borderWidth:   1,
-    borderColor:   C.border,
     borderRadius:  10,
     paddingHorizontal: 14,
     paddingVertical:   12,
     fontSize:       14,
-    color:          C.txt1,
     fontFamily:     'Sora_400Regular',
-    backgroundColor: C.white,
   },
   textarea: {
     borderWidth:   1,
-    borderColor:   C.border,
     borderRadius:  10,
     paddingHorizontal: 14,
     paddingVertical:   12,
     fontSize:       14,
-    color:          C.txt1,
     fontFamily:     'Sora_400Regular',
-    backgroundColor: C.white,
     minHeight:      110,
   },
   sendBtn: {
-    backgroundColor: C.accentGreen,
     borderRadius:    10,
     paddingVertical: 15,
     alignItems:      'center',
@@ -822,7 +743,7 @@ const s = StyleSheet.create({
   sendBtnTxt: {
     fontSize:   16,
     fontWeight: '700',
-    color:      C.white,
+    color:      '#FFFFFF',
     fontFamily: 'Sora_700Bold',
   },
 });

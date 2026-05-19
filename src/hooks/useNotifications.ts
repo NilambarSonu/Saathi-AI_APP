@@ -8,8 +8,8 @@ import {
 import { useAuthStore } from '../store/authStore';
 
 export function useNotifications() {
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<Notifications.Subscription>(undefined);
+  const responseListener = useRef<Notifications.Subscription>(undefined);
   const { user, token: authTokens } = useAuthStore();
 
   useEffect(() => {

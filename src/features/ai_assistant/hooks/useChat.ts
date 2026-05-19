@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  sendChatMessage,
+  createChatSession,
+  getChatSessionMessages,
+  type ChatMessage as ServiceChatMessage,
+} from '@/features/ai_assistant/services/chat';
 import { api, ChatSessionMessage } from '@/services/api';
 
 export interface ChatMessage {
@@ -33,8 +39,15 @@ export function useChat(sessionId?: string) {
   const [error, setError] = useState<string | null>(null);
   const [loadingText, setLoadingText] = useState<string>('');
 
+  // Active session ID — either passed from parent or auto-created on first send
+  const activeSessionIdRef = useRef<string | undefined>(sessionId);
   const loadingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isRequestPending = useRef(false);
+
+  // Keep activeSessionIdRef in sync if parent provides one
+  useEffect(() => {
+    activeSessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   const clearLoadingText = useCallback(() => {
     if (loadingIntervalRef.current) {
@@ -47,7 +60,6 @@ export function useChat(sessionId?: string) {
   const startLoadingText = useCallback(() => {
     let index = 0;
     setLoadingText(LOADING_PHRASES[0]);
-
     loadingIntervalRef.current = setInterval(() => {
       index = (index + 1) % LOADING_PHRASES.length;
       setLoadingText(LOADING_PHRASES[index]);
@@ -58,6 +70,7 @@ export function useChat(sessionId?: string) {
     return () => clearLoadingText();
   }, [clearLoadingText]);
 
+  // Load history when a sessionId is provided
   useEffect(() => {
     if (!sessionId) {
       setMessages([]);
@@ -103,27 +116,46 @@ export function useChat(sessionId?: string) {
         content: content.trim(),
         timestamp: new Date().toISOString(),
       };
-
       setMessages((prev) => [...prev, userMsg]);
 
       try {
-        const { response } = await api.chat(content);
+        // Auto-create a session if we don't have one yet
+        if (!activeSessionIdRef.current) {
+          const newSession = await createChatSession('New Chat', 'en');
+          activeSessionIdRef.current = newSession.id;
+        }
+
+        const data = await sendChatMessage(activeSessionIdRef.current!, content.trim(), 'en');
+
+        // Support multiple response shapes: { response }, { reply }, { message }, { text }
+        const aiText: string =
+          data?.response ||
+          data?.reply ||
+          data?.message ||
+          data?.text ||
+          data?.answer ||
+          (typeof data === 'string' ? data : null) ||
+          'Sorry, I could not generate a response.';
+
         const aiMsg: ChatMessage = {
           id: Date.now().toString() + '-ai',
           role: 'ai',
-          content: response || 'Sorry, I could not generate a response.',
+          content: aiText,
           timestamp: new Date().toISOString(),
         };
-
         setMessages((prev) => [...prev, aiMsg]);
       } catch (err: any) {
-        const errorMessage = err?.message || 'Could not reach Saathi AI servers. Please try again.';
-        setError(errorMessage);
+        const errorMessage =
+          err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          err?.message ||
+          'Could not reach Saathi AI servers. Please try again.';
 
+        setError(errorMessage);
         const errorMsg: ChatMessage = {
           id: Date.now().toString() + '-err',
           role: 'ai',
-          content: `Error: ${errorMessage}`,
+          content: `⚠️ ${errorMessage}`,
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, errorMsg]);
@@ -139,7 +171,8 @@ export function useChat(sessionId?: string) {
   const clearChat = useCallback(() => {
     setMessages([]);
     setError(null);
-  }, []);
+    activeSessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   return {
     messages,
@@ -149,7 +182,6 @@ export function useChat(sessionId?: string) {
     error,
     sendMessage,
     clearChat,
+    activeSessionId: activeSessionIdRef.current,
   };
 }
-
-

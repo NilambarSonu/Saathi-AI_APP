@@ -5,12 +5,14 @@ import { useAuthStore } from '@/store/authStore';
 import { tokenCache } from '@/utils/tokenCache';
 import { registerForPushNotifications } from '@/services/notifications';
 import { registerDevice } from '@/features/auth/services/auth';
+import { useTheme } from '@/context/ThemeContext';
 
 // expo-navigation-bar setVisibilityAsync is safe with edge-to-edge.
 // The unsupported APIs (setPositionAsync, setBehaviorAsync) have been removed.
 import * as NavigationBar from 'expo-navigation-bar';
 
 export default function AppLayout() {
+  const { theme } = useTheme();
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const isLoading = useAuthStore(s => s.isLoading);
   const user = useAuthStore(s => s.user);
@@ -58,8 +60,8 @@ export default function AppLayout() {
   // though the persisted session is valid.
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0FDF4' }}>
-        <ActivityIndicator size="large" color="#10B981" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }

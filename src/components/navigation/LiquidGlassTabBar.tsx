@@ -11,6 +11,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useTheme } from '@/context/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -38,6 +39,7 @@ export default function LiquidGlassTabBar({
   onTabPress,
 }: LiquidGlassTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
   const activeIndex = Math.max(0, TABS.findIndex(t => t.key === activeTab));
 
   // Animated X position of the sliding indicator
@@ -68,15 +70,21 @@ export default function LiquidGlassTabBar({
     <View style={[styles.outerWrap, { marginBottom: Math.max(insets.bottom, 12) }]}>
       {/* ── GLASS PILL CONTAINER ── */}
       <BlurView
-        intensity={85}
-        tint="light"
-        style={styles.blurContainer}
+        intensity={isDark ? 40 : 85}
+        tint={isDark ? "dark" : "light"}
+        style={[
+          styles.blurContainer, 
+          { 
+            backgroundColor: theme.tabBarBackground,
+            borderColor: theme.tabBarBorder
+          }
+        ]}
       >
         {/* Specular highlight — top edge of glass */}
-        <View style={styles.specularHighlight} />
+        {!isDark && <View style={styles.specularHighlight} />}
 
         {/* Sliding green indicator */}
-        <Animated.View style={[styles.indicator, indicatorStyle]} />
+        <Animated.View style={[styles.indicator, indicatorStyle, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : 'rgba(26, 92, 53, 0.10)', borderColor: isDark ? 'rgba(34, 197, 94, 0.2)' : 'rgba(26, 92, 53, 0.18)' }]} />
 
         {/* Tab items */}
         <View style={styles.tabsRow}>
@@ -107,6 +115,7 @@ function TabItem({
   isActive: boolean;
   onPress: () => void;
 }) {
+  const { theme } = useTheme();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(isActive ? 1 : 0.45);
 
@@ -143,7 +152,7 @@ function TabItem({
       <Animated.View style={opacityStyle}>
         {/* Inner: transform only — isolated from layout changes */}
         <Animated.View style={[styles.tabInner, scaleStyle]}>
-          <Feather name={tab.icon} size={24} color={isActive ? '#1A5C35' : '#8A9E8E'} />
+          <Feather name={tab.icon} size={24} color={isActive ? theme.activeTab : theme.inactiveTab} />
         </Animated.View>
       </Animated.View>
     </TouchableOpacity>
@@ -170,10 +179,6 @@ const styles = StyleSheet.create({
     borderRadius: 32,          // Full pill shape
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.55)',   // glass edge
-    backgroundColor: Platform.OS === 'android'
-      ? 'rgba(245,250,246,0.94)'             // Android fallback (no blur)
-      : 'transparent',
   },
   specularHighlight: {
     position: 'absolute',
@@ -188,9 +193,7 @@ const styles = StyleSheet.create({
     width: TAB_INDICATOR_WIDTH,
     height: TAB_BAR_HEIGHT - 16,
     borderRadius: 20,
-    backgroundColor: 'rgba(26, 92, 53, 0.10)',   // very subtle green fill
     borderWidth: 1,
-    borderColor: 'rgba(26, 92, 53, 0.18)',        // green glass border
   },
   tabsRow: {
     flex: 1,

@@ -2,20 +2,20 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions, ScrollView, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
 import { Spacing } from '@/constants/Spacing';
 
 const { width } = Dimensions.get('window');
 
-const SLIDES = [
+const getSLIDES = (theme: any) => [
   {
     id: '1',
     title: 'Soil Testing in ',
     highlight: '60 Seconds',
     body: 'The Agni device analyzes 14 parameters — pH, N, P, K, moisture, EC and more. No lab. No waiting.',
     badge: '60 SECS',
-    bg: '#E8F5E9',
-    iconColor: Colors.primary
+    bg: theme.fillGreen,
+    iconColor: theme.primary
   },
   {
     id: '2',
@@ -23,8 +23,8 @@ const SLIDES = [
     highlight: 'Your Language',
     body: 'Get recommendations in Odia, Hindi, English or 7 other Indian languages — with full voice advisory support.',
     badge: '10 LANGS',
-    bg: '#FFF3E0',
-    iconColor: Colors.warning
+    bg: theme.fillAmber,
+    iconColor: theme.amber
   },
   {
     id: '3',
@@ -32,15 +32,18 @@ const SLIDES = [
     highlight: 'Agriculture',
     body: 'Saathi AI is trained on peer-reviewed agronomic data to deliver personalized fertilizer plans and yield forecasts.',
     badge: 'CUSTOM LLM',
-    bg: '#F3E5F5',
-    iconColor: Colors.premium
+    bg: theme.fillPurple,
+    iconColor: theme.purple
   }
 ];
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { theme, isDark } = useTheme();
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const SLIDES = getSLIDES(theme);
 
   const completeOnboarding = async () => {
     await AsyncStorage.multiSet([
@@ -70,9 +73,9 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Pressable style={styles.skipButton} onPress={completeOnboarding}>
-        <Text style={styles.skipText}>Skip</Text>
+        <Text style={[styles.skipText, { color: theme.textSecondary }]}>Skip</Text>
       </Pressable>
 
       <ScrollView
@@ -97,11 +100,11 @@ export default function OnboardingScreen() {
             </View>
 
             <View style={styles.textContainer}>
-              <Text style={styles.title}>
+              <Text style={[styles.title, { color: theme.textPrimary }]}>
                 {slide.title}
-                <Text style={{ color: Colors.primary }}>{slide.highlight}</Text>
+                <Text style={{ color: theme.primary }}>{slide.highlight}</Text>
               </Text>
-              <Text style={styles.body}>{slide.body}</Text>
+              <Text style={[styles.body, { color: theme.textSecondary }]}>{slide.body}</Text>
             </View>
           </View>
         ))}
@@ -114,17 +117,18 @@ export default function OnboardingScreen() {
               key={index} 
               style={[
                 styles.dot, 
-                currentIndex === index ? styles.dotActive : null
+                { backgroundColor: theme.border },
+                currentIndex === index ? [styles.dotActive, { backgroundColor: theme.primary }] : null
               ]} 
             />
           ))}
         </View>
 
         <Pressable 
-          style={styles.ctaButton} 
+          style={[styles.ctaButton, { backgroundColor: theme.primary, shadowColor: theme.primary }]} 
           onPress={handleContinue}
         >
-          <Text style={styles.ctaText}>
+          <Text style={[styles.ctaText, { color: '#FFFFFF' }]}>
             {currentIndex === SLIDES.length - 1 ? 'Get Started' : 'Continue'}
           </Text>
         </Pressable>
@@ -136,7 +140,6 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   skipButton: {
     position: 'absolute',
@@ -148,7 +151,6 @@ const styles = StyleSheet.create({
   skipText: {
     fontFamily: 'Sora_600SemiBold',
     fontSize: 14,
-    color: Colors.textSecondary,
     letterSpacing: 0.2,
   },
   scrollView: {
@@ -194,7 +196,6 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'Sora_800ExtraBold',
     fontSize: 26,
-    color: Colors.textPrimary,
     textAlign: 'center',
     letterSpacing: -0.52,
     marginBottom: Spacing.md,
@@ -202,7 +203,6 @@ const styles = StyleSheet.create({
   body: {
     fontFamily: 'Sora_400Regular',
     fontSize: 14,
-    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22.4,
   },
@@ -222,20 +222,16 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.border,
   },
   dotActive: {
     width: 24,
-    backgroundColor: Colors.primary,
   },
   ctaButton: {
     height: 54,
-    backgroundColor: Colors.primary,
     borderRadius: Spacing.radius.lg,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 4,
-    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -243,7 +239,6 @@ const styles = StyleSheet.create({
   ctaText: {
     fontFamily: 'Sora_600SemiBold',
     fontSize: 16,
-    color: Colors.surface,
     letterSpacing: 0.2,
   }
 });
