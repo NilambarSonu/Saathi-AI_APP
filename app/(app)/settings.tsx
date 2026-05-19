@@ -32,8 +32,8 @@ interface SettingsState {
   autoSync: boolean;
 }
 
-function SectionCard({ title, icon, color, children, theme }: {
-  title: string; icon: string; color: string; children: React.ReactNode; theme: any;
+function SectionCard({ title, subtitle, icon, color, children, theme }: {
+  title: string; subtitle?: string; icon: string; color: string; children: React.ReactNode; theme: any;
 }) {
   return (
     <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
@@ -41,7 +41,10 @@ function SectionCard({ title, icon, color, children, theme }: {
         <View style={[styles.cardIconBg, { backgroundColor: color + '20' }]}>
           <Ionicons name={icon as any} size={18} color={color} />
         </View>
-        <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>{title}</Text>
+        <View style={styles.cardHeaderText}>
+          <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>{title}</Text>
+          {subtitle ? <Text style={[styles.cardSubtitle, { color: theme.textSecondary }]}>{subtitle}</Text> : null}
+        </View>
       </View>
       {children}
     </View>
@@ -177,6 +180,12 @@ export default function SettingsScreen() {
     else router.replace('/(app)');
   };
 
+  const summaryItems = [
+    { label: 'Theme', value: isDarkMode ? 'Dark' : 'Light', icon: isDarkMode ? 'moon' : 'sunny', color: theme.purple },
+    { label: 'Language', value: selectedLang?.label?.replace(/^.*?\s/, '') || 'English', icon: 'language', color: theme.blue },
+    { label: 'Sync', value: settings.autoSync ? 'On' : 'Off', icon: settings.autoSync ? 'cloud-done' : 'cloud-offline', color: settings.autoSync ? theme.primary : theme.textMuted },
+  ];
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top + 16, Platform.OS === 'ios' ? 60 : 40) }]}>
@@ -207,9 +216,31 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={[styles.summaryCard, { backgroundColor: isDark ? theme.surface : theme.bg0, borderColor: theme.borderLight }]}>
+          <View style={styles.summaryTop}>
+            <View>
+              <Text style={[styles.summaryEyebrow, { color: theme.primary }]}>PROFILE SETTINGS</Text>
+              <Text style={[styles.summaryTitle, { color: theme.textPrimary }]}>Your app preferences</Text>
+            </View>
+            <View style={[styles.summaryBadge, { backgroundColor: theme.primaryLight }]}>
+              <Ionicons name="options-outline" size={18} color={theme.primary} />
+            </View>
+          </View>
+          <View style={styles.summaryGrid}>
+            {summaryItems.map(item => (
+              <View key={item.label} style={[styles.summaryItem, { backgroundColor: isDark ? theme.bg1 : theme.surface, borderColor: theme.borderLight }]}>
+                <Ionicons name={item.icon as any} size={16} color={item.color} />
+                <View style={styles.summaryTextWrap}>
+                  <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>{item.label}</Text>
+                  <Text style={[styles.summaryValue, { color: theme.textPrimary }]} numberOfLines={1}>{item.value}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
 
         {/* Appearance */}
-        <SectionCard title="Appearance" icon="moon-outline" color={theme.purple} theme={theme}>
+        <SectionCard title="Appearance" subtitle="Display and visual comfort" icon="moon-outline" color={theme.purple} theme={theme}>
           <ToggleRow
             label="Dark Mode"
             description="Switch to dark theme for better low-light visibility"
@@ -221,7 +252,7 @@ export default function SettingsScreen() {
         </SectionCard>
 
         {/* Language */}
-        <SectionCard title="Language & Region" icon="globe-outline" color={theme.blue} theme={theme}>
+        <SectionCard title="Language & Region" subtitle="Choose the interface language" icon="globe-outline" color={theme.blue} theme={theme}>
           <View style={styles.langSection}>
             <Text style={[styles.toggleLabel, { color: theme.textPrimary }]}>Interface Language</Text>
             <Pressable style={[styles.langSelector, { backgroundColor: theme.background, borderColor: theme.border }]} onPress={() => setShowLangPicker(!showLangPicker)}>
@@ -254,7 +285,7 @@ export default function SettingsScreen() {
         </SectionCard>
 
         {/* Sync & Storage */}
-        <SectionCard title="Sync & Storage" icon="phone-portrait-outline" color={theme.primary} theme={theme}>
+        <SectionCard title="Sync & Storage" subtitle="Keep your soil test data backed up" icon="phone-portrait-outline" color={theme.primary} theme={theme}>
           <ToggleRow
             label="Auto Sync"
             description="Automatically sync soil test data when connected to the internet"
@@ -266,23 +297,32 @@ export default function SettingsScreen() {
         </SectionCard>
 
         {/* Data Management */}
-        <SectionCard title="Data Management" icon="server-outline" color={theme.amber} theme={theme}>
+        <SectionCard title="Data Management" subtitle="Download or move your account data" icon="server-outline" color={theme.amber} theme={theme}>
           <Pressable
-            style={[styles.actionBtn, { backgroundColor: theme.background, borderColor: theme.border }, isExporting && { opacity: 0.6 }]}
+            style={({ pressed }) => [
+              styles.actionBtn,
+              { backgroundColor: isDark ? theme.bg1 : theme.background, borderColor: theme.border },
+              pressed && { opacity: 0.78 },
+              isExporting && { opacity: 0.6 },
+            ]}
             onPress={handleExportData}
             disabled={isExporting}
           >
-            {isExporting ? (
-              <ActivityIndicator size="small" color={theme.blue} />
-            ) : (
-              <Ionicons name="download-outline" size={18} color={theme.blue} />
-            )}
-            <Text style={[styles.actionBtnText, { color: theme.blue }]}>
-              {isExporting ? 'Exporting...' : 'Export All Data (JSON)'}
-            </Text>
+            <View style={[styles.actionIconShell, { backgroundColor: theme.blue + '18' }]}>
+              {isExporting ? (
+                <ActivityIndicator size="small" color={theme.blue} />
+              ) : (
+                <Ionicons name="download-outline" size={18} color={theme.blue} />
+              )}
+            </View>
+            <View style={styles.actionCopy}>
+              <Text style={[styles.actionBtnText, { color: theme.textPrimary }]}>
+                {isExporting ? 'Exporting...' : 'Export All Data'}
+              </Text>
+              <Text style={[styles.actionBtnSub, { color: theme.textSecondary }]}>JSON file with soil tests and AI recommendations</Text>
+            </View>
             <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
           </Pressable>
-          <Text style={[styles.actionNote, { color: theme.textMuted }]}>Downloads all your soil tests and AI recommendations as a JSON file.</Text>
         </SectionCard>
 
         {/* Danger Zone */}
@@ -291,7 +331,10 @@ export default function SettingsScreen() {
             <View style={[styles.cardIconBg, { backgroundColor: theme.error + '20' }]}>
               <Ionicons name="warning-outline" size={18} color={theme.error} />
             </View>
-            <Text style={[styles.cardTitle, { color: theme.error }]}>Danger Zone</Text>
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: theme.error }]}>Danger Zone</Text>
+              <Text style={[styles.cardSubtitle, { color: theme.error + 'AA' }]}>Irreversible account actions</Text>
+            </View>
           </View>
           <Text style={[styles.dangerNote, { color: theme.error + 'AA' }]}>Irreversible actions — proceed with caution</Text>
           <View style={styles.dangerRow}>
@@ -341,6 +384,52 @@ const styles = StyleSheet.create({
   headerSub: { fontFamily: 'Sora_400Regular', fontSize: 13, marginTop: 4 },
   scroll: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md },
 
+  summaryCard: {
+    borderRadius: Spacing.radius.xl,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+    ...Spacing.shadows.sm,
+  },
+  summaryTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
+  summaryEyebrow: {
+    fontFamily: 'Sora_700Bold',
+    fontSize: 10,
+    letterSpacing: 0.8,
+  },
+  summaryTitle: {
+    fontFamily: 'Sora_700Bold',
+    fontSize: 18,
+    marginTop: 3,
+  },
+  summaryBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  summaryItem: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 10,
+    minHeight: 72,
+    justifyContent: 'space-between',
+  },
+  summaryTextWrap: { marginTop: 8 },
+  summaryLabel: { fontFamily: 'Sora_500Medium', fontSize: 10 },
+  summaryValue: { fontFamily: 'Sora_700Bold', fontSize: 12, marginTop: 2 },
+
   card: {
     borderRadius: Spacing.radius.xl,
     padding: Spacing.lg,
@@ -350,7 +439,9 @@ const styles = StyleSheet.create({
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.md },
   cardIconBg: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  cardHeaderText: { flex: 1 },
   cardTitle: { fontFamily: 'Sora_700Bold', fontSize: 15 },
+  cardSubtitle: { fontFamily: 'Sora_400Regular', fontSize: 11, lineHeight: 16, marginTop: 2 },
 
   toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
   toggleLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 14, marginBottom: 2 },
@@ -385,7 +476,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 12,
     borderWidth: 1,
   },
-  actionBtnText: { flex: 1, fontFamily: 'Sora_600SemiBold', fontSize: 14 },
+  actionIconShell: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionCopy: { flex: 1 },
+  actionBtnText: { fontFamily: 'Sora_700Bold', fontSize: 14 },
+  actionBtnSub: { fontFamily: 'Sora_400Regular', fontSize: 11, lineHeight: 16, marginTop: 2 },
   actionNote: { fontFamily: 'Sora_400Regular', fontSize: 11, marginTop: 8, paddingLeft: 4 },
 
   dangerCard: { borderWidth: 1 },

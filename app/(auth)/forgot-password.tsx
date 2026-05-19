@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, ActivityIndicator,
   KeyboardAvoidingView, Platform, Alert,
-  ImageBackground,
+  ImageBackground, StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
@@ -149,16 +149,23 @@ export default function ForgotPasswordScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1 }}
+      style={[styles.keyboardRoot, { backgroundColor: theme.background }]}
     >
-      <ScrollView style={styles.container} bounces={false} showsVerticalScrollIndicator={false}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        contentContainerStyle={[styles.scrollContent, { backgroundColor: theme.background }]}
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Hero Header */}
         <ImageBackground
           source={require('assets/images/auth_screen_mobile.png')}
           style={styles.hero}
           resizeMode="cover"
         >
-          <View style={styles.heroOverlay}>
+          <View style={[styles.heroOverlay, isDark && styles.heroOverlayDark]}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
               <Text style={{ fontSize: 24, color: '#fff' }}>←</Text>
             </TouchableOpacity>
@@ -171,18 +178,18 @@ export default function ForgotPasswordScreen() {
         </ImageBackground>
 
         {/* Card */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: theme.surface }]}>
 
           {/* ── Step 1: Email ── */}
           {step === 'email' && (
             <>
-              <Text style={styles.label}>EMAIL ADDRESS</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>EMAIL ADDRESS</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.background, borderColor: isDark ? theme.sep2 : Colors.border, color: theme.textPrimary }]}
                 value={email}
                 onChangeText={setEmail}
                 placeholder="you@example.com"
-                placeholderTextColor="#B0C4B8"
+                placeholderTextColor={isDark ? theme.textMuted : '#B0C4B8'}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoComplete="email"
@@ -203,16 +210,16 @@ export default function ForgotPasswordScreen() {
           {/* ── Step 2: Verify login OTP ── */}
           {step === 'verify' && (
             <>
-              <Text style={styles.infoText}>
-                Enter the 6-digit code sent to <Text style={styles.emailHighlight}>{email}</Text>
+              <Text style={[styles.infoText, { color: theme.textSecondary }]}>
+                Enter the 6-digit code sent to <Text style={[styles.emailHighlight, { color: theme.textPrimary }]}>{email}</Text>
               </Text>
-              <Text style={styles.label}>VERIFICATION CODE</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>VERIFICATION CODE</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.background, borderColor: isDark ? theme.sep2 : Colors.border, color: theme.textPrimary }]}
                 value={otp}
                 onChangeText={setOtp}
                 placeholder="Enter 6-digit code"
-                placeholderTextColor="#B0C4B8"
+                placeholderTextColor={isDark ? theme.textMuted : '#B0C4B8'}
                 keyboardType="number-pad"
                 maxLength={6}
               />
@@ -227,7 +234,7 @@ export default function ForgotPasswordScreen() {
                   : <Text style={styles.btnPrimaryText}>Verify OTP →</Text>}
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setStep('email')} style={styles.backLink}>
-                <Text style={styles.backLinkText}>← Change Email</Text>
+                <Text style={[styles.backLinkText, { color: theme.primary }]}>← Change Email</Text>
               </TouchableOpacity>
             </>
           )}
@@ -235,39 +242,39 @@ export default function ForgotPasswordScreen() {
           {/* ── Step 3+4: New password + change OTP ── */}
           {step === 'new_password' && (
             <>
-              <Text style={styles.infoText}>
-                Check your email for a <Text style={styles.emailHighlight}>password-change code</Text>, then enter it below with your new password.
+              <Text style={[styles.infoText, { color: theme.textSecondary }]}>
+                Check your email for a <Text style={[styles.emailHighlight, { color: theme.textPrimary }]}>password-change code</Text>, then enter it below with your new password.
               </Text>
 
-              <Text style={styles.label}>SECURITY CODE (from email)</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>SECURITY CODE (from email)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.background, borderColor: isDark ? theme.sep2 : Colors.border, color: theme.textPrimary }]}
                 value={changeOtp}
                 onChangeText={setChangeOtp}
                 placeholder="Enter 6-digit code"
-                placeholderTextColor="#B0C4B8"
+                placeholderTextColor={isDark ? theme.textMuted : '#B0C4B8'}
                 keyboardType="number-pad"
                 maxLength={6}
               />
 
-              <Text style={styles.label}>NEW PASSWORD</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>NEW PASSWORD</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.background, borderColor: isDark ? theme.sep2 : Colors.border, color: theme.textPrimary }]}
                 value={newPassword}
                 onChangeText={setNewPassword}
                 placeholder="Enter new password (min 8 chars)"
-                placeholderTextColor="#B0C4B8"
+                placeholderTextColor={isDark ? theme.textMuted : '#B0C4B8'}
                 secureTextEntry
                 autoComplete="password-new"
               />
 
-              <Text style={styles.label}>CONFIRM PASSWORD</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>CONFIRM PASSWORD</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.background, borderColor: isDark ? theme.sep2 : Colors.border, color: theme.textPrimary }]}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 placeholder="Confirm new password"
-                placeholderTextColor="#B0C4B8"
+                placeholderTextColor={isDark ? theme.textMuted : '#B0C4B8'}
                 secureTextEntry
                 autoComplete="password-new"
               />
@@ -290,9 +297,9 @@ export default function ForgotPasswordScreen() {
             onPress={() => router.replace('/(auth)/login')}
             style={styles.loginLink}
           >
-            <Text style={styles.loginLinkText}>
+            <Text style={[styles.loginLinkText, { color: theme.textSecondary }]}>
               Remember your password?{' '}
-              <Text style={{ color: Colors.primary }}>Log in</Text>
+              <Text style={{ color: theme.primary }}>Log in</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -302,7 +309,9 @@ export default function ForgotPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
+  keyboardRoot: { flex: 1 },
   container: { flex: 1, backgroundColor: Colors.background },
+  scrollContent: { flexGrow: 1 },
   hero: { minHeight: 340, position: 'relative', overflow: 'hidden' },
   heroOverlay: {
     paddingTop: 80,
@@ -310,6 +319,9 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
     backgroundColor: 'rgba(0,0,0,0.4)',
     flex: 1,
+  },
+  heroOverlayDark: {
+    backgroundColor: 'rgba(0,0,0,0.56)',
   },
   backBtn: {
     position: 'absolute', top: 48, left: 20,
@@ -332,6 +344,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: Colors.surface, borderRadius: 28,
+    flexGrow: 1,
     margin: 0, marginTop: -20, padding: 24, paddingBottom: 40, minHeight: 300,
   },
   infoText: {
