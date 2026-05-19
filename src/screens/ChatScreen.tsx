@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,6 +39,7 @@ export interface ChatMessage extends BaseChatMessage {
 
 export default function AIChatScreen() {
   const { theme, isDark } = useDarkModeTheme();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ 
     sessionId?: string; 
     sessionTitle?: string;
@@ -166,7 +167,10 @@ Please provide:
   ];
 
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+      requestAnimationFrame(() => scrollViewRef.current?.scrollToEnd({ animated: true }));
+    });
     const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
 
     return () => {
@@ -279,14 +283,14 @@ Please provide:
   };
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]}>
+    <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.background }]}>
       {isDark && (
         <LinearGradient
           colors={[theme.bg0, theme.bg1, theme.background]}
           style={StyleSheet.absoluteFill}
         />
       )}
-      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 8}>
         <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { backgroundColor: isDark ? 'rgba(24, 33, 27, 0.92)' : theme.surface, borderBottomColor: theme.sep1 }]}>
           <View style={styles.headerLeft}>
             <TouchableOpacity
@@ -325,7 +329,7 @@ Please provide:
         <ScrollView
           ref={scrollViewRef}
           style={styles.chatContainer}
-          contentContainerStyle={[styles.chatScroll, { paddingBottom: 150 }]}
+          contentContainerStyle={[styles.chatScroll, { paddingBottom: 24 }]}
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -443,87 +447,88 @@ Please provide:
           )}
         </ScrollView>
 
-        {fileAttachment && (
-          <Animated.View entering={FadeInDown} style={styles.attachmentBanner}>
-            <View style={[styles.attachmentPill, { backgroundColor: theme.surface, borderColor: theme.sep1 }]}>
-              <MaterialCommunityIcons
-                name={fileAttachment.type === 'image' ? 'image-outline' : 'file-document-outline'}
-                size={20}
-                color={theme.purple}
-              />
-              <View style={{ flex: 1, marginHorizontal: 8 }}>
-                <Text style={[styles.attachmentName, { color: theme.textPrimary }]} numberOfLines={1}>
-                  {fileAttachment.name}
-                </Text>
+        <View style={[styles.composerDock, { paddingBottom: keyboardVisible ? 8 : Math.max(Math.min(insets.bottom, 16), 8) }]}>
+          {fileAttachment && (
+            <Animated.View entering={FadeInDown} style={styles.attachmentBanner}>
+              <View style={[styles.attachmentPill, { backgroundColor: theme.surface, borderColor: theme.sep1 }]}>
+                <MaterialCommunityIcons
+                  name={fileAttachment.type === 'image' ? 'image-outline' : 'file-document-outline'}
+                  size={20}
+                  color={theme.purple}
+                />
+                <View style={{ flex: 1, marginHorizontal: 8 }}>
+                  <Text style={[styles.attachmentName, { color: theme.textPrimary }]} numberOfLines={1}>
+                    {fileAttachment.name}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setFileAttachment(null)} style={styles.attachmentRemove}>
+                  <Ionicons name="close-circle" size={20} color={theme.textMuted} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => setFileAttachment(null)} style={styles.attachmentRemove}>
-                <Ionicons name="close-circle" size={20} color={theme.textMuted} />
+            </Animated.View>
+          )}
+
+          <BlurView
+            intensity={isDark ? 40 : 60}
+            tint={isDark ? "dark" : "light"}
+            style={[
+              styles.inputGlass,
+              {
+                backgroundColor: isDark ? 'rgba(24, 33, 27, 0.86)' : 'rgba(255, 255, 255, 0.85)',
+                borderColor: isDark ? 'rgba(110, 231, 183, 0.18)' : 'rgba(255,255,255,0.2)'
+              }
+            ]}
+          >
+            <View style={styles.inputWrapper}>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => handleAttachDocument(['image/*'], 'image')}>
+                <Ionicons name="image-outline" size={22} color={theme.textSecondary} />
               </TouchableOpacity>
-            </View>
-          </Animated.View>
-        )}
-
-        <BlurView 
-          intensity={isDark ? 40 : 60} 
-          tint={isDark ? "dark" : "light"} 
-          style={[
-            styles.inputGlass, 
-            keyboardVisible && styles.inputGlassKeyboard,
-            {
-              backgroundColor: isDark ? 'rgba(24, 33, 27, 0.86)' : 'rgba(255, 255, 255, 0.85)',
-              borderColor: isDark ? 'rgba(110, 231, 183, 0.18)' : 'rgba(255,255,255,0.2)'
-            }
-          ]}
-        >
-          <View style={styles.inputWrapper}>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => handleAttachDocument(['image/*'], 'image')}>
-              <Ionicons name="image-outline" size={22} color={theme.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={() => handleAttachDocument(['application/json', 'text/csv', 'application/pdf'], 'file')}
-            >
-              <Feather name="paperclip" size={20} color={theme.textSecondary} />
-            </TouchableOpacity>
-
-            <TextInput
-              ref={textInputRef}
-              style={[styles.textInput, { color: theme.textPrimary }]}
-              placeholder="Ask Saathi AI..."
-              placeholderTextColor={theme.textMuted}
-              value={inputText}
-              onChangeText={setInputText}
-              onFocus={() => {
-                setTimeout(() => {
-                  scrollViewRef.current?.scrollToEnd({ animated: true });
-                }, 200);
-              }}
-              multiline
-              maxLength={500}
-            />
-
-            {inputText.trim() || fileAttachment ? (
               <TouchableOpacity
-                style={[styles.sendBtn, isLoading && styles.sendBtnDisabled]}
-                onPress={() => handleSend()}
-                disabled={isLoading}
-                activeOpacity={0.8}
+                style={styles.iconBtn}
+                onPress={() => handleAttachDocument(['application/json', 'text/csv', 'application/pdf'], 'file')}
               >
-                <LinearGradient colors={[theme.purple, theme.premium]} style={styles.sendBtnGradient}>
-                  <Ionicons name="arrow-up" size={18} color="#FFF" style={{ marginLeft: 1 }} />
-                </LinearGradient>
+                <Feather name="paperclip" size={20} color={theme.textSecondary} />
               </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={[styles.micBtn, isRecording && styles.micBtnRecording, { backgroundColor: theme.surfaceAlt }]} onPress={handleVoiceInput}>
-                {isRecording ? (
-                  <MaterialCommunityIcons name="stop" size={22} color={theme.error} />
-                ) : (
-                  <Feather name="mic" size={20} color={theme.textSecondary} />
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-        </BlurView>
+
+              <TextInput
+                ref={textInputRef}
+                style={[styles.textInput, { color: theme.textPrimary }]}
+                placeholder="Ask Saathi AI..."
+                placeholderTextColor={theme.textMuted}
+                value={inputText}
+                onChangeText={setInputText}
+                onFocus={() => {
+                  setTimeout(() => {
+                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                  }, 200);
+                }}
+                multiline
+                maxLength={500}
+              />
+
+              {inputText.trim() || fileAttachment ? (
+                <TouchableOpacity
+                  style={[styles.sendBtn, isLoading && styles.sendBtnDisabled]}
+                  onPress={() => handleSend()}
+                  disabled={isLoading}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient colors={[theme.purple, theme.premium]} style={styles.sendBtnGradient}>
+                    <Ionicons name="arrow-up" size={18} color="#FFF" style={{ marginLeft: 1 }} />
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={[styles.micBtn, isRecording && styles.micBtnRecording, { backgroundColor: theme.surfaceAlt }]} onPress={handleVoiceInput}>
+                  {isRecording ? (
+                    <MaterialCommunityIcons name="stop" size={22} color={theme.error} />
+                  ) : (
+                    <Feather name="mic" size={20} color={theme.textSecondary} />
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          </BlurView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -609,7 +614,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chatContainer: { flex: 1 },
-  chatScroll: { padding: 20 },
+  chatScroll: { flexGrow: 1, padding: 20 },
   welcomeState: { alignItems: 'center', justifyContent: 'center', paddingTop: 10 },
   lottieWrapper: { width: 220, height: 220, marginBottom: 10 },
   lottieRobot: { width: '100%', height: '100%' },
@@ -676,7 +681,10 @@ const styles = StyleSheet.create({
   msgTime: { fontFamily: 'Sora_500Medium', fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
   msgTimeAI: {},
   msgTimeUser: { color: 'rgba(255,255,255,0.7)' },
-  attachmentBanner: { position: 'absolute', bottom: 100, left: 16, right: 16, zIndex: 20 },
+  composerDock: {
+    paddingTop: 8,
+  },
+  attachmentBanner: { marginHorizontal: 16, marginBottom: 8, zIndex: 20 },
   attachmentPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -687,16 +695,13 @@ const styles = StyleSheet.create({
   attachmentName: { fontFamily: 'Sora_600SemiBold', fontSize: 13 },
   attachmentRemove: { padding: 4 },
   inputGlass: {
-    position: 'absolute',
-    bottom: 20,
-    left: 16,
-    right: 16,
+    marginHorizontal: 16,
     borderRadius: 32,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
-  inputGlassKeyboard: { bottom: Platform.OS === 'android' ? 0 : 0 },
+  inputGlassKeyboard: {},
   inputWrapper: { flexDirection: 'row', alignItems: 'flex-end', padding: 6 },
   iconBtn: { width: 40, height: 44, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   textInput: {

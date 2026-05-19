@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '@/context/ThemeContext';
+import { useDarkModeTheme } from '@/context/ThemeContext';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const TESTIMONIALS = [
@@ -73,7 +73,7 @@ function Stars({ count, theme }: { count: number; theme: any }) {
 export default function AboutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark } = useDarkModeTheme();
 
   const [fullName, setFullName] = useState('');
   const [email,    setEmail]    = useState('');

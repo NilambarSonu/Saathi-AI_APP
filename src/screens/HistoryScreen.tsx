@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState, useCallback, useRef, useTransition } from 'react';
 import {
   View,
   Text,
@@ -38,7 +38,8 @@ import LottieView from 'lottie-react-native';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MAP_SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * 0.66);
 
 const COLORS = {
   backgroundTop: '#F0FDF4',
@@ -107,6 +108,10 @@ export default function HistoryScreen({ navigation }: any) {
 
   const [selectedParameter, setSelectedParameter] = useState<ParameterName>('Nitrogen');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('30 Days');
+  const [isFilterTransitionPending, startFilterTransition] = useTransition();
+  const activeTimeFilter = useDeferredValue(timeFilter);
+  const activeParameter = useDeferredValue(selectedParameter);
+  const isChartUpdating = isFilterTransitionPending || activeTimeFilter !== timeFilter || activeParameter !== selectedParameter;
   const [mapMode, setMapMode] = useState<'satellite' | 'standard' | 'osm'>(Platform.OS === 'android' ? 'satellite' : 'standard');
   const [selectedLog, setSelectedLog] = useState<SoilTest | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -120,7 +125,7 @@ export default function HistoryScreen({ navigation }: any) {
   const mapRef = useRef<MapView>(null);
   const fullMapRef = useRef<MapView>(null);
 
-  const COLORS_THEMED = {
+  const COLORS_THEMED = useMemo(() => ({
     backgroundTop: theme.bg0,
     backgroundBottom: theme.background,
     title: theme.textPrimary,
@@ -133,7 +138,7 @@ export default function HistoryScreen({ navigation }: any) {
     warningBorder: isDark ? '#5F4D1E' : '#FDE68A',
     warningText: isDark ? theme.warning : '#92400E',
     shadow: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.04)',
-  };
+  }), [isDark, theme]);
 
   // Safety fallback — only run once (mapReadyRef guards it from re-running on focus)
   useEffect(() => {
@@ -176,10 +181,10 @@ export default function HistoryScreen({ navigation }: any) {
     } catch (e) {
       console.log('[History] Sync haptics error:', e);
     }
-    setTimeFilter(filter);
+    startFilterTransition(() => setTimeFilter(filter));
     setIsTimeMenuVisible(false);
     setChartTooltip(null);
-  }, []);
+  }, [startFilterTransition]);
 
   const handleSelectParam = useCallback((param: ParameterName) => {
     try {
@@ -189,10 +194,10 @@ export default function HistoryScreen({ navigation }: any) {
     } catch (e) {
       console.log('[History] Sync haptics error:', e);
     }
-    setSelectedParameter(param);
+    startFilterTransition(() => setSelectedParameter(param));
     setIsParamMenuVisible(false);
     setChartTooltip(null);
-  }, []);
+  }, [startFilterTransition]);
 
 
 
@@ -288,23 +293,23 @@ export default function HistoryScreen({ navigation }: any) {
 
   // Filter logs based on time range
   const filteredLogs = useMemo(() => {
-    if (timeFilter === 'All Time') return logs;
+    if (activeTimeFilter === 'All Time') return logs;
 
     const now = new Date();
     let daysToSubtract = 30;
-    if (timeFilter === '60 Days') daysToSubtract = 60;
-    if (timeFilter === '90 Days') daysToSubtract = 90;
-    if (timeFilter === '1 Year') daysToSubtract = 365;
+    if (activeTimeFilter === '60 Days') daysToSubtract = 60;
+    if (activeTimeFilter === '90 Days') daysToSubtract = 90;
+    if (activeTimeFilter === '1 Year') daysToSubtract = 365;
 
     const cutoff = subDays(now, daysToSubtract);
     return logs.filter(log => isAfter(parseISO(log.testDate), cutoff));
-  }, [logs, timeFilter]);
+  }, [logs, activeTimeFilter]);
 
   // Calculate statistics for the selected parameter
   const stats = useMemo(() => {
     if (!filteredLogs.length) return { avg: 0, total: 0, change: 0 };
 
-    const key = getParamKey(selectedParameter);
+    const key = getParamKey(activeParameter);
     const values = filteredLogs.map(l => Number(l[key]));
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
 
@@ -324,11 +329,11 @@ export default function HistoryScreen({ navigation }: any) {
       total: filteredLogs.length,
       change
     };
-  }, [filteredLogs, selectedParameter]);
+  }, [filteredLogs, activeParameter]);
 
   // Prepare chart data (max 7 points for readability)
   const chartData = useMemo(() => {
-    const key = getParamKey(selectedParameter);
+    const key = getParamKey(activeParameter);
     const points = filteredLogs.slice(0, 7).reverse();
 
     if (points.length === 0) {
@@ -342,11 +347,11 @@ export default function HistoryScreen({ navigation }: any) {
       labels: points.map(l => format(parseISO(l.testDate), 'MMM d')),
       datasets: [{
         data: points.map(l => Number(l[key] ?? 0)),
-        color: (opacity = 1) => getParamColor(theme, selectedParameter),
+        color: (opacity = 1) => getParamColor(theme, activeParameter),
         strokeWidth: 3
       }]
     };
-  }, [filteredLogs, selectedParameter, theme]);
+  }, [filteredLogs, activeParameter, theme]);
 
   const handleExport = async () => {
     if (!logs.length || !user) {
@@ -547,13 +552,13 @@ export default function HistoryScreen({ navigation }: any) {
               )}
               {mapMarkers.map((marker) => (
                 <Marker
-                  key={`${marker.id}-${selectedParameter}`}
+                  key={`${marker.id}-${activeParameter}`}
                   coordinate={marker.coordinate}
                   title={`Test on ${format(parseISO(marker.date), 'MMM d, yyyy')}`}
                   tracksViewChanges={false}
                 >
-                  <View style={[styles.customMarker, { borderColor: getParamColor(theme, selectedParameter), backgroundColor: isDark ? theme.surface : '#FFF' }]}>
-                    <View style={[styles.markerDot, { backgroundColor: getParamColor(theme, selectedParameter) }]} />
+                  <View style={[styles.customMarker, { borderColor: getParamColor(theme, activeParameter), backgroundColor: isDark ? theme.surface : '#FFF' }]}>
+                    <View style={[styles.markerDot, { backgroundColor: getParamColor(theme, activeParameter) }]} />
                   </View>
                 </Marker>
               ))}
@@ -567,92 +572,91 @@ export default function HistoryScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Fullscreen Map Modal */}
+        {/* Partial Map Sheet */}
         <Modal
           visible={isMapFullscreen}
-          animationType="slide"
+          animationType="fade"
+          transparent
           statusBarTranslucent
           onRequestClose={() => setIsMapFullscreen(false)}
         >
-          <View style={{ flex: 1, backgroundColor: '#000' }}>
-            <MapView
-              ref={fullMapRef}
-              style={StyleSheet.absoluteFillObject}
-              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-              initialRegion={mapInitialRegion}
-              mapType={
-                mapMode === 'satellite'
-                  ? 'satellite'
-                  : (mapMode === 'standard'
-                    ? 'standard'
-                    : (Platform.OS === 'android' ? 'none' : 'standard'))
-              }
-              showsUserLocation={true}
-              showsMyLocationButton={true}
-              scrollEnabled={true}
-              zoomEnabled={true}
-              zoomControlEnabled={true}
-              rotateEnabled={true}
-              pitchEnabled={true}
-            >
-              {mapMode === 'osm' && (
-                <UrlTile
-                  urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-                  maximumZ={19}
-                  tileSize={256}
-                  zIndex={1}
-                />
-              )}
-              {mapMarkers.map((marker) => (
-                <Marker
-                  key={`fs-${marker.id}`}
-                  coordinate={marker.coordinate}
-                  title={`Test on ${format(parseISO(marker.date), 'MMM d, yyyy')}`}
-                  tracksViewChanges={false}
+          <View style={styles.mapSheetOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsMapFullscreen(false)} />
+            <View style={[styles.mapSheet, { height: MAP_SHEET_HEIGHT, backgroundColor: theme.surface, borderColor: COLORS_THEMED.border }]}>
+              <View style={[styles.mapSheetHandle, { backgroundColor: isDark ? theme.sep2 : '#CBD5E1' }]} />
+              <View style={styles.mapSheetHeader}>
+                <View>
+                  <Text style={[styles.mapSheetTitle, { color: COLORS_THEMED.title }]}>Field Locations</Text>
+                  <Text style={[styles.mapSheetSubtitle, { color: COLORS_THEMED.subtitle }]}>{mapMarkers.length} mapped tests</Text>
+                </View>
+                <Pressable
+                  onPress={() => setIsMapFullscreen(false)}
+                  style={({ pressed }) => [styles.mapSheetClose, { backgroundColor: pressed ? theme.surfaceAlt : isDark ? theme.bg1 : '#F1F5F9' }]}
                 >
-                  <View style={[styles.customMarker, { borderColor: getParamColor(theme, selectedParameter), backgroundColor: isDark ? theme.surface : '#FFF' }]}>
-                    <View style={[styles.markerDot, { backgroundColor: getParamColor(theme, selectedParameter) }]} />
-                  </View>
-                </Marker>
-              ))}
-            </MapView>
-            {/* Close button */}
-            <Pressable
-              onPress={() => setIsMapFullscreen(false)}
-              style={({ pressed }) => ({
-                position: 'absolute',
-                top: Platform.OS === 'android' ? 40 : 56,
-                right: 16,
-                backgroundColor: pressed ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.6)',
-                borderRadius: 20,
-                padding: 10,
-                zIndex: 10,
-              })}
-            >
-              <Ionicons name="contract-outline" size={20} color="#FFF" />
-            </Pressable>
-            {/* Map type row */}
-            <View style={[styles.mapControls, {
-              position: 'absolute',
-              top: Platform.OS === 'android' ? 40 : 56,
-              left: 16,
-              zIndex: 10,
-              backgroundColor: isDark ? theme.bg1 : '#FFF',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 4,
-              elevation: 4,
-            }]}>
-              <Pressable onPress={() => handleSetMapMode('satellite')} style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'satellite' && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }], pressed && { opacity: 0.7 }]}>
-                <Text style={[styles.mapTypeLabel, { color: theme.textSecondary }, mapMode === 'satellite' && [styles.mapTypeLabelActive, { color: theme.textPrimary }]]}>Satellite</Text>
-              </Pressable>
-              <Pressable onPress={() => handleSetMapMode('standard')} style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'standard' && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }], pressed && { opacity: 0.7 }]}>
-                <Text style={[styles.mapTypeLabel, { color: theme.textSecondary }, mapMode === 'standard' && [styles.mapTypeLabelActive, { color: theme.textPrimary }]]}>Standard</Text>
-              </Pressable>
-              <Pressable onPress={() => handleSetMapMode('osm')} style={({ pressed }) => [styles.mapTypeBtn, mapMode === 'osm' && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }], pressed && { opacity: 0.7 }]}>
-                <Text style={[styles.mapTypeLabel, { color: theme.textSecondary }, mapMode === 'osm' && [styles.mapTypeLabelActive, { color: theme.textPrimary }]]}>OSM</Text>
-              </Pressable>
+                  <Ionicons name="contract-outline" size={18} color={COLORS_THEMED.title} />
+                </Pressable>
+              </View>
+              <View style={[styles.mapSheetControls, { backgroundColor: isDark ? theme.bg1 : '#F8FAFC' }]}>
+                {(['satellite', 'standard', 'osm'] as const).map(mode => (
+                  <Pressable
+                    key={mode}
+                    onPress={() => handleSetMapMode(mode)}
+                    style={({ pressed }) => [
+                      styles.mapTypeBtn,
+                      mapMode === mode && [styles.mapTypeBtnActive, { backgroundColor: isDark ? theme.surfaceAlt : '#FFF' }],
+                      pressed && { opacity: 0.72 },
+                    ]}
+                  >
+                    <Text style={[styles.mapTypeLabel, { color: theme.textSecondary }, mapMode === mode && [styles.mapTypeLabelActive, { color: COLORS_THEMED.accent }]]}>
+                      {mode === 'osm' ? 'OSM' : mode.charAt(0).toUpperCase() + mode.slice(1)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={[styles.mapSheetMapWrap, { borderColor: isDark ? theme.sep2 : '#E2E8F0' }]}>
+                <MapView
+                  ref={fullMapRef}
+                  style={StyleSheet.absoluteFillObject}
+                  provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                  initialRegion={mapInitialRegion}
+                  mapType={
+                    mapMode === 'satellite'
+                      ? 'satellite'
+                      : (mapMode === 'standard'
+                        ? 'standard'
+                        : (Platform.OS === 'android' ? 'none' : 'standard'))
+                  }
+                  showsUserLocation={true}
+                  showsMyLocationButton={true}
+                  scrollEnabled={true}
+                  zoomEnabled={true}
+                  zoomControlEnabled={true}
+                  rotateEnabled={false}
+                  pitchEnabled={false}
+                  moveOnMarkerPress={false}
+                >
+                  {mapMode === 'osm' && (
+                    <UrlTile
+                      urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+                      maximumZ={19}
+                      tileSize={256}
+                      zIndex={1}
+                    />
+                  )}
+                  {mapMarkers.map((marker) => (
+                    <Marker
+                      key={`sheet-${marker.id}-${activeParameter}`}
+                      coordinate={marker.coordinate}
+                      title={`Test on ${format(parseISO(marker.date), 'MMM d, yyyy')}`}
+                      tracksViewChanges={false}
+                    >
+                      <View style={[styles.customMarker, { borderColor: getParamColor(theme, activeParameter), backgroundColor: isDark ? theme.surface : '#FFF' }]}>
+                        <View style={[styles.markerDot, { backgroundColor: getParamColor(theme, activeParameter) }]} />
+                      </View>
+                    </Marker>
+                  ))}
+                </MapView>
+              </View>
             </View>
           </View>
         </Modal>
@@ -684,7 +688,7 @@ export default function HistoryScreen({ navigation }: any) {
 
         {/* 3. Trend Chart */}
         <View style={[styles.card, { backgroundColor: COLORS_THEMED.card, borderColor: COLORS_THEMED.border }]}>
-          <Text style={[styles.cardTitle, { color: COLORS_THEMED.subtitle }]}>{selectedParameter} Trend Analysis</Text>
+          <Text style={[styles.cardTitle, { color: COLORS_THEMED.subtitle }]}>{activeParameter} Trend Analysis</Text>
           {loading ? (
             <View style={styles.chartLoader}><ActivityIndicator color={COLORS_THEMED.accent} /></View>
           ) : filteredLogs.length === 0 ? (
@@ -703,8 +707,8 @@ export default function HistoryScreen({ navigation }: any) {
                   height={232}
                   chartConfig={{
                     backgroundColor: theme.surface, backgroundGradientFrom: theme.surface, backgroundGradientTo: theme.surface,
-                    decimalPlaces: selectedParameter === 'pH Level' ? 1 : 0,
-                    color: (opacity = 1) => getParamColor(theme, selectedParameter),
+                    decimalPlaces: activeParameter === 'pH Level' ? 1 : 0,
+                    color: (opacity = 1) => getParamColor(theme, activeParameter),
                     labelColor: (opacity = 1) => isDark ? theme.textMuted : '#94A3B8',
                     style: { borderRadius: 16 },
                     propsForDots: { r: '6', strokeWidth: '2', stroke: theme.surface },
@@ -723,6 +727,14 @@ export default function HistoryScreen({ navigation }: any) {
                     );
                   }}
                 />
+                {isChartUpdating && (
+                  <View style={[styles.chartUpdatingOverlay, { backgroundColor: isDark ? 'rgba(16,22,17,0.58)' : 'rgba(255,255,255,0.62)' }]}>
+                    <View style={[styles.chartUpdatingPill, { backgroundColor: theme.surface, borderColor: isDark ? theme.sep2 : '#E2E8F0' }]}>
+                      <ActivityIndicator size="small" color={COLORS_THEMED.accent} />
+                      <Text style={[styles.chartUpdatingText, { color: COLORS_THEMED.subtitle }]}>Updating</Text>
+                    </View>
+                  </View>
+                )}
                 {chartTooltip !== null && (
                   <View
                     pointerEvents="none"
@@ -741,11 +753,11 @@ export default function HistoryScreen({ navigation }: any) {
                     <Text style={[styles.tooltipDateText, { color: isDark ? theme.textMuted : '#94A3B8' }]}>
                       {chartData.labels[chartTooltip.index]}
                     </Text>
-                    <Text style={[styles.tooltipValueText, { color: getParamColor(theme, selectedParameter) }]}>
-                      {selectedParameter === 'pH Level'
+                    <Text style={[styles.tooltipValueText, { color: getParamColor(theme, activeParameter) }]}>
+                      {activeParameter === 'pH Level'
                         ? chartTooltip.value.toFixed(1)
                         : Math.round(chartTooltip.value).toString()}
-                      {UNITS[selectedParameter] ? ` ${UNITS[selectedParameter]}` : ''}
+                      {UNITS[activeParameter] ? ` ${UNITS[activeParameter]}` : ''}
                     </Text>
                   </View>
                 )}
@@ -757,10 +769,10 @@ export default function HistoryScreen({ navigation }: any) {
         {/* 4. Stats */}
         <View style={[styles.statsBar, { backgroundColor: COLORS_THEMED.card, borderColor: COLORS_THEMED.border }]}>
           <View style={styles.statItem}>
-            <Text style={[styles.statLabel, { color: COLORS_THEMED.subtitle }]}>Avg {selectedParameter}</Text>
-            <Text style={[styles.statValue, { color: getParamColor(theme, selectedParameter) }]}>
-              {selectedParameter === 'pH Level' ? stats.avg.toFixed(1) : stats.avg.toFixed(0)}
-              <Text style={[styles.unitText, { color: COLORS_THEMED.subtitle }]}> {UNITS[selectedParameter]}</Text>
+            <Text style={[styles.statLabel, { color: COLORS_THEMED.subtitle }]}>Avg {activeParameter}</Text>
+            <Text style={[styles.statValue, { color: getParamColor(theme, activeParameter) }]}>
+              {activeParameter === 'pH Level' ? stats.avg.toFixed(1) : stats.avg.toFixed(0)}
+              <Text style={[styles.unitText, { color: COLORS_THEMED.subtitle }]}> {UNITS[activeParameter]}</Text>
             </Text>
           </View>
           <View style={[styles.divider, { backgroundColor: isDark ? theme.sep2 : '#F1F5F9' }]} />
@@ -809,16 +821,16 @@ export default function HistoryScreen({ navigation }: any) {
                       <Text style={[styles.logTime, { color: COLORS_THEMED.subtitle }]}>{format(parseISO(log.testDate), 'hh:mm a')}</Text>
                     </View>
                     <View style={styles.logValues}>
-                      <Text style={[styles.logMainValue, { color: getParamColor(theme, selectedParameter) }]}>
-                        {selectedParameter === 'pH Level' ? 'pH' : (selectedParameter === 'Moisture' ? 'M' : selectedParameter.charAt(0))}{' '}
-                        {Number(log[getParamKey(selectedParameter)]).toFixed(selectedParameter === 'pH Level' ? 1 : 0)}
-                        <Text style={styles.logUnitSmall}> {UNITS[selectedParameter]}</Text>
+                      <Text style={[styles.logMainValue, { color: getParamColor(theme, activeParameter) }]}>
+                        {activeParameter === 'pH Level' ? 'pH' : (activeParameter === 'Moisture' ? 'M' : activeParameter.charAt(0))}{' '}
+                        {Number(log[getParamKey(activeParameter)]).toFixed(activeParameter === 'pH Level' ? 1 : 0)}
+                        <Text style={styles.logUnitSmall}> {UNITS[activeParameter]}</Text>
                       </Text>
                       <Text style={[styles.logSubValue, { color: COLORS_THEMED.subtitle }]}>
-                        {selectedParameter !== 'pH Level' && `pH:${Number(log.ph).toFixed(1)} `}
-                        {selectedParameter !== 'Nitrogen' && `N:${Number(log.nitrogen).toFixed(0)} `}
-                        {selectedParameter !== 'Phosphorus' && `P:${Number(log.phosphorus).toFixed(0)} `}
-                        {selectedParameter !== 'Potassium' && `K:${Number(log.potassium).toFixed(0)}`}
+                        {activeParameter !== 'pH Level' && `pH:${Number(log.ph).toFixed(1)} `}
+                        {activeParameter !== 'Nitrogen' && `N:${Number(log.nitrogen).toFixed(0)} `}
+                        {activeParameter !== 'Phosphorus' && `P:${Number(log.phosphorus).toFixed(0)} `}
+                        {activeParameter !== 'Potassium' && `K:${Number(log.potassium).toFixed(0)}`}
                       </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color={isDark ? theme.border : "#CBD5E1"} />
@@ -1318,6 +1330,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  chartUpdatingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 12,
+  },
+  chartUpdatingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  chartUpdatingText: {
+    fontFamily: 'Sora_600SemiBold',
+    fontSize: 11,
+  },
   mapContainer: {
     height: 260,
     borderRadius: 20,
@@ -1354,6 +1385,66 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  mapSheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(2,6,23,0.28)',
+  },
+  mapSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    elevation: 16,
+  },
+  mapSheetHandle: {
+    width: 44,
+    height: 4,
+    borderRadius: 999,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  mapSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  mapSheetTitle: {
+    fontFamily: 'Sora_700Bold',
+    fontSize: 16,
+  },
+  mapSheetSubtitle: {
+    fontFamily: 'Sora_500Medium',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  mapSheetClose: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapSheetControls: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 10,
+  },
+  mapSheetMapWrap: {
+    flex: 1,
+    borderRadius: 22,
+    overflow: 'hidden',
+    borderWidth: 1,
   },
   logItem: {
     flexDirection: 'row',

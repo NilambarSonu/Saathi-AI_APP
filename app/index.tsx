@@ -12,12 +12,12 @@ import Animated, {
   withRepeat
 } from 'react-native-reanimated';
 import { Colors } from '@/constants/Colors';
-import { useTheme } from '@/context/ThemeContext';
+import { useDarkModeTheme } from '@/context/ThemeContext';
 import { useAuthStore } from '@/store/authStore';
 
 export default function SplashScreen() {
   const router = useRouter();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark } = useDarkModeTheme();
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
 
   // Animation Values

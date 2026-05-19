@@ -9,11 +9,11 @@ import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { registerAccount, startSocialAuth } from '@/features/auth/services/auth';
 import { Colors } from '@/constants/Colors';
-import { useTheme } from '@/context/ThemeContext';
+import { useDarkModeTheme } from '@/context/ThemeContext';
 import { useAuthStore } from '@/store/authStore';
 
 export default function RegisterScreen() {
-  const { theme } = useTheme();
+  const { theme } = useDarkModeTheme();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -116,8 +116,12 @@ export default function RegisterScreen() {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-      <ScrollView style={[styles.container, { backgroundColor: theme.background }]} bounces={false}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.keyboardRoot, { backgroundColor: theme.background }]}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        contentContainerStyle={[styles.scrollContent, { backgroundColor: theme.background }]}
+        bounces={false}
+      >
         {/* Hero — fixed image + dark overlay */}
         <ImageBackground
           source={require('assets/images/auth_screen_mobile.png')}
@@ -335,7 +339,9 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
+  keyboardRoot: { flex: 1 },
   container: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
   hero: { minHeight: 340, position: 'relative', overflow: 'hidden' },
   heroOverlay: {
     paddingTop: 80,
@@ -350,7 +356,7 @@ const styles = StyleSheet.create({
   },
   heroTitle: { fontSize: 24, fontFamily: 'Sora_800ExtraBold', color: '#fff', lineHeight: 30, marginTop: 58 },
   heroSub: { fontSize: 13, fontFamily: 'Sora_400Regular', color: 'rgba(255,255,255,0.6)', marginTop: 6 },
-  card: { borderRadius: 28, marginTop: -20, padding: 24, paddingBottom: 40 },
+  card: { borderRadius: 28, flexGrow: 1, marginTop: -20, padding: 24, paddingBottom: 40 },
   tabRow: { flexDirection: 'row', borderRadius: 12, padding: 4, marginBottom: 24 },
   tab: { flex: 1, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
   tabActive: { elevation: 2 },

@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  Switch, Alert, ActivityIndicator, Platform
+  Switch, Alert, ActivityIndicator, Platform, Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { Colors } from '@/constants/Colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Spacing } from '@/constants/Spacing';
 import { useAuthStore } from '@/store/authStore';
-import { useTheme } from '@/context/ThemeContext';
+import { useDarkModeTheme, useTheme } from '@/context/ThemeContext';
 import apiClient from '@/api/axiosConfig';
 import { getUserData } from '@/features/auth/services/user';
 import { logout } from '@/features/auth/services/auth';
@@ -48,8 +48,8 @@ function SectionCard({ title, icon, color, children, theme }: {
   );
 }
 
-function ToggleRow({ label, description, value, onToggle, theme }: {
-  label: string; description?: string; value: boolean; onToggle: (v: boolean) => void; theme: any;
+function ToggleRow({ label, description, value, onToggle, theme, isDark }: {
+  label: string; description?: string; value: boolean; onToggle: (v: boolean) => void; theme: any; isDark?: boolean;
 }) {
   return (
     <View style={styles.toggleRow}>
@@ -61,7 +61,7 @@ function ToggleRow({ label, description, value, onToggle, theme }: {
         value={value}
         onValueChange={onToggle}
         trackColor={{ false: theme.border, true: theme.primary + '70' }}
-        thumbColor={value ? theme.primary : '#f4f3f4'}
+        thumbColor={value ? theme.primary : isDark ? theme.textMuted : '#f4f3f4'}
       />
     </View>
   );
@@ -69,10 +69,11 @@ function ToggleRow({ label, description, value, onToggle, theme }: {
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { clearUser } = useAuthStore();
   const { setMode, isDarkMode } = useTheme();
-  const theme = Colors.light;
-  const isDark = false;
+  const { theme, isDark } = useDarkModeTheme();
+  const backScale = useRef(new Animated.Value(1)).current;
   
   const [settings, setSettings] = useState<SettingsState>({
     language: 'en',
@@ -162,11 +163,47 @@ export default function SettingsScreen() {
 
   const selectedLang = LANGUAGES.find(l => l.code === settings.language);
 
+  const animateBack = (toValue: number) => {
+    Animated.spring(backScale, {
+      toValue,
+      useNativeDriver: true,
+      speed: 22,
+      bounciness: 6,
+    }).start();
+  };
+
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(app)');
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Settings</Text>
-        <Text style={[styles.headerSub, { color: theme.textSecondary }]}>Customize your Saathi AI experience</Text>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + 16, Platform.OS === 'ios' ? 60 : 40) }]}>
+        <View style={styles.headerTop}>
+          <Animated.View style={{ transform: [{ scale: backScale }] }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              onPress={handleBack}
+              onPressIn={() => animateBack(0.94)}
+              onPressOut={() => animateBack(1)}
+              style={[
+                styles.backButton,
+                {
+                  backgroundColor: isDark ? theme.surface : theme.surface,
+                  borderColor: isDark ? theme.borderLight : 'transparent',
+                },
+              ]}
+            >
+              <Ionicons name="chevron-back" size={22} color={theme.textPrimary} />
+            </Pressable>
+          </Animated.View>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Settings</Text>
+            <Text style={[styles.headerSub, { color: theme.textSecondary }]}>Customize your Saathi AI experience</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -179,6 +216,7 @@ export default function SettingsScreen() {
             value={isDarkMode}
             onToggle={(v) => setMode(v ? 'dark' : 'light')}
             theme={theme}
+            isDark={isDark}
           />
         </SectionCard>
 
@@ -195,7 +233,11 @@ export default function SettingsScreen() {
                 {LANGUAGES.map(lang => (
                   <Pressable
                     key={lang.code}
-                    style={[styles.langOption, settings.language === lang.code && [styles.langOptionActive, { backgroundColor: theme.surfaceAlt }]]}
+                    style={[
+                      styles.langOption,
+                      isDark && { borderBottomColor: theme.borderLight },
+                      settings.language === lang.code && [styles.langOptionActive, { backgroundColor: theme.surfaceAlt }],
+                    ]}
                     onPress={() => handleLanguageChange(lang.code)}
                   >
                     <Text style={[styles.langOptionText, { color: theme.textSecondary }, settings.language === lang.code && [styles.langOptionTextActive, { color: theme.primary }]]}>
@@ -219,6 +261,7 @@ export default function SettingsScreen() {
             value={settings.autoSync}
             onToggle={(v) => handleToggle('autoSync', v)}
             theme={theme}
+            isDark={isDark}
           />
         </SectionCard>
 
@@ -280,9 +323,19 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.md,
+  },
+  headerTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  headerCopy: { flex: 1 },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    ...Spacing.shadows.sm,
   },
   headerTitle: { fontFamily: 'Sora_800ExtraBold', fontSize: 26 },
   headerSub: { fontFamily: 'Sora_400Regular', fontSize: 13, marginTop: 4 },

@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions, ScrollView, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTheme } from '@/context/ThemeContext';
+import { useDarkModeTheme } from '@/context/ThemeContext';
 import { Spacing } from '@/constants/Spacing';
 
 const { width } = Dimensions.get('window');
@@ -39,7 +39,7 @@ const getSLIDES = (theme: any) => [
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark } = useDarkModeTheme();
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
 

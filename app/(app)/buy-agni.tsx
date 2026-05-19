@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video, ResizeMode } from 'expo-av';
-import { useTheme } from '@/context/ThemeContext';
+import { useDarkModeTheme } from '@/context/ThemeContext';
 
 const { width: W } = Dimensions.get('window');
 const PRICE = 4699;
@@ -168,7 +168,7 @@ function SlideItem({ item, theme }: { item: SlideData; theme: any }) {
 export default function BuyAgniScreen() {
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark } = useDarkModeTheme();
   const [slide, setSlide] = useState(0);
   const [qty,   setQty]   = useState(1);
   const [busy,  setBusy]  = useState(0);

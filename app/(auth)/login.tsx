@@ -19,12 +19,12 @@ import { startSocialAuth } from '@/features/auth/services/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
-import { useTheme } from '@/context/ThemeContext';
+import { useDarkModeTheme } from '@/context/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '@/store/authStore';
 
 export default function LoginScreen() {
-  const { theme } = useTheme();
+  const { theme } = useDarkModeTheme();
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -98,10 +98,11 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1 }}
+      style={[styles.keyboardRoot, { backgroundColor: theme.background }]}
     >
       <ScrollView
         style={[styles.container, { backgroundColor: theme.background }]}
+        contentContainerStyle={[styles.scrollContent, { backgroundColor: theme.background }]}
         bounces={false}
         showsVerticalScrollIndicator={false}
       >
@@ -257,7 +258,9 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  keyboardRoot: { flex: 1 },
   container: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
   hero: {
     minHeight: 340,
     position: 'relative',
@@ -309,6 +312,7 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 28,
+    flexGrow: 1,
     margin: 0,
     marginTop: -20,
     padding: 24,
